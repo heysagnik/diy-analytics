@@ -1,36 +1,42 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# DIY Analytics ✨
 
-## Getting Started
+[![MIT License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Vercel](https://img.shields.io/badge/Vercel-Ready-black)](https://vercel.com/new/clone?repository-url=https://github.com/heysagnik/diy-analytics)
+[![GitHub Stars](https://img.shields.io/github/stars/heysagnik/diy-analytics?style=social)](https://github.com/heysagnik/diy-analytics)
 
-First, run the development server:
+> **Your website stats, without the privacy headaches!** Get powerful insights in minutes, no coding required!
+
+## 🚀 Get Started in Seconds!
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/heysagnik/diy-analytics)
+
+## ✨ Why You'll Love It
+
+- **🔒 Privacy Champion** - No personal data, no cookies, no consent banners!
+- **⚡ Ultra-Light** - Under 2KB script that won't slow your site down
+- **🔍 Crystal Clear** - Simple dashboard showing what matters most
+- **🚫 GDPR-Friendly** - Compliance made effortless
+- **🛠️ No-Code Setup** - Deploy and integrate in just minutes!
+
+## 💻 Quick Setup
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# Clone, configure, and launch!
+git clone https://github.com/heysagnik/diy-analytics.git
+cp .env.local.example .env.local  # Add your MongoDB URI
+npm install && npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 📊 Add to Your Site
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Just paste this one line anywhere in your HTML:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```html
+<script async defer src="https://your-analytics-domain.com/script.js"></script>
+```
 
-## Learn More
+## 🤝 Join Our Community
 
-To learn more about Next.js, take a look at the following resources:
+We welcome contributions! Fork → Feature → Pull Request
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+[MIT License](LICENSE) - Build something amazing!
