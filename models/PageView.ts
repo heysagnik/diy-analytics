@@ -1,10 +1,11 @@
-import mongoose, { Schema } from 'mongoose';
+import mongoose from 'mongoose';
 
-const PageViewSchema = new Schema({
+const pageViewSchema = new mongoose.Schema({
   projectId: {
-    type: Schema.Types.ObjectId,
+    type: mongoose.Schema.Types.ObjectId,
+    required: true,
     ref: 'Project',
-    required: true
+    index: true
   },
   url: {
     type: String,
@@ -12,44 +13,72 @@ const PageViewSchema = new Schema({
   },
   path: {
     type: String,
-    required: true
+    required: true,
+    index: true
   },
   referrer: {
-    type: String,
-    default: ''
-  },
-  userAgent: {
-    type: String,
-    required: true
+    type: String
   },
   browser: {
     type: String,
-    required: true
+    index: true
   },
   os: {
     type: String,
-    required: true
+    index: true
   },
   device: {
     type: String,
-    default: 'desktop'
+    index: true
   },
   country: {
     type: String,
-    default: 'unknown'
-  },
-  language: {
-    type: String,
-    default: 'en'
-  },
-  timestamp: {
-    type: Date,
-    default: Date.now
+    index: true
   },
   sessionId: {
     type: String,
-    required: true
+    required: true,
+    index: true
+  },
+  userId: {
+    type: String
+  },
+  userAgent: {
+    type: String
+  },
+  utmSource: {
+    type: String
+  },
+  utmMedium: {
+    type: String
+  },
+  utmCampaign: {
+    type: String
+  },
+  utmTerm: {
+    type: String
+  },
+  utmContent: {
+    type: String
+  },
+  timestamp: {
+    type: Date,
+    default: Date.now,
+    index: true
   }
+}, {
+  timestamps: true,
+  collection: 'pageviews'
 });
 
-export default mongoose.models.PageView || mongoose.model('PageView', PageViewSchema);
+// Use this index for frequent queries
+pageViewSchema.index({ projectId: 1, timestamp: -1 });
+pageViewSchema.index({ projectId: 1, sessionId: 1 });
+pageViewSchema.index({ projectId: 1, path: 1 });
+pageViewSchema.index({ projectId: 1, referrer: 1 });
+pageViewSchema.index({ projectId: 1, country: 1 });
+pageViewSchema.index({ projectId: 1, browser: 1 });
+pageViewSchema.index({ projectId: 1, device: 1 });
+pageViewSchema.index({ projectId: 1, timestamp: -1, sessionId: 1 });
+
+export default mongoose.models.PageView || mongoose.model('PageView', pageViewSchema);

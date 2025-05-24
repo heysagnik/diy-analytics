@@ -115,21 +115,20 @@ export default function Home() {
 
   return (
     <div style={{ backgroundColor: defaultTheme.background }} className="min-h-screen">
-      {/* Main content with better max width for desktop */}
-      <div className="w-full max-w-6xl px-3 sm:px-6 py-6 sm:py-10 mx-auto relative">
-        {/* Enhanced Header with better desktop spacing */}
-        <div className="flex flex-col xs:flex-row justify-between items-start xs:items-center gap-3 sm:gap-0 mb-6 sm:mb-10">
-          <div>
-            <h1 className="text-xl sm:text-3xl font-bold" style={{ color: defaultTheme.accent }}>
-              Projects
-            </h1>
-          </div>
-          <div className="flex w-full xs:w-auto items-center gap-3">
-            <div className="relative flex-1 xs:flex-none">
+      {/* Improved container with better padding on different screen sizes */}
+      <div className="w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-12 mx-auto">
+        {/* Enhanced header with better alignment and spacing */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold" style={{ color: defaultTheme.accent }}>
+            Projects
+          </h1>
+          
+          <div className="flex flex-col xs:flex-row w-full sm:w-auto items-stretch xs:items-center gap-3 mt-2 sm:mt-0">
+            <div className="relative flex-1 xs:w-64">
               <input
                 type="text"
                 placeholder="Search projects..."
-                className="w-full xs:w-64 pl-10 pr-4 py-2 border rounded-full text-sm focus:outline-none focus:ring-1"
+                className="w-full pl-10 pr-4 py-2.5 border rounded-full text-sm focus:outline-none focus:ring-1 transition-colors"
                 style={{ 
                   backgroundColor: defaultTheme.cardBg, 
                   borderColor: defaultTheme.cardBorder,
@@ -139,7 +138,7 @@ export default function Home() {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
               <svg
-                className="absolute left-4 top-2.5"
+                className="absolute left-4 top-3"
                 width="16"
                 height="16"
                 fill="none"
@@ -156,14 +155,15 @@ export default function Home() {
               </svg>
             </div>
             
-            {/* Enhanced New Site Button */}
+            {/* Improved New Site Button */}
             <button 
-              className="flex items-center gap-2 px-5 py-2 text-white rounded-full transition-all hover:shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2"
+              className="flex items-center justify-center gap-2 px-5 py-2.5 text-white rounded-full transition-all hover:shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2"
               style={{ 
                 background: defaultTheme.primary,
                 boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                transition: 'all 0.2s ease-in-out'
-              }}
+                transition: 'all 0.2s ease-in-out',
+                "--tw-ring-color": defaultTheme.primary,
+              } as React.CSSProperties}
               onClick={() => setShowNewProjectModal(true)}
             >
               <svg 
@@ -175,74 +175,85 @@ export default function Home() {
               >
                 <path d="M224,128a8,8,0,0,1-8,8H136v80a8,8,0,0,1-16,0V136H40a8,8,0,0,1,0-16h80V40a8,8,0,0,1,16,0v80h80A8,8,0,0,1,224,128Z"></path>
               </svg>
-              <span className="text-sm font-medium">New Site</span>
+              <span className="text-sm font-medium whitespace-nowrap">New Site</span>
             </button>
           </div>
         </div>
 
-        {/* Improved Filter Buttons with better spacing and visual hierarchy */}
-        <div className="flex items-center gap-3 mb-8 overflow-x-auto pb-1 border-b" style={{ borderColor: defaultTheme.cardBorder }}>
-          <button 
-            className="px-5 py-2 text-sm rounded-full text-white font-medium transition-colors flex-shrink-0" 
-            style={{ 
-              background: filter === "All" ? defaultTheme.primary : defaultTheme.cardBg,
-              color: filter === "All" ? 'white' : defaultTheme.accent,
-              border: `1px solid ${defaultTheme.cardBorder}`
-            }}
-            onClick={() => setFilter("All")}
-          >
-            All
-          </button>
-          <button 
-            className="px-5 py-2 text-sm rounded-full font-medium transition-colors flex-shrink-0"
-            style={{ 
-              background: filter === "Growing" ? defaultTheme.primary : defaultTheme.cardBg,
-              color: filter === "Growing" ? 'white' : defaultTheme.accent,
-              border: `1px solid ${defaultTheme.cardBorder}`
-            }}
-            onClick={() => setFilter("Growing")}
-          >
-            Growing
-          </button>
-          <button 
-            className="px-5 py-2 text-sm rounded-full font-medium transition-colors flex-shrink-0"
-            style={{ 
-              background: filter === "Declining" ? defaultTheme.primary : defaultTheme.cardBg,
-              color: filter === "Declining" ? 'white' : defaultTheme.accent,
-              border: `1px solid ${defaultTheme.cardBorder}`
-            }}
-            onClick={() => setFilter("Declining")}
-          >
-            Declining
-          </button>
+        {/* Enhanced Filter Section */}
+        <div className="flex items-center gap-3 mb-8 overflow-x-auto pb-2 border-b border-opacity-50" style={{ borderColor: defaultTheme.cardBorder }}>
+          {["All", "Growing", "Declining"].map((option) => (
+            <button 
+              key={option}
+              className="px-6 py-2.5 text-sm rounded-full font-medium transition-colors flex-shrink-0" 
+              style={{ 
+                background: filter === option ? defaultTheme.primary : defaultTheme.cardBg,
+                color: filter === option ? 'white' : defaultTheme.accent,
+                border: `1px solid ${filter === option ? defaultTheme.primary : defaultTheme.cardBorder}`,
+                boxShadow: filter === option ? '0 2px 5px rgba(0,0,0,0.1)' : 'none'
+              }}
+              onClick={() => setFilter(option)}
+            >
+              {option}
+            </button>
+          ))}
         </div>
 
-        {/* Enhanced Projects Grid with better desktop layout */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
-          {loading ? (
-            <p className="col-span-full text-center py-10" style={{ color: defaultTheme.textLight }}>Loading projects...</p>
-          ) : filteredProjects.length === 0 ? (
-            <div className="col-span-full text-center py-10">
-              <p style={{ color: defaultTheme.textLight }}>No projects found. Create one to get started!</p>
-              <button 
-                className="mt-4 inline-flex items-center gap-2 px-4 py-2 text-white rounded-full transition-all hover:shadow-md"
-                style={{ backgroundColor: defaultTheme.primary }}
-                onClick={() => setShowNewProjectModal(true)}
-              >
-                <svg 
-                  xmlns="http://www.w3.org/2000/svg" 
-                  width="14" 
-                  height="14" 
-                  fill="currentColor" 
-                  viewBox="0 0 256 256"
-                >
-                  <path d="M224,128a8,8,0,0,1-8,8H136v80a8,8,0,0,1-16,0V136H40a8,8,0,0,1,0-16h80V40a8,8,0,0,1,16,0v80h80A8,8,0,0,1,224,128Z"></path>
-                </svg>
-                <span className="text-sm font-medium">Create New Project</span>
-              </button>
+        {/* Enhanced Loading State */}
+        {loading ? (
+          <div className="flex justify-center items-center py-20">
+            <div className="space-y-4 w-full max-w-md">
+              <div className="h-8 bg-gray-200 rounded animate-pulse w-1/3 mx-auto"></div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {[1, 2, 3, 4].map(i => (
+                  <div key={i} className="h-32 rounded-lg bg-gray-200 animate-pulse" style={{ animationDelay: `${i * 0.1}s` }}></div>
+                ))}
+              </div>
             </div>
-          ) : (
-            filteredProjects.map((project) => (
+          </div>
+        ) : filteredProjects.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 px-4 text-center rounded-xl border" 
+            style={{ backgroundColor: defaultTheme.cardBg, borderColor: defaultTheme.cardBorder }}>
+            <svg 
+              xmlns="http://www.w3.org/2000/svg" 
+              width="48" 
+              height="48" 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="1" 
+              strokeLinecap="round" 
+              strokeLinejoin="round"
+              style={{ color: defaultTheme.textLight }}
+              className="mb-4 opacity-60"
+            >
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+              <line x1="8" y1="12" x2="16" y2="12"></line>
+            </svg>
+            <p className="text-lg mb-2" style={{ color: defaultTheme.accent }}>No projects found</p>
+            <p className="mb-6 max-w-md" style={{ color: defaultTheme.textLight }}>
+              {searchQuery ? "Try adjusting your search criteria." : "Create your first project to get started with analytics."}
+            </p>
+            <button 
+              className="flex items-center gap-2 px-6 py-2.5 text-white rounded-full transition-all hover:shadow-lg"
+              style={{ backgroundColor: defaultTheme.primary }}
+              onClick={() => setShowNewProjectModal(true)}
+            >
+              <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                width="16" 
+                height="16" 
+                fill="currentColor" 
+                viewBox="0 0 256 256"
+              >
+                <path d="M224,128a8,8,0,0,1-8,8H136v80a8,8,0,0,1-16,0V136H40a8,8,0,0,1,0-16h80V40a8,8,0,0,1,16,0v80h80A8,8,0,0,1,224,128Z"></path>
+              </svg>
+              <span className="text-sm font-medium">Create New Project</span>
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 lg:gap-6">
+            {filteredProjects.map((project) => (
               <div 
                 key={project._id} 
                 className="rounded-lg p-5 transition-all shadow-sm hover:shadow-lg cursor-pointer group"
@@ -252,15 +263,16 @@ export default function Home() {
                 }}
                 onClick={() => router.push(`/projects/${project._id}`)}
               >
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h3 className="text-lg font-semibold tracking-tight group-hover:text-primary transition-colors" 
+                {/* Enhanced Project Card Layout */}
+                <div className="flex justify-between items-start mb-5">
+                  <div className="overflow-hidden">
+                    <h3 className="text-lg font-semibold tracking-tight group-hover:text-primary transition-colors truncate" 
                       style={{ color: defaultTheme.accent }}>
                       {project.name}
                     </h3>
                     <a 
                       href={`https://${project.url}`} 
-                      className="text-xs hover:opacity-100 transition-opacity"
+                      className="text-xs hover:underline transition-opacity truncate block mt-1"
                       style={{ color: defaultTheme.textLight }}
                       target="_blank"
                       rel="noopener noreferrer"
@@ -269,7 +281,8 @@ export default function Home() {
                       {project.url}
                     </a>
                   </div>
-                  <span className="text-xs p-1.5 rounded" style={{ backgroundColor: defaultTheme.background }}>
+                  <span className="ml-2 p-1.5 rounded-full hover:bg-opacity-80 transition-colors" 
+                    style={{ backgroundColor: defaultTheme.background }}>
                     <svg
                       width="16"
                       height="16"
@@ -286,13 +299,14 @@ export default function Home() {
                   </span>
                 </div>
                 
-                <div className="flex items-center justify-between">
+                {/* Enhanced Stats Layout */}
+                <div className="flex items-center justify-between mt-auto">
                   <div className="flex space-x-6">
                     <div>
                       <div className="text-xs font-medium uppercase tracking-wider" style={{ color: defaultTheme.textLight }}>
                         Views
                       </div>
-                      <div className="text-base font-semibold" style={{ color: defaultTheme.accent }}>
+                      <div className="text-base font-semibold mt-1" style={{ color: defaultTheme.accent }}>
                         {project.analytics?.views.toLocaleString() || '0'}
                       </div>
                     </div>
@@ -300,7 +314,7 @@ export default function Home() {
                       <div className="text-xs font-medium uppercase tracking-wider" style={{ color: defaultTheme.textLight }}>
                         Users
                       </div>
-                      <div className="text-base font-semibold" style={{ color: defaultTheme.accent }}>
+                      <div className="text-base font-semibold mt-1" style={{ color: defaultTheme.accent }}>
                         {project.analytics?.users.toLocaleString() || '0'}
                       </div>
                     </div>
@@ -315,14 +329,14 @@ export default function Home() {
                   </div>
                 </div>
               </div>
-            ))
-          )}
-        </div>
+            ))}
+          </div>
+        )}
         
-        {/* Enhanced Modal for Desktop with stronger blur effect */}
+        {/* Improved Modal Layout */}
         {showNewProjectModal && (
           <div 
-            className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 backdrop-blur-md p-4 transition-all duration-300"
+            className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 backdrop-blur-sm p-4 transition-all duration-200"
             onClick={(e) => {
               if (e.target === e.currentTarget) {
                 setShowNewProjectModal(false);
@@ -330,15 +344,15 @@ export default function Home() {
             }}
           >
             <div 
-              className="rounded-xl p-6 max-w-md w-full mx-3 sm:mx-0 shadow-xl transform transition-all duration-300 scale-100" 
+              className="rounded-xl p-7 max-w-md w-full mx-auto shadow-xl transform transition-all duration-300 scale-100" 
               style={{ backgroundColor: defaultTheme.cardBg }}
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex justify-between items-center mb-5">
+              <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl font-bold" style={{ color: defaultTheme.accent }}>Add New Website</h2>
                 <button
                   onClick={() => setShowNewProjectModal(false)}
-                  className="p-1.5 rounded-full hover:bg-gray-100 focus:outline-none focus:ring-2 dark:hover:bg-gray-700"
+                  className="p-1.5 rounded-full hover:bg-gray-100 focus:outline-none focus:ring-2 transition-colors"
                   style={{ "--tw-ring-color": defaultTheme.primary } as React.CSSProperties}
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -346,14 +360,14 @@ export default function Home() {
                   </svg>
                 </button>
               </div>
-              <form onSubmit={handleCreateProject}>
-                <div className="mb-5">
+              <form onSubmit={handleCreateProject} className="space-y-6">
+                <div>
                   <label className="block text-sm font-medium mb-2" style={{ color: defaultTheme.accent }}>
                     Project Name
                   </label>
                   <input 
                     type="text"
-                    className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 text-sm"
+                    className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 text-sm transition-colors"
                     style={{ 
                       borderColor: defaultTheme.cardBorder,
                       backgroundColor: defaultTheme.background,
@@ -365,13 +379,13 @@ export default function Home() {
                     placeholder="My Awesome Website"
                   />
                 </div>
-                <div className="mb-6">
+                <div>
                   <label className="block text-sm font-medium mb-2" style={{ color: defaultTheme.accent }}>
                     Website URL
                   </label>
                   <input 
                     type="text"
-                    className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 text-sm"
+                    className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 text-sm transition-colors"
                     style={{ 
                       borderColor: defaultTheme.cardBorder,
                       backgroundColor: defaultTheme.background,
@@ -383,13 +397,14 @@ export default function Home() {
                     required
                   />
                 </div>
-                <div className="flex justify-end space-x-4">
+                <div className="flex justify-end gap-4 pt-2">
                   <button
                     type="button"
                     className="px-5 py-2.5 text-sm font-medium rounded-lg transition-colors hover:bg-opacity-80"
                     style={{ 
                       color: defaultTheme.accent,
-                      backgroundColor: defaultTheme.background 
+                      backgroundColor: defaultTheme.background,
+                      border: `1px solid ${defaultTheme.cardBorder}`
                     }}
                     onClick={() => setShowNewProjectModal(false)}
                   >

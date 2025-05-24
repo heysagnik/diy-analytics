@@ -88,7 +88,7 @@ export async function GET(
     const skip = (page - 1) * limit;
 
     // Define common aggregation stages used for both fetching users and counting total
-    const commonPipelineStages: PipelineStage[] = [ // Use PipelineStage[]
+    const commonPipelineStages: PipelineStage[] = [
       { $match: initialFilter }, // Match documents first
       { 
         $sort: { timestamp: -1 } // Sort by timestamp to get the $first correct fields in $group
@@ -98,10 +98,11 @@ export async function GET(
           _id: '$sessionId',
           userId: { $first: '$sessionId' },
           country: { $first: '$country' },
-          lastSeen: { $first: '$timestamp' },
-          browser: { $first: '$browser' },
-          device: { $first: '$device' },
-          os: { $first: '$os' },
+          lastSeen: { $max: '$timestamp' }, // Use $max for clarity, captures latest timestamp
+          firstSeen: { $min: '$timestamp' }, // Capture the earliest timestamp
+          browser: { $first: '$browser' }, // Takes from the latest record due to sort
+          device: { $first: '$device' },   // Takes from the latest record
+          os: { $first: '$os' },           // Takes from the latest record
           paths: { $addToSet: '$path' },
           activityCount: { $sum: 1 }, // Calculate activity count for each user session
         }
@@ -109,21 +110,19 @@ export async function GET(
     ];
 
     // Dynamically add activity filter stage if 'activity' param is present
-    const activityFilterStages: PipelineStage[] = []; // Use PipelineStage[]
+    const activityFilterStages: PipelineStage[] = [];
     if (activity) {
-      let activityCondition: ActivityCondition = {}; // Use the defined interface
-      // Define activity levels based on activityCount. Adjust ranges as needed.
+      let activityCondition: ActivityCondition = {};
       switch (activity.toLowerCase()) {
-        case 'low': // Example: 1-5 activities
+        case 'low':
           activityCondition = { activityCount: { $gte: 1, $lte: 5 } };
           break;
-        case 'medium': // Example: 6-15 activities
+        case 'medium':
           activityCondition = { activityCount: { $gt: 5, $lte: 15 } };
           break;
-        case 'high': // Example: >15 activities
+        case 'high':
           activityCondition = { activityCount: { $gt: 15 } };
           break;
-        // If activity param is unrecognized, no activity filter is applied.
       }
       if (Object.keys(activityCondition).length > 0) {
         activityFilterStages.push({ $match: activityCondition });
@@ -131,21 +130,49 @@ export async function GET(
       }
     }
     
-    // Aggregate to get unique users with their last activity, including activity filter
-    const usersAggregationPipeline = [
+    // Define the $lookup stage for recent events
+    // Assumes 'Event' collection is named 'events' and Event documents have 'sessionId' and 'projectId'
+    const lookupRecentEventsStage: PipelineStage = {
+      $lookup: {
+        from: 'events', // Verify this is the correct collection name for your Event model
+        let: { userSessionId: '$_id', pId: projectId }, // _id from $group is sessionId
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: ['$sessionId', '$$userSessionId'] }, // Match event's sessionId
+                  { $eq: ['$projectId', '$$pId'] } // Match event's projectId
+                ]
+              }
+            }
+          },
+          { $sort: { timestamp: -1 } }, // Get the most recent events
+          { $limit: 3 }, // Limit to 3 recent events
+          { $project: { _id: 0, name: 1, timestamp: 1 } } // Select desired event fields
+        ],
+        as: 'recentEvents' // Output array field name
+      }
+    };
+    
+    // Aggregate to get unique users with their last activity, including activity filter and recent events
+    const usersAggregationPipeline: PipelineStage[] = [
       ...commonPipelineStages,
       ...activityFilterStages, // Apply activity filter here
+      lookupRecentEventsStage,  // Add recent events for each user
       {
         $project: { // Project the desired fields for the response
           _id: 0,
           userId: 1,
           country: 1,
           lastSeen: 1,
+          firstSeen: 1, // Include firstSeen
           browser: 1,
           device: 1,
           os: 1,
           pathCount: { $size: '$paths' },
-          activityCount: 1
+          activityCount: 1,
+          recentEvents: 1 // Include recentEvents
         }
       },
       {
@@ -165,7 +192,8 @@ export async function GET(
     console.log(`Found ${users.length} users after all filters and pagination.`);
 
     // Get total count for pagination, applying all relevant filters including activity
-    const totalUsersAggregationPipeline = [
+    // Do NOT include lookupRecentEventsStage in the count pipeline for performance.
+    const totalUsersAggregationPipeline: PipelineStage[] = [
       ...commonPipelineStages,
       ...activityFilterStages, // Ensure activity filter is applied for total count
       { $count: 'total' }

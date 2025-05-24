@@ -1,189 +1,243 @@
 export const getTrackingScript = () => {
+  const endpoint = `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/track`;
+  
   return `
 <script>
 (function() {
-  console.log('[Analytics] Script Initializing (Ignoring DNT)...');
-  const config = {
-    endpoint: "${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/track",
-    sessionTimeout: 20 * 60 * 1000
-  };
-  console.log('[Analytics] Config:', config);
+  const SV = "1.3.0";
+  const DBG = false;
+  const EP = "${endpoint}";
+  const TIMEOUT = 20 * 60 * 1000;
+  const OPT_KEY = '_ia_optout';
+  const SID_KEY = '_ia_sid';
+  const UID_KEY = '_ia_uid';
+
+  const log = (...a) => DBG && console.log('[A]', ...a);
+  const err = (...a) => DBG && console.error('[A]', ...a);
+
+  log('Init', SV, EP);
   
-  let currentUrl = location.href;
-  let sessionId = getSessionId();
-  let lastActivityTime = Date.now();
+  let url = location.href;
+  let sid = getSID();
+  let lastActivity = Date.now();
   
-  function getSessionId() {
-    if (localStorage.getItem('_ia_optout')) {
-      console.log('[Analytics] Opt-out flag is set. No session ID.');
-      return null;
-    }
-    let id = sessionStorage.getItem('_ia_sid');
+  function genID() { return Math.random().toString(36).substring(2, 10); }
+
+  function getSID() {
+    if (localStorage.getItem(OPT_KEY)) return null;
+    let id = sessionStorage.getItem(SID_KEY);
     if (!id) {
-      id = Math.random().toString(36).substring(2, 10);
-      sessionStorage.setItem('_ia_sid', id);
-      console.log('[Analytics] New session ID created:', id);
-    } else {
-      console.log('[Analytics] Existing session ID found:', id);
+      id = genID();
+      sessionStorage.setItem(SID_KEY, id);
+      log('New sid:', id);
     }
     return id;
   }
   
-  function refreshSession() {
-    const now = Date.now();
-    if (now - lastActivityTime > config.sessionTimeout) {
-      console.log('[Analytics] Session timeout. Refreshing session ID.');
-      sessionId = Math.random().toString(36).substring(2, 10);
-      sessionStorage.setItem('_ia_sid', sessionId);
+  function getUID() {
+    if (localStorage.getItem(OPT_KEY)) return null;
+    let id = localStorage.getItem(UID_KEY);
+    if (!id) {
+      id = genID();
+      localStorage.setItem(UID_KEY, id);
     }
-    lastActivityTime = now;
+    return id;
   }
   
-  ["mousedown", "keydown", "touchstart", "scroll"].forEach(eventType => {
-    window.addEventListener(eventType, refreshSession, { passive: true });
-  });
+  function refresh() {
+    const now = Date.now();
+    if (now - lastActivity > TIMEOUT) {
+      if (!localStorage.getItem(OPT_KEY)) {
+        sid = genID();
+        sessionStorage.setItem(SID_KEY, sid);
+      } else {
+        sid = null;
+      }
+    }
+    lastActivity = now;
+  }
   
-  function trackPageView() {
-    // Removed navigator.doNotTrack check here
-    console.log('[Analytics] trackPageView called. SessionID:', sessionId);
-    if (!sessionId) { // Still check for sessionId and opt-out
-      console.log('[Analytics] Tracking conditions (no sessionID or opt-out) not met. Exiting trackPageView.');
-      return;
+  function getBrowserInfo() {
+    const ua = navigator.userAgent;
+    let browser = 'Unknown';
+    let os = 'Unknown';
+    let device = 'desktop';
+    
+    // Browser detection
+    if (/Firefox/i.test(ua)) browser = 'Firefox';
+    else if (/Chrome/i.test(ua) && !/Edg|Edge/i.test(ua)) browser = 'Chrome';
+    else if (/Edg|Edge/i.test(ua)) browser = 'Edge';
+    else if (/Safari/i.test(ua) && !/Chrome/i.test(ua)) browser = 'Safari';
+    else if (/MSIE|Trident/i.test(ua)) browser = 'IE';
+    else if (/Opera|OPR/i.test(ua)) browser = 'Opera';
+    
+    // OS detection
+    if (/Windows/i.test(ua)) os = 'Windows';
+    else if (/Macintosh|Mac OS X/i.test(ua)) os = 'macOS';
+    else if (/Linux/i.test(ua)) os = 'Linux';
+    else if (/Android/i.test(ua)) os = 'Android';
+    else if (/iOS|iPhone|iPad|iPod/i.test(ua)) os = 'iOS';
+    
+    // Device detection
+    if (/Mobi|Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua)) {
+      device = /iPad|tablet|Tablet/i.test(ua) ? 'tablet' : 'mobile';
     }
     
-    refreshSession();
+    return { browser, os, device };
+  }
+  
+  ["mousedown", "keydown", "touchstart", "scroll"].forEach(e => 
+    window.addEventListener(e, refresh, { passive: true }));
+  
+  function pageview() {
+    if (!sid) return;
+    refresh();
+    if (!sid) return;
+    
+    const params = new URLSearchParams(window.location.search);
+    const { browser, os, device } = getBrowserInfo();
     
     const payload = {
-      type: "pageview",
       domain: location.hostname,
+      type: "pageview",
       url: location.href,
       path: location.pathname,
       referrer: document.referrer || null,
-      utmSource: new URLSearchParams(window.location.search).get('utm_source'),
-      utmMedium: new URLSearchParams(window.location.search).get('utm_medium'),
-      utmCampaign: new URLSearchParams(window.location.search).get('utm_campaign'),
-      utmTerm: new URLSearchParams(window.location.search).get('utm_term'),
-      utmContent: new URLSearchParams(window.location.search).get('utm_content'),
-      sessionId: sessionId,
-      timestamp: Date.now()
+      sessionId: sid,
+      uid: getUID(),
+      browser: browser,
+      os: os,
+      device: device,
+      userAgent: navigator.userAgent,
+      v: SV,
+      us: params.get('utm_source'),
+      um: params.get('utm_medium'),
+      uc: params.get('utm_campaign'),
+      ut: params.get('utm_term'),
+      ue: params.get('utm_content'),
+      ts: Date.now()
     };
-    console.log('[Analytics] Payload to send:', payload);
-    sendPayload(payload);
+    
+    send(payload);
   }
   
-  function sendPayload(data) {
-    const jsonData = JSON.stringify(data);
-    console.log('[Analytics] Attempting to send payload. Endpoint:', config.endpoint);
+  window.trackEvent = function(name, data) {
+    if (!sid) return;
+    refresh();
+    if (!sid) return;
     
-    // Add this line to show the exact request format
-    console.log('[Analytics] Full request URL:', config.endpoint);
+    const { browser, os, device } = getBrowserInfo();
     
-    // Try fetch API for more reliable error reporting
-    fetch(config.endpoint, {
+    const payload = {
+      domain: location.hostname,
+      type: "event",
+      url: location.href,
+      eventName: name,
+      eventData: typeof data === 'object' ? JSON.stringify(data) : String(data),
+      sessionId: sid,
+      uid: getUID(),
+      browser: browser,
+      os: os,
+      device: device,
+      userAgent: navigator.userAgent,
+      referrer: document.referrer || null,
+      v: SV,
+      ts: Date.now()
+    };
+    
+    send(payload);
+  };
+  
+  function send(data) {
+    const json = JSON.stringify(data);
+    
+    fetch(EP, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: jsonData,
+      body: json,
+      keepalive: true
     })
-    .then(response => {
-      if (!response.ok) throw new Error(\`\`HTTP error \${response.status}\`\`);
-      return response.json();
-    })
-    .then(data => console.log('[Analytics] Fetch response:', data))
-    .catch(error => {
-      console.error('[Analytics] Fetch error:', error);
-      // Fall back to original methods
-      if (navigator.sendBeacon) {
-        try {
-          console.log('[Analytics] Using navigator.sendBeacon.');
-          if (navigator.sendBeacon(config.endpoint, jsonData)) {
-            console.log('[Analytics] sendBeacon call successful (queued).');
-            return;
-          } else {
-            console.warn('[Analytics] sendBeacon call returned false (not queued). Falling back.');
-          }
-        } catch (error) {
-          console.error('[Analytics] sendBeacon error. Falling back.', error);
-        }
-      } else {
-        console.log('[Analytics] navigator.sendBeacon not available. Using image fallback.');
+    .then(r => {
+      if (!r.ok) {
+        r.text().then(t => err(\`HTTP \${r.status}: \${t}\`)).catch(() => {});
+        throw new Error(\`HTTP \${r.status}\`);
       }
-      
-      const img = new Image();
-      img.onload = () => console.log('[Analytics] Image fallback: request likely sent (onload).');
-      img.onerror = () => console.error('[Analytics] Image fallback: request error (onerror).');
-      img.src = config.endpoint + "?d=" + encodeURIComponent(jsonData);
-      console.log('[Analytics] Image fallback src:', img.src);
+      return r.json().catch(() => ({}));
+    })
+    .then(r => {
+      log('Sent:', data.type, r);
+    })
+    .catch(e => {
+      err('Send failed:', e.message);
     });
   }
   
-  function handleNavigationChange() {
-    if (currentUrl !== location.href) {
-      console.log('[Analytics] Navigation detected. Old URL:', currentUrl, 'New URL:', location.href);
-      currentUrl = location.href;
-      setTimeout(trackPageView, 100);
-    }
-  }
-  
-  function initializeAnalytics() {
-    console.log('[Analytics] Initializing analytics interface...');
-    window.insightAnalytics = {
-      optOut: function() {
-        localStorage.setItem('_ia_optout', '1');
-        sessionStorage.removeItem('_ia_sid');
-        sessionId = null;
-        console.log('[Analytics] Opted out.');
-        return "Analytics tracking disabled.";
-      },
-      optIn: function() {
-        localStorage.removeItem('_ia_optout');
-        console.log('[Analytics] Opted in.');
-        sessionId = getSessionId(); 
-        if (!sessionId) { 
-          sessionId = Math.random().toString(36).substring(2, 10);
-          sessionStorage.setItem('_ia_sid', sessionId);
-        }
-        trackPageView();
-        return "Analytics tracking enabled.";
-      },
-      isOptedOut: function() {
-        return !!localStorage.getItem('_ia_optout');
+  function handleVisibilityChange() {
+    if (document.visibilityState === 'visible') {
+      refresh();
+      if (location.href !== url) {
+        url = location.href;
+        pageview();
       }
-    };
-    
-    // Removed navigator.doNotTrack check here
-    console.log('[Analytics] Checking initial tracking conditions. OptOutFlag:', localStorage.getItem('_ia_optout'));
-    if (!localStorage.getItem('_ia_optout')) { // Only check for opt-out
-      console.log('[Analytics] Initial trackPageView call (DNT Ignored).');
-      trackPageView();
-      
-      const originalPushState = history.pushState;
-      const originalReplaceState = history.replaceState;
-      
-      history.pushState = function() {
-        originalPushState.apply(this, arguments);
-        handleNavigationChange();
-      };
-      
-      history.replaceState = function() {
-        originalReplaceState.apply(this, arguments);
-        handleNavigationChange();
-      };
-      
-      window.addEventListener('popstate', handleNavigationChange);
-      
-      document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') {
-          refreshSession();
-        }
-      });
-    } else {
-      console.log('[Analytics] Initial tracking conditions (opt-out) not met. No initial pageview track.');
     }
   }
   
-  initializeAnalytics();
-  console.log('[Analytics] Script Fully Initialized.');
+  function handlePopState() {
+    if (location.href !== url) {
+      url = location.href;
+      pageview();
+    }
+  }
+  
+  const originalPushState = history.pushState;
+  const originalReplaceState = history.replaceState;
+  
+  history.pushState = function() {
+    originalPushState.apply(history, arguments);
+    setTimeout(() => {
+      if (location.href !== url) {
+        url = location.href;
+        pageview();
+      }
+    }, 0);
+  };
+  
+  history.replaceState = function() {
+    originalReplaceState.apply(history, arguments);
+    setTimeout(() => {
+      if (location.href !== url) {
+        url = location.href;
+        pageview();
+      }
+    }, 0);
+  };
+  
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+  window.addEventListener('popstate', handlePopState);
+  
+  // Initial pageview
+  pageview();
+  
+  // Opt-out functionality
+  window.optOutAnalytics = function() {
+    localStorage.setItem(OPT_KEY, '1');
+    sessionStorage.removeItem(SID_KEY);
+    localStorage.removeItem(UID_KEY);
+    sid = null;
+    log('Opted out');
+  };
+  
+  window.optInAnalytics = function() {
+    localStorage.removeItem(OPT_KEY);
+    sid = getSID();
+    log('Opted in');
+  };
+  
+  window.isOptedOut = function() {
+    return !!localStorage.getItem(OPT_KEY);
+  };
+  
+  log('Ready');
 })();
-</script>
-`;
-};
+</script>`;
+}; 

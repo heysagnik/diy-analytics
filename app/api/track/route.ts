@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import connectToDatabase from "../../../lib/mongodb";
-import Project from "../../../models/Project";
-import PageView from "../../../models/PageView";
-import Event from "../../../models/Event";
-import { UAParser } from 'ua-parser-js';
+import connectToDatabase from "@/lib/mongodb";
+import { trackingService, TrackingPayload, TrackingContext } from "../analytics/services/trackingService";
 
-const corsHeaders = {
+const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
@@ -13,134 +10,92 @@ const corsHeaders = {
 };
 
 export async function OPTIONS() {
-  return new NextResponse(null, { status: 200, headers: corsHeaders });
+  return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
 }
 
-async function handler(req: NextRequest) {
+async function trackHandler(req: NextRequest) {
   try {
-    let body;
+    await connectToDatabase();
+
+    let payload: TrackingPayload;
+    
     if (req.method === 'POST') {
-      body = await req.json();
+      payload = await req.json();
     } else if (req.method === 'GET') {
       const dataParam = req.nextUrl.searchParams.get('d');
-      if (dataParam) {
-        body = JSON.parse(decodeURIComponent(dataParam));
-      } else {
-        return NextResponse.json({ error: 'Data parameter is missing for GET request' }, { status: 400, headers: corsHeaders });
+      if (!dataParam) {
+        return NextResponse.json({ 
+          success: false,
+          error: 'Data parameter is missing' 
+        }, { status: 400, headers: CORS_HEADERS });
+      }
+      
+      try {
+        payload = JSON.parse(decodeURIComponent(dataParam));
+      } catch {
+        return NextResponse.json({ 
+          success: false,
+          error: 'Invalid data parameter encoding' 
+        }, { status: 400, headers: CORS_HEADERS });
       }
     } else {
-      return NextResponse.json({ error: 'Method not allowed' }, { status: 405, headers: corsHeaders });
+      return NextResponse.json({ 
+        success: false,
+        error: 'Method not allowed' 
+      }, { status: 405, headers: CORS_HEADERS });
     }
 
-    const { domain, type, url, referrer, eventName, eventData, sessionId } = body;
-    
-    if (!domain || !type || !url) {
-      return NextResponse.json(
-        { error: 'Domain, type, and URL are required' }, 
-        { status: 400, headers: corsHeaders }
-      );
-    }
+    // Extract tracking context from request
+    const context: TrackingContext = {
+      ip: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 
+          req.headers.get('x-real-ip') || 
+          'unknown',
+      userAgent: req.headers.get('user-agent') || '',
+      country: req.headers.get('x-vercel-ip-country') || 
+               req.headers.get('cf-ipcountry') || 
+               undefined,
+      language: req.headers.get('accept-language')?.split(',')[0]?.trim() || undefined,
+      headers: Object.fromEntries(req.headers.entries())
+    };
 
-    await connectToDatabase();
-    
-    const normalizedDomain = domain.replace(/^(?:https?:\/\/)?(?:www\.)?/i, "").split('/')[0];
-    
-    const project = await Project.findOne({
-      $or: [
-        { domain: normalizedDomain },
-        { url: normalizedDomain }, // Match directly if URL equals domain
-        { url: { $regex: normalizedDomain.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' } } // Match if URL contains domain
-      ]
-    });
-    
-    if (!project) {
-      return NextResponse.json(
-        { error: 'No project found for this domain' }, 
-        { status: 404, headers: corsHeaders }
-      );
-    }
-    
-    const projectId = project._id;
-    const userAgentString = req.headers.get('user-agent') || '';
-    const parser = new UAParser(userAgentString);
-    const browserInfo = parser.getBrowser();
-    const osInfo = parser.getOS();
-    const deviceInfo = parser.getDevice();
-    const visitorSessionId = sessionId || Math.random().toString(36).substring(2, 15);
-    
-    let parsedUrl;
-    try {
-        parsedUrl = new URL(url);
-    } catch (error) {
-        // Actually using the error variable
-        const message = error instanceof Error ? error.message : 'Unknown parsing error';
-        return NextResponse.json({ 
-            error: 'Invalid URL format', 
-            details: message 
-        }, { status: 400, headers: corsHeaders });
-    }
+    // Process tracking request
+    const result = await trackingService.processTracking(payload, context);
 
-    // Extract UTM parameters
-    const utmSource = parsedUrl.searchParams.get('utm_source') || null;
-    const utmMedium = parsedUrl.searchParams.get('utm_medium') || null;
-    const utmCampaign = parsedUrl.searchParams.get('utm_campaign') || null;
-    const utmTerm = parsedUrl.searchParams.get('utm_term') || null;
-    const utmContent = parsedUrl.searchParams.get('utm_content') || null;
-
-    // Try to get country using a more reliable method
-    const country = req.headers.get('x-vercel-ip-country') || 
-                    req.headers.get('cf-ipcountry') || 
-                    req.headers.get('x-real-ip') || 
-                    req.headers.get('x-forwarded-for')?.split(',')[0] || 
-                    'unknown';
-
-    if (type === 'pageview') {
-      const pageView = new PageView({
-        projectId,
-        url,
-        path: parsedUrl.pathname,
-        referrer,
-        userAgent: userAgentString,
-        browser: browserInfo.name || 'unknown',
-        os: osInfo.name || 'unknown',
-        device: deviceInfo.type || 'desktop',
-        country,
-        language: req.headers.get('accept-language')?.split(',')[0]?.trim() || 'en',
-        sessionId: visitorSessionId,
-        // Add UTM parameters
-        utmSource,
-        utmMedium,
-        utmCampaign,
-        utmTerm,
-        utmContent
+    if (result.success) {
+      return NextResponse.json({
+        success: true,
+        sessionId: result.sessionId,
+        details: result.details
+      }, { headers: CORS_HEADERS });
+    } else {
+      return NextResponse.json({
+        success: false,
+        error: result.error,
+        details: result.details
+      }, { 
+        status: 400, 
+        headers: CORS_HEADERS 
       });
-      await pageView.save();
-      return NextResponse.json({ success: true, sessionId: visitorSessionId }, { headers: corsHeaders });
-    } else if (type === 'event') {
-      if (!eventName) {
-        return NextResponse.json({ error: 'Event name is required' }, { status: 400, headers: corsHeaders });
-      }
-      const event = new Event({
-        projectId,
-        name: eventName,
-        url,
-        path: parsedUrl.pathname,
-        data: eventData || {},
-        sessionId: visitorSessionId
-      });
-      await event.save();
-      return NextResponse.json({ success: true }, { headers: corsHeaders });
     }
-    
-    return NextResponse.json({ error: 'Invalid tracking type' }, { status: 400, headers: corsHeaders });
-  } catch (error) {
+
+  } catch (error: unknown) {
     console.error('Tracking API Error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
-    if (error instanceof SyntaxError && errorMessage.includes("JSON")) {
-        return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400, headers: corsHeaders });
+    
+    if (error instanceof SyntaxError && error.message.toLowerCase().includes("json")) {
+      return NextResponse.json({ 
+        success: false,
+        error: 'Invalid JSON payload' 
+      }, { status: 400, headers: CORS_HEADERS });
     }
-    return NextResponse.json({ error: errorMessage }, { status: 500, headers: corsHeaders });
+    
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    
+    return NextResponse.json({ 
+      success: false,
+      error: 'Internal server error',
+      details: process.env.NODE_ENV === 'development' ? errorMessage : undefined
+    }, { status: 500, headers: CORS_HEADERS });
   }
 }
 
-export { handler as GET, handler as POST };
+export { trackHandler as GET, trackHandler as POST };

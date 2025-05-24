@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import connectToDatabase from "../../../../lib/mongodb";
 import Project from "../../../../models/Project";
+import PageView from "../../../../models/PageView";
+import Event from "../../../../models/Event";
 import mongoose from "mongoose";
 
 // GET /api/projects/:id
@@ -91,11 +93,40 @@ export async function DELETE(
 
   try {
     await connectToDatabase();
-    const project = await Project.findByIdAndDelete(id);
-    if (!project) {
-      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    
+    // Start a session to handle operations
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    
+    try {
+      // Delete the project
+      const project = await Project.findByIdAndDelete(id, { session });
+      
+      if (!project) {
+        await session.abortTransaction();
+        session.endSession();
+        return NextResponse.json({ error: "Project not found" }, { status: 404 });
+      }
+      
+      // Delete all PageView records for this project
+      await PageView.deleteMany({ projectId: id }, { session });
+      
+      // Delete all Event records for this project
+      await Event.deleteMany({ projectId: id }, { session });
+      
+      // Commit the transaction
+      await session.commitTransaction();
+      session.endSession();
+      
+      return NextResponse.json({ 
+        message: "Project and all associated analytics data deleted successfully" 
+      });
+    } catch (error) {
+      // If an error occurs, abort the transaction
+      await session.abortTransaction();
+      session.endSession();
+      throw error;
     }
-    return NextResponse.json({ message: "Project deleted successfully" });
   } catch (err) {
     console.error("Error deleting project:", err);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
