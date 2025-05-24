@@ -4,25 +4,36 @@
 [![Vercel](https://img.shields.io/badge/Vercel-Ready-black)](https://vercel.com/new/clone?repository-url=https://github.com/heysagnik/diy-analytics)
 [![GitHub Stars](https://img.shields.io/github/stars/heysagnik/diy-analytics?style=social)](https://github.com/heysagnik/diy-analytics)
 
-> **Your website stats, without the privacy headaches!** Get powerful insights in minutes, no coding required!
+> Privacy-friendly & Powerful website analytics in minutes — no coding, no complex setup , no fuss.
+
+
+
 
 ![localhost_3000_projects_6831e67f66e2968bb78db4ba](https://github.com/user-attachments/assets/6fd0f55d-74ea-4027-aec0-d78739fbb157)
 
+> ⚠️ Disclaimer: This project is in alpha. Not recommended for production use yet. Expect rapid changes and bugs.
 
-## 🚀 Get Started in Seconds!
+
+## 🚀 Instant Setup
+
+Launch your own analytics tool in seconds:
 
 Deploy to Vercel with one click: <br/> <br/>
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/heysagnik/diy-analytics)  <br/> 
 
-Or, follow the manual **Quick Setup** guide below for other environments.
+Prefer manual setup? Follow the **Quick Setup** below.
 
-## ✨ Why You'll Love It
+## ✨ What Makes It Awesome
 
-- **🔒 Privacy First, Always** - Respects user privacy: no personal data collection, no cookies, and no annoying consent banners.
-- **⚡ Feather-Light Script** - Tiny tracking script (under 2KB) that keeps your website fast and responsive.
-- **🔍 Clear & Actionable Insights** - A simple, intuitive dashboard that shows you the website traffic metrics that matter most.
-- **🚫 GDPR & CCPA Compliant by Design** - Built to be privacy-friendly, making regulatory compliance straightforward.
-- **🛠️ Effortless No-Code Setup** - Get up and running in minutes. Deploy with a click and integrate with a single line of code!
+- **🔒 100% Privacy-Respecting** – No personal data, no cookies, no pop-ups.
+
+- **⚡ Super Lightweight** – Tracking script is under 2KB. Blazing fast.
+
+- **📈 Insightful Dashboard** – Get traffic data that actually matters.
+
+- **✅ GDPR & CCPA Friendly** – Compliance built-in, not bolted on.
+
+- **🛠️ Easy Self-Hosting** – Deploy and integrate with a single line of code.
 
 ## 💻 Quick Setup
 
@@ -50,7 +61,7 @@ npm run dev
 
 ## 📊 Add to Your Site
 
-Just copy the code from the dashboard and paste in your website.
+Copy the snippet from your dashboard and paste it into your site’s <head>.
 <img src="https://github.com/user-attachments/assets/55b84635-32a3-48e5-aef4-8b9510090762" width='500'/>
 
 
