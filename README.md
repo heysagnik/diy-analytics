@@ -6,10 +6,14 @@
 
 > **Your website stats, without the privacy headaches!** Get powerful insights in minutes, no coding required!
 
+![localhost_3000_projects_6831e67f66e2968bb78db4ba](https://github.com/user-attachments/assets/6fd0f55d-74ea-4027-aec0-d78739fbb157)
+
+
 ## 🚀 Get Started in Seconds!
 
-Deploy to Vercel with one click:
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/heysagnik/diy-analytics)
+Deploy to Vercel with one click: <br/> <br/>
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/heysagnik/diy-analytics)  <br/> 
+
 Or, follow the manual **Quick Setup** guide below for other environments.
 
 ## ✨ Why You'll Love It
@@ -22,34 +26,35 @@ Or, follow the manual **Quick Setup** guide below for other environments.
 
 ## 💻 Quick Setup
 
+
+### 1. Clone the repository
 ```bash
-# 1. Clone the repository
 git clone https://github.com/heysagnik/diy-analytics.git
 cd diy-analytics
+```
+### 2. Set up environment variables
+Create a .env file similar to the .env.local.example
+Then, open .env.local and update MONGODB_URI with your actual MongoDB connection string.
+For local development, the default value might work if you have MongoDB running locally.
+For production, ensure you use your production database URI.
 
-# 2. Set up environment variables
-# Copy the example environment file:
-cp .env.local.example .env.local
-# Then, open .env.local and update MONGODB_URI with your actual MongoDB connection string.
-# For local development, the default value might work if you have MongoDB running locally.
-# For production, ensure you use your production database URI.
-
-# 3. Install dependencies
+### 3. Install dependencies
+```bash
 npm install
-
-# 4. Run the development server
+```
+### 4. Run the development server
+```bash
 npm run dev
 # This will start the application on http://localhost:3000 (or the next available port).
 ```
 
 ## 📊 Add to Your Site
 
-Just paste this one line anywhere in your HTML:
+Just copy the code from the dashboard and paste in your website.
+<img src="https://github.com/user-attachments/assets/55b84635-32a3-48e5-aef4-8b9510090762" width='500'/>
 
-```html
-<script async defer src="https://your-analytics-deployment.com/script.js"></script>
-```
-**Important:** Replace `https://your-analytics-deployment.com` with the actual URL where you have deployed your DIY Analytics instance.
+
+
 
 ## 🤝 Join Our Community & Contribute
 
