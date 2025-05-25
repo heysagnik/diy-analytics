@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
+import { Toaster } from 'react-hot-toast';
+import Providers from "./providers"; // Import the Providers component
 
 // Configure Manrope font from local files
 const manrope = localFont({
@@ -69,7 +71,10 @@ export default function RootLayout({
       <body
         className={`${manrope.variable} antialiased bg-white text-black`} 
       >
-        {children}
+        <Providers> {/* Wrap children with Providers */}
+          <Toaster position="top-center" reverseOrder={false} />
+          {children}
+        </Providers>
       </body>
     </html>
   );

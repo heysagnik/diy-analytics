@@ -150,14 +150,19 @@ export const prepareChartData = (data: number[], labels: string[]) => {
 };
 
 // Data validation utilities
-export const isValidAnalyticsResponse = (data: any): data is AnalyticsResponse => {
+export const isValidAnalyticsResponse = (data: unknown): data is AnalyticsResponse => {
+  // Perform a runtime check to ensure 'data' is an object and not null
+  if (typeof data !== 'object' || data === null) {
+    return false;
+  }
+  // Now, we can safely cast to Record<string, unknown> to check for properties
+  const obj = data as Record<string, unknown>;
+
   return !!(
-    data &&
-    typeof data === 'object' &&
-    data.timeRange &&
-    data.uniqueUsers &&
-    data.pageViews &&
-    Array.isArray(data.pages) &&
-    Array.isArray(data.sources)
+    obj.timeRange &&
+    obj.uniqueUsers &&
+    obj.pageViews &&
+    Array.isArray(obj.pages) &&
+    Array.isArray(obj.sources)
   );
-}; 
+};

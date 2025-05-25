@@ -27,7 +27,7 @@ export interface Event {
   name: string;
   url: string;
   path: string;
-  data?: any;
+  data?: Record<string, unknown>; // Refined from any
   sessionId: string;
   timestamp?: string;
 }

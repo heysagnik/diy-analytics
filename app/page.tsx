@@ -1,104 +1,77 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { defaultTheme } from '@/utils/theme';
-
-interface Project {
-  _id: string;
-  name: string;
-  url: string;
-  analytics?: {
-    views: number;
-    users: number;
-    growth: string;
-  };
-}
+import { getProjects, createProject, Project } from '@/lib/api/projects';
+import toast from 'react-hot-toast';
+import ErrorState from '@/components/common/ErrorState';
 
 export default function Home() {
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [loading, setLoading] = useState(true);
+  const router = useRouter();
+  const queryClient = useQueryClient();
+
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
   const [newProject, setNewProject] = useState({ name: '', url: '' });
   const [filter, setFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
-  
-  const router = useRouter();
 
-  // Fetch projects when component mounts
-  useEffect(() => {
-    const fetchProjects = async () => {
-      try {
-        const response = await fetch('/api/projects');
-        const data = await response.json();
-        
-        // Get analytics summaries for each project
-        const projectsWithAnalytics = await Promise.all(data.map(async (project: Project) => {
-          try {
-            const analyticsRes = await fetch(`/api/projects/${project._id}/analytics?dateRange=Last 30 days`);
-            const analytics = await analyticsRes.json();
-            
-            return {
-              ...project,
-              analytics: {
-                views: analytics.pageViews?.total || 0,
-                users: analytics.uniqueUsers?.total || 0,
-                growth: (analytics.uniqueUsers?.change || 0) >= 0 
-                  ? `+${analytics.uniqueUsers?.change || 0}%` 
-                  : `${analytics.uniqueUsers?.change || 0}%`
-              }
-            };
-          } catch (error) {
-            console.log('Failed to fetch analytics for project:', project._id, error);
-            return {
-              ...project,
-              analytics: { views: 0, users: 0, growth: "+0%" }
-            };
-          }
-        }));
-        
-        setProjects(projectsWithAnalytics);
-      } catch (error) {
-        console.error('Failed to fetch projects:', error);
-      } finally {
-        setLoading(false);
+  // Fetch projects using useQuery
+  const { 
+    data: projects = [], // Default to empty array if data is undefined
+    isLoading, 
+    isError, 
+    error, 
+    refetch 
+  } = useQuery<Project[], Error>({
+    queryKey: ['projects'],
+    queryFn: getProjects,
+  });
+
+  // Create project using useMutation
+  const createProjectMutation = useMutation<Project | null, Error, { name: string; url: string }>({
+    mutationFn: createProject,
+    onSuccess: (createdProject) => {
+      if (createdProject) {
+        queryClient.invalidateQueries({ queryKey: ['projects'] });
+        setNewProject({ name: '', url: '' });
+        setShowNewProjectModal(false);
+        toast.success("Project created successfully!");
+      } else {
+        // This case might indicate a server-side validation error handled gracefully by createProject
+        toast.error("Failed to create project. Please check the details and try again.");
       }
-    };
-    
-    fetchProjects();
-  }, []);
-  
-  // Create new project
+    },
+    onError: (err) => {
+      console.error('Failed to create project:', err);
+      toast.error(`An error occurred: ${err.message || "Please try again."}`);
+    },
+  });
+
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!newProject.name || !newProject.url) return;
     
+    // Show loading toast immediately
+    const toastId = toast.loading("Creating project...");
+    
     try {
-      const response = await fetch('/api/projects', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(newProject)
-      });
-      
-      const createdProject = await response.json();
-      
-      setProjects(prev => [{
-        ...createdProject,
-        analytics: { views: 0, users: 0, growth: "+0%" }
-      }, ...prev]);
-      
-      setNewProject({ name: '', url: '' });
-      setShowNewProjectModal(false);
-    } catch (error) {
-      console.error('Failed to create project:', error);
+      await createProjectMutation.mutateAsync(newProject);
+      // No need to manually dismiss toastId here if onSuccess/onError handles it.
+      // However, useMutation doesn't directly give toastId to its callbacks.
+      // It's better to handle toast updates within onSuccess/onError.
+      // For this specific pattern, we'll let the mutation callbacks handle their own toasts.
+      toast.dismiss(toastId); // Dismiss loading toast if mutateAsync resolves before callbacks (unlikely but good practice)
+    } catch (_err) { // eslint-disable-line @typescript-eslint/no-unused-vars
+      // This catch is for errors during the mutateAsync call itself, not covered by onError.
+      // Generally, onError in useMutation should handle API errors.
+      toast.error("An unexpected error occurred during submission.", { id: toastId });
     }
   };
   
   // Filter projects based on growth and search query
-  const filteredProjects = projects.filter(project => {
+  const filteredProjects = (projects || []).filter(project => {
     // Filter by search query first
     const matchesSearch = searchQuery === "" || 
       project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -135,7 +108,7 @@ export default function Home() {
                   "--tw-ring-color": defaultTheme.primary
                 } as React.CSSProperties}
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
               />
               <svg
                 className="absolute left-4 top-3"
@@ -200,7 +173,7 @@ export default function Home() {
         </div>
 
         {/* Enhanced Loading State */}
-        {loading ? (
+        {isLoading ? (
           <div className="flex justify-center items-center py-20">
             <div className="space-y-4 w-full max-w-md">
               <div className="h-8 bg-gray-200 rounded animate-pulse w-1/3 mx-auto"></div>
@@ -211,6 +184,8 @@ export default function Home() {
               </div>
             </div>
           </div>
+        ) : isError ? (
+          <ErrorState message={error?.message || "Failed to load projects. Please try again."} onRetry={() => refetch()} />
         ) : filteredProjects.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 px-4 text-center rounded-xl border" 
             style={{ backgroundColor: defaultTheme.cardBg, borderColor: defaultTheme.cardBorder }}>
@@ -374,7 +349,7 @@ export default function Home() {
                       "--tw-ring-color": defaultTheme.primary
                     } as React.CSSProperties}
                     value={newProject.name}
-                    onChange={(e) => setNewProject({...newProject, name: e.target.value})}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewProject({...newProject, name: e.target.value})}
                     required
                     placeholder="My Awesome Website"
                   />
@@ -392,7 +367,7 @@ export default function Home() {
                       "--tw-ring-color": defaultTheme.primary
                     } as React.CSSProperties}
                     value={newProject.url}
-                    onChange={(e) => setNewProject({...newProject, url: e.target.value})}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewProject({...newProject, url: e.target.value})}
                     placeholder="example.com"
                     required
                   />

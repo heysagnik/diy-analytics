@@ -65,18 +65,27 @@ export const useProject = ({ projectId, isValidProjectId }: UseProjectProps): Us
       } else {
         throw new Error('Project not found in API response.');
       }
-    } catch (error: any) {
+    } catch (error: unknown) { // Changed 'any' to 'unknown'
       console.error(`Error fetching project (attempt ${attempt}):`, error);
       
-      const canRetry = error.name !== 'AbortError' && 
-                       !error.message.toLowerCase().includes('not found') &&
-                       !error.message.toLowerCase().includes('invalid project id');
+      let errorMessage = 'An unknown error occurred while fetching project details.';
+      let canRetry = true;
+
+      if (error instanceof Error) {
+        errorMessage = error.message;
+        canRetry = error.name !== 'AbortError' && 
+                   !errorMessage.toLowerCase().includes('not found') &&
+                   !errorMessage.toLowerCase().includes('invalid project id');
+      } else {
+        // If it's not an Error instance, we might not be able to determine retry eligibility
+        canRetry = false; 
+      }
 
       if (attempt < MAX_RETRIES && canRetry) {
         await new Promise(resolve => setTimeout(resolve, 1000 * attempt)); 
         await fetchProject(attempt + 1);
       } else {
-        setError(error instanceof Error ? error.message : 'An unknown error occurred while fetching project details.');
+        setError(errorMessage);
         setIsLoading(false); 
       }
     }

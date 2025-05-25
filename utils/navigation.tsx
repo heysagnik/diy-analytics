@@ -7,19 +7,20 @@ import {
   GearIcon,
   LifebuoyIcon,
   ChatCircleIcon,
-  ArrowBendUpLeftIcon
+  ArrowBendUpLeftIcon,
+  IconProps // Import IconProps
 } from "@phosphor-icons/react";
 import { NavigationItem } from "../components/layout/Navigation";
 import { FooterLink } from "../components/project/Footer";
 import React from "react";
 
 // Wrapper components with data attributes for animations
-const AnimatedHouseIcon = (props: any) => <HouseIcon {...props} data-icon="HouseIcon" />;
-const AnimatedUserIcon = (props: any) => <UserCircleIcon {...props} data-icon="UserCircleIcon" />;
-const AnimatedFunnelIcon = (props: any) => <FunnelIcon {...props} data-icon="FunnelIcon" />;
-const AnimatedArrowsIcon = (props: any) => <ArrowsDownUpIcon {...props} data-icon="ArrowsDownUpIcon" />;
-const AnimatedFlaskIcon = (props: any) => <FlaskIcon {...props} data-icon="FlaskIcon" />;
-const AnimatedGearIcon = (props: any) => <GearIcon {...props} data-icon="GearIcon" />;
+const AnimatedHouseIcon = (props: IconProps) => <HouseIcon {...props} data-icon="HouseIcon" />;
+const AnimatedUserIcon = (props: IconProps) => <UserCircleIcon {...props} data-icon="UserCircleIcon" />;
+const AnimatedFunnelIcon = (props: IconProps) => <FunnelIcon {...props} data-icon="FunnelIcon" />;
+const AnimatedArrowsIcon = (props: IconProps) => <ArrowsDownUpIcon {...props} data-icon="ArrowsDownUpIcon" />;
+const AnimatedFlaskIcon = (props: IconProps) => <FlaskIcon {...props} data-icon="FlaskIcon" />;
+const AnimatedGearIcon = (props: IconProps) => <GearIcon {...props} data-icon="GearIcon" />;
 
 // Get navigation items based on project path
 export const getNavigationItems = (projectBasePath: string): NavigationItem[] => [
