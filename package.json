@@ -6,13 +6,15 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "jest"
   },
   "dependencies": {
     "@apollo/server": "^4.12.1",
     "@as-integrations/next": "^3.2.0",
     "@headlessui/react": "^2.2.4",
     "@phosphor-icons/react": "^2.1.8",
+    "@tanstack/react-query": "^5.77.0",
     "chart.js": "^4.4.9",
     "d3": "^7.9.0",
     "framer-motion": "^12.12.2",
@@ -34,6 +36,7 @@
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
     "@types/d3": "^7.4.3",
+    "@types/jest": "^29.5.14",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
@@ -41,7 +44,11 @@
     "@types/ua-parser-js": "^0.7.39",
     "eslint": "^9",
     "eslint-config-next": "15.3.2",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
+    "jest-fetch-mock": "^3.0.3",
     "tailwindcss": "^4",
+    "ts-jest": "^29.3.4",
     "typescript": "^5"
   }
 }
