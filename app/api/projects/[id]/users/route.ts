@@ -1,234 +1,258 @@
 import { NextRequest, NextResponse } from 'next/server';
 import connectToDatabase from '@/lib/mongodb';
 import PageView from '@/models/PageView';
-import mongoose, { isValidObjectId, PipelineStage } from 'mongoose'; // Import mongoose and PipelineStage
+import mongoose, { isValidObjectId, PipelineStage } from 'mongoose';
 
-// Define an interface for the filter
 interface PageViewFilter {
   projectId: mongoose.Types.ObjectId;
   country?: string;
   timestamp?: { $gte: Date };
-  // Add other potential filter properties here if needed
 }
 
-// Define an interface for activity conditions
-interface ActivityCondition {
-  activityCount?: { $gte?: number; $lte?: number; $gt?: number };
+interface PaginationParams {
+  page: number;
+  limit: number;
+  skip: number;
 }
 
+interface QueryFilters {
+  country?: string;
+  lastSeen?: string;
+  activity?: string;
+}
 
-export async function GET(
-  request: NextRequest,
-  context: { params: Promise<{ id: string }> }
-) {
-  try {
-    // Connect to the database
-    await connectToDatabase();
-    
-    // Access id from params - correctly await the promise
-    const { id: projectIdString } = await context.params; // Renamed for clarity
-    
-    // Validate project ID
-    if (!isValidObjectId(projectIdString)) {
-      return NextResponse.json(
-        { error: 'Invalid project ID' },
-        { status: 400 }
-      );
-    }
-    
-    const projectId = new mongoose.Types.ObjectId(projectIdString); // Convert to ObjectId
+class UserAnalyticsHandler {
+  private static readonly DEFAULT_PAGE = 1;
+  private static readonly DEFAULT_LIMIT = 10;
+  private static readonly MAX_LIMIT = 100;
+  private static readonly RECENT_EVENTS_LIMIT = 3;
 
-    // Get search parameters
-    const searchParams = request.nextUrl.searchParams;
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '10');
-    const country = searchParams.get('country');
-    const lastSeen = searchParams.get('lastSeen');
-    const activity = searchParams.get('activity'); 
-    
-    // Build initial filter query based on projectId, country, and lastSeen
-    const initialFilter: PageViewFilter = { projectId: projectId }; // Use ObjectId and the defined interface
-    
-    if (country) {
-      initialFilter.country = country;
+  private static readonly TIME_RANGES = {
+    lastHour: () => new Date(Date.now() - 60 * 60 * 1000),
+    today: () => {
+      const date = new Date();
+      date.setHours(0, 0, 0, 0);
+      return date;
+    },
+    yesterday: () => {
+      const date = new Date();
+      date.setHours(0, 0, 0, 0);
+      date.setDate(date.getDate() - 1);
+      return date;
+    },
+    lastWeek: () => {
+      const date = new Date();
+      date.setHours(0, 0, 0, 0);
+      date.setDate(date.getDate() - 7);
+      return date;
     }
-    
-    if (lastSeen) {
-      const now = new Date();
-      let timeAgo;
-      
-      switch (lastSeen) {
-        case 'lastHour':
-          timeAgo = new Date(now.getTime() - 60 * 60 * 1000);
-          break;
-        case 'today':
-          timeAgo = new Date(now.setHours(0, 0, 0, 0));
-          break;
-        case 'yesterday':
-          timeAgo = new Date(now.setHours(0, 0, 0, 0));
-          timeAgo.setDate(timeAgo.getDate() - 1);
-          break;
-        case 'lastWeek':
-          timeAgo = new Date(now.setHours(0, 0, 0, 0));
-          timeAgo.setDate(timeAgo.getDate() - 7);
-          break;
-        default:
-          timeAgo = null;
-      }
-      
-      if (timeAgo) {
-        initialFilter.timestamp = { $gte: timeAgo };
-      }
-    }
+  } as const;
 
-    // Add this log to inspect the filter being applied
-    console.log('Applying initial filter:', JSON.stringify(initialFilter));
-    
-    // Pagination calculation
+  private static readonly ACTIVITY_LEVELS = {
+    low: { $gte: 1, $lte: 5 },
+    medium: { $gt: 5, $lte: 15 },
+    high: { $gt: 15 }
+  } as const;
+
+  private validateProjectId(projectId: string): mongoose.Types.ObjectId {
+    if (!isValidObjectId(projectId)) {
+      throw new Error('Invalid project ID format');
+    }
+    return new mongoose.Types.ObjectId(projectId);
+  }
+
+  private extractPaginationParams(searchParams: URLSearchParams): PaginationParams {
+    const page = Math.max(1, parseInt(searchParams.get('page') || String(UserAnalyticsHandler.DEFAULT_PAGE)));
+    const limit = Math.min(
+      UserAnalyticsHandler.MAX_LIMIT,
+      Math.max(1, parseInt(searchParams.get('limit') || String(UserAnalyticsHandler.DEFAULT_LIMIT)))
+    );
     const skip = (page - 1) * limit;
 
-    // Define common aggregation stages used for both fetching users and counting total
-    const commonPipelineStages: PipelineStage[] = [
-      { $match: initialFilter }, // Match documents first
-      { 
-        $sort: { timestamp: -1 } // Sort by timestamp to get the $first correct fields in $group
-      },
+    return { page, limit, skip };
+  }
+
+  private extractQueryFilters(searchParams: URLSearchParams): QueryFilters {
+    return {
+      country: searchParams.get('country') || undefined,
+      lastSeen: searchParams.get('lastSeen') || undefined,
+      activity: searchParams.get('activity') || undefined
+    };
+  }
+
+  private buildBaseFilter(projectId: mongoose.Types.ObjectId, filters: QueryFilters): PageViewFilter {
+    const baseFilter: PageViewFilter = { projectId };
+
+    if (filters.country) {
+      baseFilter.country = filters.country;
+    }
+
+    if (filters.lastSeen && filters.lastSeen in UserAnalyticsHandler.TIME_RANGES) {
+      const timeCalculator = UserAnalyticsHandler.TIME_RANGES[filters.lastSeen as keyof typeof UserAnalyticsHandler.TIME_RANGES];
+      baseFilter.timestamp = { $gte: timeCalculator() };
+    }
+
+    return baseFilter;
+  }
+
+  private buildActivityFilter(activity?: string): PipelineStage[] {
+    if (!activity || !(activity.toLowerCase() in UserAnalyticsHandler.ACTIVITY_LEVELS)) {
+      return [];
+    }
+
+    const activityLevel = activity.toLowerCase() as keyof typeof UserAnalyticsHandler.ACTIVITY_LEVELS;
+    const condition = UserAnalyticsHandler.ACTIVITY_LEVELS[activityLevel];
+
+    return [{ $match: { activityCount: condition } }];
+  }
+
+  private createBasePipeline(filter: PageViewFilter): PipelineStage[] {
+    return [
+      { $match: filter },
+      { $sort: { timestamp: -1 } },
       {
-        $group: { // Group by session to identify unique users and their aggregate data
+        $group: {
           _id: '$sessionId',
           userId: { $first: '$sessionId' },
           country: { $first: '$country' },
-          lastSeen: { $max: '$timestamp' }, // Use $max for clarity, captures latest timestamp
-          firstSeen: { $min: '$timestamp' }, // Capture the earliest timestamp
-          browser: { $first: '$browser' }, // Takes from the latest record due to sort
-          device: { $first: '$device' },   // Takes from the latest record
-          os: { $first: '$os' },           // Takes from the latest record
+          lastSeen: { $max: '$timestamp' },
+          firstSeen: { $min: '$timestamp' },
+          browser: { $first: '$browser' },
+          device: { $first: '$device' },
+          os: { $first: '$os' },
           paths: { $addToSet: '$path' },
-          activityCount: { $sum: 1 }, // Calculate activity count for each user session
+          activityCount: { $sum: 1 }
         }
-      },
+      }
     ];
+  }
 
-    // Dynamically add activity filter stage if 'activity' param is present
-    const activityFilterStages: PipelineStage[] = [];
-    if (activity) {
-      let activityCondition: ActivityCondition = {};
-      switch (activity.toLowerCase()) {
-        case 'low':
-          activityCondition = { activityCount: { $gte: 1, $lte: 5 } };
-          break;
-        case 'medium':
-          activityCondition = { activityCount: { $gt: 5, $lte: 15 } };
-          break;
-        case 'high':
-          activityCondition = { activityCount: { $gt: 15 } };
-          break;
-      }
-      if (Object.keys(activityCondition).length > 0) {
-        activityFilterStages.push({ $match: activityCondition });
-        console.log('Applying activity filter:', JSON.stringify(activityCondition));
-      }
-    }
-    
-    // Define the $lookup stage for recent events
-    // Assumes 'Event' collection is named 'events' and Event documents have 'sessionId' and 'projectId'
-    const lookupRecentEventsStage: PipelineStage = {
+  private createRecentEventsLookup(projectId: mongoose.Types.ObjectId): PipelineStage {
+    return {
       $lookup: {
-        from: 'events', // Verify this is the correct collection name for your Event model
-        let: { userSessionId: '$_id', pId: projectId }, // _id from $group is sessionId
+        from: 'events',
+        let: { userSessionId: '$_id', pId: projectId },
         pipeline: [
           {
             $match: {
               $expr: {
                 $and: [
-                  { $eq: ['$sessionId', '$$userSessionId'] }, // Match event's sessionId
-                  { $eq: ['$projectId', '$$pId'] } // Match event's projectId
+                  { $eq: ['$sessionId', '$$userSessionId'] },
+                  { $eq: ['$projectId', '$$pId'] }
                 ]
               }
             }
           },
-          { $sort: { timestamp: -1 } }, // Get the most recent events
-          { $limit: 3 }, // Limit to 3 recent events
-          { $project: { _id: 0, name: 1, timestamp: 1 } } // Select desired event fields
+          { $sort: { timestamp: -1 } },
+          { $limit: UserAnalyticsHandler.RECENT_EVENTS_LIMIT },
+          { $project: { _id: 0, name: 1, timestamp: 1 } }
         ],
-        as: 'recentEvents' // Output array field name
+        as: 'recentEvents'
       }
     };
-    
-    // Aggregate to get unique users with their last activity, including activity filter and recent events
-    const usersAggregationPipeline: PipelineStage[] = [
-      ...commonPipelineStages,
-      ...activityFilterStages, // Apply activity filter here
-      lookupRecentEventsStage,  // Add recent events for each user
+  }
+
+  private createUsersPipeline(
+    baseFilter: PageViewFilter,
+    projectId: mongoose.Types.ObjectId,
+    activityFilter: PipelineStage[],
+    pagination: PaginationParams
+  ): PipelineStage[] {
+    return [
+      ...this.createBasePipeline(baseFilter),
+      ...activityFilter,
+      this.createRecentEventsLookup(projectId),
       {
-        $project: { // Project the desired fields for the response
+        $project: {
           _id: 0,
           userId: 1,
           country: 1,
           lastSeen: 1,
-          firstSeen: 1, // Include firstSeen
+          firstSeen: 1,
           browser: 1,
           device: 1,
           os: 1,
           pathCount: { $size: '$paths' },
           activityCount: 1,
-          recentEvents: 1 // Include recentEvents
+          recentEvents: 1
         }
       },
-      {
-        $sort: { lastSeen: -1 as -1 } // Sort the final user list
-      },
-      {
-        $skip: skip
-      },
-      {
-        $limit: limit
-      }
+      { $sort: { lastSeen: -1 } },
+      { $skip: pagination.skip },
+      { $limit: pagination.limit }
     ];
+  }
 
-    const users = await PageView.aggregate(usersAggregationPipeline);
-
-    // Add this log to see the direct result of the aggregation
-    console.log(`Found ${users.length} users after all filters and pagination.`);
-
-    // Get total count for pagination, applying all relevant filters including activity
-    // Do NOT include lookupRecentEventsStage in the count pipeline for performance.
-    const totalUsersAggregationPipeline: PipelineStage[] = [
-      ...commonPipelineStages,
-      ...activityFilterStages, // Ensure activity filter is applied for total count
+  private createCountPipeline(baseFilter: PageViewFilter, activityFilter: PipelineStage[]): PipelineStage[] {
+    return [
+      ...this.createBasePipeline(baseFilter),
+      ...activityFilter,
       { $count: 'total' }
     ];
-    
-    const totalUsersResult = await PageView.aggregate(totalUsersAggregationPipeline);
+  }
 
-    const total = totalUsersResult.length > 0 ? totalUsersResult[0].total : 0;
-    const totalPages = Math.ceil(total / limit);
-    
-    // Get list of all countries for filters
+  private async fetchCountries(projectId: mongoose.Types.ObjectId): Promise<string[]> {
     const countries = await PageView.aggregate([
-      { $match: { projectId: projectId } }, // Use ObjectId
+      { $match: { projectId } },
       { $group: { _id: '$country' } },
       { $project: { country: '$_id', _id: 0 } },
       { $sort: { country: 1 } }
     ]);
 
-    return NextResponse.json({
-      users,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages
-      },
-      filters: {
-        countries: countries.map(c => c.country).filter(Boolean)
-      }
-    });
-  } catch (error) {
-    console.error('Error fetching users:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch users' },
-      { status: 500 }
-    );
+    return countries.map(c => c.country).filter(Boolean);
   }
+
+  async handleRequest(request: NextRequest, context: { params: Promise<{ id: string }> }): Promise<NextResponse> {
+    try {
+      await connectToDatabase();
+
+      const { id: projectIdString } = await context.params;
+      const projectId = this.validateProjectId(projectIdString);
+
+      const searchParams = request.nextUrl.searchParams;
+      const pagination = this.extractPaginationParams(searchParams);
+      const queryFilters = this.extractQueryFilters(searchParams);
+
+      const baseFilter = this.buildBaseFilter(projectId, queryFilters);
+      const activityFilter = this.buildActivityFilter(queryFilters.activity);
+
+      const usersPipeline = this.createUsersPipeline(baseFilter, projectId, activityFilter, pagination);
+      const countPipeline = this.createCountPipeline(baseFilter, activityFilter);
+
+      const [users, totalResult, countries] = await Promise.all([
+        PageView.aggregate(usersPipeline),
+        PageView.aggregate(countPipeline),
+        this.fetchCountries(projectId)
+      ]);
+
+      const total = totalResult.length > 0 ? totalResult[0].total : 0;
+      const totalPages = Math.ceil(total / pagination.limit);
+
+      return NextResponse.json({
+        users,
+        pagination: {
+          page: pagination.page,
+          limit: pagination.limit,
+          total,
+          totalPages
+        },
+        filters: {
+          countries
+        }
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to fetch users';
+      const status = error instanceof Error && error.message.includes('Invalid') ? 400 : 500;
+
+      return NextResponse.json({ error: message }, { status });
+    }
+  }
+}
+
+export async function GET(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
+): Promise<NextResponse> {
+  const handler = new UserAnalyticsHandler();
+  return handler.handleRequest(request, context);
 }
