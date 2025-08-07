@@ -61,7 +61,7 @@ npm run dev
 
 ## 📊 Add to Your Site
 
-Copy the snippet from your dashboard and paste it into your site’s <head>.
+Copy the snippet from your dashboard and paste it into your site’s `<head>`.
 <img src="https://github.com/user-attachments/assets/55b84635-32a3-48e5-aef4-8b9510090762" width='500'/>
 
 
