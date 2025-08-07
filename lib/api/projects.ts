@@ -4,6 +4,7 @@ export interface Project {
   _id: string;
   name: string;
   url: string;
+  trackingCode: string;
   analytics?: ProjectAnalytics; // Use ProjectAnalytics interface
 }
 

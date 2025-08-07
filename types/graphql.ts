@@ -3,6 +3,7 @@ export interface Project {
   name: string;
   url: string;
   domain?: string;
+  trackingCode: string;
   publicMode?: boolean;
   createdAt?: string;
 }

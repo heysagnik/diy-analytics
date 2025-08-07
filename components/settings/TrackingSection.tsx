@@ -4,6 +4,7 @@ import { Button } from '../ui/Button';
 import { CaretRightIcon, CodeIcon } from '@phosphor-icons/react';
 import { ToggleSwitch } from '../ui/ToggleSwitch';
 import { InputField } from '../ui/InputField';
+import { CopyableField } from '../ui/CopyableField';
 
 interface TrackingSectionProps {
   project: Project;
@@ -123,8 +124,40 @@ export const TrackingSection: React.FC<TrackingSectionProps> = ({
     }
   };
 
+  const getTrackingScript = () => {
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+    return `<script async defer src="${baseUrl}/api/tracker.js?site-id=${project.trackingCode}"></script>`;
+  };
+
   return (
     <div className="space-y-6">
+      {/* Tracking Code Section */}
+      <div className="p-3 sm:p-5 bg-white rounded-lg border border-gray-100 shadow-sm">
+        <div className="flex items-center gap-3 mb-4">
+          <CodeIcon size={20} style={{ color: theme.accent }} />
+          <h3 className="font-medium">Tracking Code</h3>
+        </div>
+        
+        <div className="space-y-4">
+          <div>
+            <CopyableField
+              label="Site ID"
+              value={project.trackingCode}
+              theme={theme}
+            />
+          </div>
+          
+          <div>
+            <CopyableField
+              label="Tracking Script"
+              value={getTrackingScript()}
+              theme={theme}
+              hint="Add this script to your website's <head> section to start tracking"
+            />
+          </div>
+        </div>
+      </div>
+
       {/* Exclude My Visits - Primary Setting */}
       <div className="p-3 sm:p-5 bg-white rounded-lg border border-gray-100 shadow-sm">
         <div className="flex items-center gap-3 mb-4">

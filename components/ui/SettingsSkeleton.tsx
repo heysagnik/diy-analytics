@@ -7,7 +7,7 @@ interface SettingsSkeletonProps {
 
 export const SettingsSkeleton: React.FC<SettingsSkeletonProps> = ({ theme }) => {
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6 animate-pulse">
+    <div className="max-w-3xl mx-auto px-4 py-6">
       {/* Page title skeleton */}
       <div className="h-8 bg-gray-200 rounded-md w-2/3 mb-2"></div>
       <div className="h-4 bg-gray-200 rounded-md w-5/6 mb-6"></div>

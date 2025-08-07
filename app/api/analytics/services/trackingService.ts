@@ -5,6 +5,7 @@ import PageView from '../../../../models/PageView';
 import Event from '../../../../models/Event';
 
 export interface TrackingPayload {
+  siteId: string; // Add siteId to payload
   domain: string;
   type: 'pageview' | 'event';
   url: string;
@@ -64,6 +65,7 @@ interface ProjectDocument {
   _id: Types.ObjectId;
   domain?: string;
   url?: string;
+  trackingCode: string;
 }
 
 interface SessionInfo {
@@ -99,13 +101,27 @@ export class TrackingService {
         return { success: false, error: validationError };
       }
 
-      // Find project
-      const project = await this.findProject(payload.domain);
+      // Find project by tracking code
+      const project = await this.findProjectByTrackingCode(payload.siteId);
       if (!project) {
         return { 
           success: false, 
-          error: 'Project not found for this domain',
-          details: { domain: payload.domain }
+          error: 'Invalid site ID or project not found',
+          details: { siteId: payload.siteId }
+        };
+      }
+
+      // Validate domain authorization
+      const domainValidationError = this.validateDomainAuthorization(project, payload.domain);
+      if (domainValidationError) {
+        return { 
+          success: false, 
+          error: domainValidationError,
+          details: { 
+            siteId: payload.siteId,
+            domain: payload.domain,
+            allowedDomains: [project.domain, project.url].filter(Boolean)
+          }
         };
       }
 
@@ -126,7 +142,8 @@ export class TrackingService {
         sessionId,
         details: {
           type: payload.type,
-          projectId: project._id.toString()
+          projectId: project._id.toString(),
+          siteId: payload.siteId
         }
       };
 
@@ -144,6 +161,10 @@ export class TrackingService {
    * Validate tracking payload
    */
   private validatePayload(payload: TrackingPayload): string | null {
+    if (!payload.siteId || typeof payload.siteId !== 'string') {
+      return 'Site ID is required and must be a string';
+    }
+
     if (!payload.domain || typeof payload.domain !== 'string') {
       return 'Domain is required and must be a string';
     }
@@ -178,30 +199,36 @@ export class TrackingService {
   }
 
   /**
-   * Find project by domain
+   * Find project by tracking code
    */
-  private async findProject(domain: string): Promise<ProjectDocument | null> {
-    const normalizedDomain = domain.replace(/^(?:https?:\/\/)?(?:www\.)?/i, "").split('/')[0];
-    
-    // Try exact domain match first
-    let project = await Project.findOne({
-      $or: [
-        { domain: normalizedDomain },
-        { url: normalizedDomain },
-      ]
-    }).lean() as ProjectDocument | null;
+  private async findProjectByTrackingCode(trackingCode: string): Promise<ProjectDocument | null> {
+    return await Project.findOne({ trackingCode }).lean() as ProjectDocument | null;
+  }
 
-    // Fallback to regex match for projects with URL paths
-    if (!project) {
-      project = await Project.findOne({ 
-        url: { 
-          $regex: `^https?:\/\/(www\.)?${normalizedDomain.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 
-          $options: 'i' 
-        } 
-      }).lean() as ProjectDocument | null;
+  /**
+   * Validate domain authorization
+   */
+  private validateDomainAuthorization(project: ProjectDocument, requestDomain: string): string | null {
+    const allowedDomains = [project.domain, project.url].filter(Boolean);
+    
+    if (allowedDomains.length === 0) {
+      return 'Project has no authorized domains configured';
     }
 
-    return project;
+    const normalizedRequestDomain = requestDomain.replace(/^(?:https?:\/\/)?(?:www\.)?/i, "").split('/')[0];
+    
+    const isAuthorized = allowedDomains.some(domain => {
+      if (!domain) return false;
+      const normalizedDomain = domain.replace(/^(?:https?:\/\/)?(?:www\.)?/i, "").split('/')[0];
+      return normalizedRequestDomain === normalizedDomain || 
+             normalizedRequestDomain.endsWith('.' + normalizedDomain);
+    });
+
+    if (!isAuthorized) {
+      return `Domain '${requestDomain}' is not authorized for this site ID`;
+    }
+
+    return null;
   }
 
   /**

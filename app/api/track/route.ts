@@ -45,6 +45,14 @@ async function trackHandler(req: NextRequest) {
       }, { status: 405, headers: CORS_HEADERS });
     }
 
+    // Validate that siteId is present
+    if (!payload.siteId) {
+      return NextResponse.json({ 
+        success: false,
+        error: 'Site ID is required' 
+      }, { status: 400, headers: CORS_HEADERS });
+    }
+
     // Extract tracking context from request
     const context: TrackingContext = {
       ip: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 

@@ -28,6 +28,15 @@ export { TextareaField } from './ui/TextareaField';
 export { ToggleSwitch } from './ui/ToggleSwitch';
 export { SettingsSkeleton } from './ui/SettingsSkeleton';
 
+// Home Components
+export { ProjectCard } from './home/ProjectCard';
+export { ProjectGrid } from './home/ProjectGrid';
+export { NewProjectModal } from './home/NewProjectModal';
+export { ProjectListHeader } from './home/ProjectListHeader';
+export { ProjectFilters } from './home/ProjectFilters';
+export { ProjectListSkeleton } from './home/ProjectListSkeleton';
+export { EmptyState as ProjectEmptyState } from './home/EmptyState';
+
 // Layout Components
 export { default as Navigation } from './layout/Navigation';
 export { default as ErrorBoundary } from './layout/ErrorBoundary';
@@ -43,4 +52,4 @@ export { default as Footer } from './project/Footer';
 export { TrackingSection } from './settings/TrackingSection';
 export { DangerZoneSection } from './settings/DangerZoneSection';
 export { DataManagementSection } from './settings/DataManagementSection';
-export { GeneralSection } from './settings/GeneralSection'; 
+export { GeneralSection } from './settings/GeneralSection';

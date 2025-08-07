@@ -18,6 +18,16 @@ const ProjectSchema = new Schema({
     trim: true,
     index: true // Add index for faster lookups
   },
+  trackingCode: {
+    type: String,
+    required: true,
+    unique: true,
+    index: true,
+    default: function() {
+      // Generate a unique tracking code if not provided
+      return 'site_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    }
+  },
   publicMode: {
     type: Boolean,
     default: false

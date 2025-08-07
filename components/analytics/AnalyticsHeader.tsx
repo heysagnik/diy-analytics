@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Project, DateRange } from '@/types/analytics';
 import DateRangePicker from './DateRangePicker';
-import { getTrackingScript } from '@/lib/tracking-script';
 
 interface AnalyticsHeaderProps {
   project: Project;
@@ -19,6 +18,11 @@ export const AnalyticsHeader: React.FC<AnalyticsHeaderProps> = ({
   const projectUrlHref = project.url.startsWith('http://') || project.url.startsWith('https://') 
     ? project.url 
     : `https://${project.url}`;
+  
+  const getTrackingScript = () => {
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+    return `<script async defer src="${baseUrl}/api/tracker.js?site-id=${project.trackingCode}"></script>`;
+  };
 
   const handleCopyCode = async () => {
     try {
