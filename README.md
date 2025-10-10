@@ -74,8 +74,22 @@ We're building DIY Analytics as a community effort and welcome contributions of 
 **How to contribute:**
 - **Found a bug?** [Open an issue](https://github.com/heysagnik/diy-analytics/issues).
 - **Have a feature idea?** [Start a discussion](https://github.com/heysagnik/diy-analytics/discussions) or open an issue.
-- **Ready to contribute code or documentation?** Fork the repository, create your feature branch, and then submit a pull request!
+- **Ready to contribute code or documentation?** Read our [Contributing Guide](CONTRIBUTING.md) and submit a pull request!
+
+### 🎃 Hacktoberfest
+
+We're participating in **Hacktoberfest**! Check out our:
+- [Issues labeled `hacktoberfest`](https://github.com/heysagnik/diy-analytics/labels/hacktoberfest)
+- [Issues labeled `good-first-issue`](https://github.com/heysagnik/diy-analytics/labels/good-first-issue)
+- [Comprehensive Issues Analysis](ISSUES_ANALYSIS.md) - Full list of contribution opportunities
 
 Check out our [open issues](https://github.com/heysagnik/diy-analytics/issues) to see where you can help.
+
+### 📚 Documentation
+
+- [Contributing Guide](CONTRIBUTING.md) - How to contribute
+- [Code of Conduct](CODE_OF_CONDUCT.md) - Community guidelines
+- [Security Policy](SECURITY.md) - Security and vulnerability reporting
+- [Issues Analysis](ISSUES_ANALYSIS.md) - Comprehensive project analysis
 
 Let's build something amazing together!
