@@ -29,13 +29,13 @@ export { ToggleSwitch } from './ui/ToggleSwitch';
 export { SettingsSkeleton } from './ui/SettingsSkeleton';
 
 // Home Components
-export { ProjectCard } from './home/ProjectCard';
-export { ProjectGrid } from './home/ProjectGrid';
+export { default as ProjectCard } from "./home/ProjectCard";
+export { default as ProjectGrid } from "./home/ProjectGrid";
+export { EmptyState } from "./home/EmptyState";
 export { NewProjectModal } from './home/NewProjectModal';
 export { ProjectListHeader } from './home/ProjectListHeader';
 export { ProjectFilters } from './home/ProjectFilters';
 export { ProjectListSkeleton } from './home/ProjectListSkeleton';
-export { EmptyState as ProjectEmptyState } from './home/EmptyState';
 
 // Layout Components
 export { default as Navigation } from './layout/Navigation';
