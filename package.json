@@ -10,7 +10,7 @@
     "test": "jest"
   },
   "dependencies": {
-    "@apollo/server": "^4.12.1",
+    "@apollo/server": "^4.13.0",
     "@as-integrations/next": "^3.2.0",
     "@headlessui/react": "^2.2.4",
     "@phosphor-icons/react": "^2.1.8",
