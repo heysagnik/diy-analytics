@@ -98,7 +98,8 @@ function generateTrackingScript(project: ProjectForScript) {
   if (!process.env.NEXT_PUBLIC_SITE_URL && process.env.NODE_ENV === 'production') {
     console.warn('[tracker.js] NEXT_PUBLIC_SITE_URL is not set — generated scripts will point at http://localhost:3000/api/track, which will fail for real visitors.');
   }
-  const endpoint = `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/track`;
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000').replace(/\/+$/, '');
+  const endpoint = `${siteUrl}/api/track`;
   const siteId = project.trackingCode;
   const allowedDomains = [project.domain, project.url].filter(Boolean);
 
