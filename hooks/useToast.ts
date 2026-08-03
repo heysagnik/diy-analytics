@@ -1,18 +1,16 @@
-import { useState } from 'react';
-import { ToastProps } from '../types/settings';
+import { useCallback } from 'react';
+import { toast } from 'sonner';
 
 export const useToast = () => {
-  const [toasts, setToasts] = useState<ToastProps[]>([]);
+  const showToast = useCallback((type: 'success' | 'error' | 'info', message: string) => {
+    if (type === 'success') {
+      toast.success(message);
+    } else if (type === 'error') {
+      toast.error(message);
+    } else {
+      toast.info(message);
+    }
+  }, []);
 
-  const showToast = (type: 'success' | 'error' | 'info', message: string) => {
-    const newToast = { type, message };
-    setToasts([...toasts, newToast]);
-    
-    // Auto-dismiss after 5 seconds
-    setTimeout(() => {
-      setToasts((currentToasts) => currentToasts.filter(t => t !== newToast));
-    }, 5000);
-  };
-
-  return { toasts, showToast };
+  return { showToast };
 };

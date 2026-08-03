@@ -1,65 +1,33 @@
 "use client";
 
-import React from "react";
-import { ListIcon, CircleNotchIcon } from "@phosphor-icons/react";
-import { Theme } from "../../utils/theme";
+import { CircleNotchIcon, SidebarSimpleIcon } from "@phosphor-icons/react";
+import { Button } from "@/components/ui/button";
 
 interface HeaderProps {
   onMenuToggle: () => void;
   projectName: string;
-  theme: Theme;
-  apiMode?: string;
   isLoading?: boolean;
 }
 
-export default function Header({ onMenuToggle, projectName, theme, apiMode, isLoading = false }: HeaderProps) {
+export default function Header({ onMenuToggle, projectName, isLoading = false }: HeaderProps) {
   return (
-    <header
-      className="px-4 py-2 flex items-center border-b"
-      style={{
-        backgroundColor: theme.navBg,
-        borderColor: theme.sidebarBorder,
-      }}
-    >
-      <button
+    <header className="px-3 py-3 flex items-center gap-3 bg-surface-secondary/90 backdrop-blur-md sticky top-0 z-20">
+      <Button
+        size="icon-sm"
+        variant="ghost"
         onClick={onMenuToggle}
-        className="lg:hidden p-2 rounded-md hover:bg-opacity-20 hover:bg-gray-500 transition-colors focus:outline-none focus-visible:ring-2 active:bg-opacity-30"
         aria-label="Open sidebar"
-        style={{
-          outlineColor: theme.lightAccent,
-        }}
       >
-        <ListIcon size={24} weight="bold" style={{ color: theme.accent }} />
-      </button>
+        <SidebarSimpleIcon size={20} weight="bold" />
+      </Button>
 
-      <div className="ml-4 lg:ml-0 flex items-center">
-        <h1 className="text-lg font-semibold ml-1 truncate max-w-[200px]" style={{ color: theme.accent }}>
+      <div className="flex items-center gap-2 min-w-0">
+        <h1 className="font-display font-medium text-lg text-foreground truncate max-w-[220px]">
           {projectName}
         </h1>
-        
-        {/* Loading indicator */}
         {isLoading && (
-          <div className="ml-2">
-            <CircleNotchIcon className="animate-spin" size={16} style={{ color: theme.accent }} />
-          </div>
+          <CircleNotchIcon className="animate-spin text-muted-foreground flex-shrink-0" size={16} />
         )}
-        
-        {apiMode && (
-          <span 
-            className="ml-3 text-xs px-1.5 py-0.5 rounded"
-            style={{ 
-              backgroundColor: apiMode === 'GraphQL' ? theme.lightAccent : theme.cardBorder,
-              color: apiMode === 'GraphQL' ? theme.accent : theme.textLight
-            }}
-          >
-            {apiMode}
-          </span>
-        )}
-      </div>
-
-      {/* Right side of header - could add user info, notifications, etc. */}
-      <div className="ml-auto flex items-center">
-        {/* Placeholder for future components */}
       </div>
     </header>
   );

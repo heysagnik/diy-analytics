@@ -9,9 +9,12 @@ const CORS_HEADERS = {
   'Vary': 'Origin'
 } as const;
 
+// Project analytics requires authenticated project access. Keep responses
+// private and non-cacheable so shared caches cannot bypass authorization.
+// Public, cacheable analytics are served only by /api/public/analytics for
+// projects with publicMode enabled.
 const CACHE_HEADERS = {
-  'Cache-Control': 'public, max-age=300, stale-while-revalidate=600',
-  'ETag': `"analytics-${Date.now()}"`,
+  'Cache-Control': 'private, no-store',
   'Content-Type': 'application/json'
 } as const;
 
@@ -82,4 +85,3 @@ export const OPTIONS = () => routeHandler.handleOptions();
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-export const revalidate = 300;

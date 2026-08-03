@@ -1,387 +1,415 @@
-import { useState, useRef, useEffect } from 'react';
-import { Calendar, CaretRight, CaretLeft} from '@phosphor-icons/react';
-import type { DateRange } from '@/types/analytics';
+import React, { useState, useRef, useEffect, useId } from 'react';
+import { DateRange } from '@/types/analytics';
+import { CalendarIcon, CaretDownIcon, CaretLeftIcon, CaretRightIcon, CheckIcon } from '@phosphor-icons/react';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+
+export interface CustomDateRange {
+  startDate: string;
+  endDate: string;
+}
 
 interface DateRangePickerProps {
   dateRange: DateRange;
-  onDateRangeChange: (range: DateRange) => void;
-  className?: string;
+  onDateRangeChange: (dateRange: DateRange) => void;
+  customRange?: CustomDateRange | null;
+  onCustomRangeChange?: (range: CustomDateRange | null) => void;
 }
 
-const predefinedRanges: DateRange[] = [
-  "Last Hour",
-  "Last 24 hours", 
-  "Last 7 days",
-  "Last 30 days",
-  "Last 6 months",
-  "Last 12 months"
+const DATE_RANGE_OPTIONS: DateRange[] = [
+  'Last Hour',
+  'Last 24 hours',
+  'Last 7 days',
+  'Last 30 days',
+  'Last 6 months',
+  'Last 12 months',
+  'All Time',
 ];
 
-// interface CustomRange {
-//   startDate: Date;
-//   endDate: Date;
-// }
+const WEEKDAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 
-export default function DateRangePicker({ 
-  dateRange, 
-  onDateRangeChange,
-  className
-}: DateRangePickerProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [showCalendar, setShowCalendar] = useState(false);
-  const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [selectedStart, setSelectedStart] = useState<Date | null>(null);
-  const [selectedEnd, setSelectedEnd] = useState<Date | null>(null);
-  const [isSelectingRange, setIsSelectingRange] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const calendarRef = useRef<HTMLDivElement>(null);
-  
+const parseISODate = (value: string) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const [y, m, d] = value.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  return date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d ? date : null;
+};
+
+const toISODate = (year: number, month: number, day: number) =>
+  `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+interface MiniCalendarProps {
+  value: string;
+  onChange: (date: string) => void;
+}
+
+function MiniCalendar({ value, onChange }: MiniCalendarProps) {
+  const today = new Date();
+  const initial = (value && parseISODate(value)) || today;
+  const [viewYear, setViewYear] = useState(initial.getFullYear());
+  const [viewMonth, setViewMonth] = useState(initial.getMonth());
+  const initialDayRef = useRef<HTMLButtonElement>(null);
+
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-        setShowCalendar(false);
-        resetSelection();
-      }
-    }
-    
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+    initialDayRef.current?.focus();
   }, []);
 
-  const resetSelection = () => {
-    setSelectedStart(null);
-    setSelectedEnd(null);
-    setIsSelectingRange(false);
-  };
+  const monthLabel = new Date(viewYear, viewMonth, 1).toLocaleDateString(undefined, {
+    month: 'long',
+    year: 'numeric',
+  });
+  const firstWeekday = new Date(viewYear, viewMonth, 1).getDay();
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const cells: (number | null)[] = [
+    ...Array.from({ length: firstWeekday }, () => null),
+    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+  ];
 
-  const handleRangeSelect = (range: DateRange | "Custom Range") => {
-    if (range === "Custom Range") {
-      setShowCalendar(true);
-      setIsSelectingRange(true);
-      setIsOpen(false);
+  const goPrev = () => {
+    if (viewMonth === 0) {
+      setViewMonth(11);
+      setViewYear((y) => y - 1);
     } else {
-      onDateRangeChange(range);
-      setIsOpen(false);
-      resetSelection();
+      setViewMonth((m) => m - 1);
     }
   };
 
-  const getDaysInMonth = (date: Date) => {
-    const year = date.getFullYear();
-    const month = date.getMonth();
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-    const daysInMonth = lastDay.getDate();
-    const startingDayOfWeek = (firstDay.getDay() + 6) % 7; // Convert to Monday = 0
-    
-    const days = [];
-    
-    // Add previous month's trailing days
-    const prevMonth = new Date(year, month - 1, 0);
-    const prevMonthDays = prevMonth.getDate();
-    for (let i = startingDayOfWeek - 1; i >= 0; i--) {
-      days.push({
-        day: prevMonthDays - i,
-        isCurrentMonth: false,
-        date: new Date(year, month - 1, prevMonthDays - i)
-      });
-    }
-    
-    // Add current month days
-    for (let day = 1; day <= daysInMonth; day++) {
-      days.push({
-        day,
-        isCurrentMonth: true,
-        date: new Date(year, month, day)
-      });
-    }
-    
-    // Add next month's leading days
-    const remainingDays = 42 - days.length; // 6 rows * 7 days
-    for (let day = 1; day <= remainingDays; day++) {
-      days.push({
-        day,
-        isCurrentMonth: false,
-        date: new Date(year, month + 1, day)
-      });
-    }
-    
-    return days;
-  };
-
-  const navigateMonth = (direction: 'prev' | 'next') => {
-    setCurrentMonth(prev => {
-      const newMonth = new Date(prev);
-      if (direction === 'prev') {
-        newMonth.setMonth(prev.getMonth() - 1);
-      } else {
-        newMonth.setMonth(prev.getMonth() + 1);
-      }
-      return newMonth;
-    });
-  };
-
-  const handleDateClick = (date: Date) => {
-    const today = new Date();
-    today.setHours(23, 59, 59, 999); // End of today
-    
-    // Don't allow future dates
-    if (date > today) return;
-    
-    if (!selectedStart || (selectedStart && selectedEnd)) {
-      setSelectedStart(date);
-      setSelectedEnd(null);
-    } else if (selectedStart && !selectedEnd) {
-      if (date < selectedStart) {
-        setSelectedStart(date);
-        setSelectedEnd(null);
-      } else {
-        setSelectedEnd(date);
-      }
+  const goNext = () => {
+    if (viewMonth === 11) {
+      setViewMonth(0);
+      setViewYear((y) => y + 1);
+    } else {
+      setViewMonth((m) => m + 1);
     }
   };
-
-  const applyCustomRange = () => {
-    if (selectedStart && selectedEnd) {
-      // Format the custom range for display
-      const formatDate = (date: Date) => {
-        return date.toLocaleDateString('en-US', { 
-          month: 'short', 
-          day: 'numeric',
-          year: date.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
-        });
-      };
-      
-      const customRangeLabel = `${formatDate(selectedStart)} - ${formatDate(selectedEnd)}` as DateRange;
-      onDateRangeChange(customRangeLabel);
-      setShowCalendar(false);
-      setIsSelectingRange(false);
-    }
-  };
-
-  const cancelCustomRange = () => {
-    setShowCalendar(false);
-    setIsSelectingRange(false);
-    resetSelection();
-  };
-
-  const isDateBetween = (date: Date) => {
-    if (!selectedStart || !selectedEnd) return false;
-    return date > selectedStart && date < selectedEnd;
-  };
-
-  const isToday = (date: Date) => {
-    const today = new Date();
-    return date.toDateString() === today.toDateString();
-  };
-
-  const formatMonthYear = (date: Date) => {
-    return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-  };
-
-  const goToCurrentMonth = () => {
-    setCurrentMonth(new Date());
-  };
-
-  const isCurrentMonth = () => {
-    const now = new Date();
-    return currentMonth.getMonth() === now.getMonth() && 
-           currentMonth.getFullYear() === now.getFullYear();
-  };
-
-  const days = getDaysInMonth(currentMonth);
 
   return (
-    <div className="relative" ref={dropdownRef}>
-      <div className="flex bg-white rounded-lg md:shadow relative">
-        {/* Calendar Button */}
-        <button 
-          className={`hover:bg-gray-100 text-gray-500 focus:text-gray-600 hover:text-gray-600 focus:outline-none text-sm px-2.5 flex items-center font-semibold rounded-l-lg transition-colors ${
-            showCalendar ? 'bg-gray-50 !text-gray-600' : ''
-          }`}
-          style={{ height: '36px' }}
-          onClick={() => handleRangeSelect("Custom Range" as DateRange)}
-        >
-          <Calendar size={17} className="-mt-px" />
-        </button>
-
-        {/* Range Picker Button */}
+    <div className="w-64 rounded-xl bg-surface border border-border shadow-xl p-2.5 text-xs transition-[opacity,transform] duration-150 ease-out starting:opacity-0 starting:scale-95">
+      <div className="flex items-center justify-between mb-2 px-0.5">
         <button
-          className={`hover:bg-gray-100 text-gray-500 hover:text-gray-600 focus:text-gray-600 focus:outline-none text-sm pr-1.5 pl-2 flex items-center justify-center font-semibold rounded-r-lg relative overflow-hidden border-l border-gray-200 transition-colors ${
-            className || ''
-          }`}
-          style={{ height: '36px' }}
-          onClick={() => setIsOpen(!isOpen)}
+          type="button"
+          onClick={goPrev}
+          aria-label="Previous month"
+          className="relative flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 hover:bg-surface-secondary hover:text-foreground active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring before:absolute before:-inset-1.5 before:content-['']"
         >
-          <span className="text-gray-900 mx-1 truncate max-w-32">{dateRange}</span>
-          <CaretRight size={19} className="transform rotate-90 mr-1 mt-px flex-shrink-0" />
+          <CaretLeftIcon size={12} weight="bold" />
+        </button>
+        <span className="text-xs font-semibold text-foreground">{monthLabel}</span>
+        <button
+          type="button"
+          onClick={goNext}
+          aria-label="Next month"
+          className="relative flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 hover:bg-surface-secondary hover:text-foreground active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring before:absolute before:-inset-1.5 before:content-['']"
+        >
+          <CaretRightIcon size={12} weight="bold" />
         </button>
       </div>
 
-      {/* Calendar Popup - Positioned more to the left */}
-      {showCalendar && (
-        <div 
-          className="absolute top-full mt-2 bg-white shadow-xl rounded-lg border border-gray-200 z-50 animate-in slide-in-from-top-2 duration-200"
-          ref={calendarRef}
-          style={{ 
-            width: '320px',
-            left: '-120px' // Move the calendar 120px to the left
-          }}
-        >
-          <div className="p-4">
-            {/* Calendar Header */}
-            <div className="flex items-center justify-between mb-4">
-              <button 
-                className="p-2 hover:bg-gray-100 rounded-full text-gray-600 transition-colors"
-                onClick={() => navigateMonth('prev')}
-              >
-                <CaretLeft size={16} />
-              </button>
-              
-              <div className="flex items-center space-x-2">
-                <button 
-                  className="px-3 py-1 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
-                  onClick={goToCurrentMonth}
-                >
-                  {formatMonthYear(currentMonth)}
-                </button>
-                {!isCurrentMonth() && (
-                  <button
-                    className="w-2 h-2 bg-blue-500 rounded-full hover:bg-blue-600 transition-colors"
-                    onClick={goToCurrentMonth}
-                    title="Go to current month"
-                  />
-                )}
-              </div>
-              
-              <button 
-                className="p-2 hover:bg-gray-100 rounded-full text-gray-600 transition-colors"
-                onClick={() => navigateMonth('next')}
-              >
-                <CaretRight size={16} />
-              </button>
-            </div>
+      <div
+        className="grid gap-y-0.5 text-center"
+        style={{ gridTemplateColumns: 'repeat(7, minmax(0, 1fr))' }}
+      >
+        {WEEKDAY_LABELS.map((d) => (
+          <span key={d} className="label-eyebrow py-1 text-muted-foreground">
+            {d}
+          </span>
+        ))}
+        {cells.map((day, idx) => {
+          if (day === null) return <span key={`empty-${idx}`} />;
+          const iso = toISODate(viewYear, viewMonth, day);
+          const isSelected = value === iso;
+          const isToday =
+            today.getFullYear() === viewYear && today.getMonth() === viewMonth && today.getDate() === day;
+          const receivesInitialFocus = isSelected || (!parseISODate(value) && isToday) || (day === 1 && !isSelected && !isToday);
 
-            {/* Calendar Grid */}
-            <div className="space-y-2">
-              {/* Day Headers */}
-              <div className="grid grid-cols-7 gap-1">
-                {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
-                  <div key={day} className="text-xs text-center text-gray-500 font-medium py-2">
-                    {day}
-                  </div>
-                ))}
-              </div>
-              
-              {/* Calendar Days */}
-              <div className="grid grid-cols-7 gap-1">
-                {days.map((dayObj, index) => {
-                  const isSelected = selectedStart && dayObj.date.getTime() === selectedStart.getTime();
-                  const isEndSelected = selectedEnd && dayObj.date.getTime() === selectedEnd.getTime();
-                  const isInRange = isDateBetween(dayObj.date);
-                  const isCurrentDay = isToday(dayObj.date);
-                  const isFuture = dayObj.date > new Date();
-                  
-                  return (
-                    <button
-                      key={index}
-                      className={`
-                        relative h-8 w-8 text-sm rounded-md transition-all duration-150 font-medium
-                        ${!dayObj.isCurrentMonth ? 'text-gray-300' : 'text-gray-700'}
-                        ${isFuture ? 'text-gray-300 cursor-not-allowed' : 'hover:bg-gray-100 cursor-pointer'}
-                        ${isSelected ? 'bg-blue-600 text-white hover:bg-blue-700' : ''}
-                        ${isEndSelected ? 'bg-blue-600 text-white hover:bg-blue-700' : ''}
-                        ${isInRange ? 'bg-blue-100 text-blue-700' : ''}
-                        ${isCurrentDay && !isSelected && !isEndSelected ? 'ring-2 ring-blue-200' : ''}
-                      `}
-                      onClick={() => handleDateClick(dayObj.date)}
-                      disabled={isFuture}
-                    >
-                      {dayObj.day}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+          return (
+            <button
+              key={day}
+              type="button"
+              ref={receivesInitialFocus ? initialDayRef : undefined}
+              aria-label={new Date(viewYear, viewMonth, day).toLocaleDateString(undefined, {
+                dateStyle: 'long',
+              })}
+              onClick={() => onChange(iso)}
+              className={`mx-auto flex size-7 items-center justify-center rounded-full tabular-nums transition-colors duration-150 active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                isSelected
+                  ? 'bg-accent text-accent-foreground font-semibold'
+                  : isToday
+                  ? 'font-semibold text-accent ring-1 ring-inset ring-accent/40 hover:bg-surface-secondary'
+                  : 'text-foreground hover:bg-surface-secondary'
+              }`}
+            >
+              {day}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
-            {/* Range Selection Status */}
-            {isSelectingRange && (
-              <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                <div className="text-sm text-blue-700">
-                  {!selectedStart && "Select start date"}
-                  {selectedStart && !selectedEnd && "Select end date"}
-                  {selectedStart && selectedEnd && (
-                    <div className="space-y-2">
-                      <div>
-                        <strong>Range:</strong> {selectedStart.toLocaleDateString()} - {selectedEnd.toLocaleDateString()}
-                      </div>
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={applyCustomRange}
-                          className="px-3 py-1 bg-blue-600 text-white text-xs rounded-md hover:bg-blue-700 transition-colors"
-                        >
-                          Apply Range
-                        </button>
-                        <button
-                          onClick={cancelCustomRange}
-                          className="px-3 py-1 bg-gray-200 text-gray-700 text-xs rounded-md hover:bg-gray-300 transition-colors"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
+interface DateFieldProps {
+  label: string;
+  value: string;
+  isActive: boolean;
+  onToggle: () => void;
+  onChange: (date: string) => void;
+  error?: string;
+  buttonRef?: React.RefObject<HTMLButtonElement | null>;
+}
 
-            {/* Quick Actions */}
-            {!isSelectingRange && (
-              <div className="mt-4 pt-3 border-t border-gray-200">
-                <button
-                  onClick={() => {
-                    setIsSelectingRange(true);
-                    resetSelection();
-                  }}
-                  className="w-full text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors"
-                >
-                  Select Custom Range
-                </button>
-              </div>
-            )}
-          </div>
+function DateField({ label, value, isActive, onToggle, onChange, error, buttonRef }: DateFieldProps) {
+  const id = useId();
+  const buttonId = `${id}-button`;
+  const errorId = `${id}-error`;
+  return (
+    <div className="relative flex flex-col gap-1">
+      <Label htmlFor={buttonId}>{label}</Label>
+      <button
+        id={buttonId}
+        type="button"
+        ref={buttonRef}
+        onClick={onToggle}
+        aria-expanded={isActive}
+        aria-describedby={error ? errorId : undefined}
+        className="h-8 w-full flex items-center justify-between rounded-lg border border-input bg-transparent px-2.5 text-sm text-foreground transition-colors outline-none hover:bg-surface-secondary/50 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+      >
+        <span className={value ? 'text-foreground' : 'text-muted-foreground'}>{value || 'Select date'}</span>
+        <CalendarIcon size={14} className="text-muted-foreground" />
+      </button>
+      {isActive && (
+        <div className="absolute left-0 top-full z-10 mt-1">
+          <MiniCalendar value={value} onChange={onChange} />
         </div>
       )}
-
-      {/* Dropdown Menu */}
-      {isOpen && (
-        <div 
-          className="absolute top-full right-0 mt-2 bg-white shadow-xl rounded-lg border border-gray-200 py-1 z-50 animate-in slide-in-from-top-2 duration-200"
-          style={{ minWidth: '160px' }}
-        >
-          {predefinedRanges.map((range) => (
-            <button
-              key={range}
-              className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 transition-colors ${
-                dateRange === range ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'
-              }`}
-              onClick={() => handleRangeSelect(range)}
-            >
-              {range}
-            </button>
-          ))}
-          <hr className="my-1 border-gray-200" />
-          <button
-            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-            onClick={() => handleRangeSelect("Custom Range" as DateRange)}
-          >
-            Custom Range
-          </button>
-        </div>
+      {error && (
+        <p id={errorId} className="text-xs text-destructive" role="alert">
+          {error}
+        </p>
       )}
     </div>
   );
 }
+
+export const DateRangePicker: React.FC<DateRangePickerProps> = ({
+  dateRange,
+  onDateRangeChange,
+  customRange,
+  onCustomRangeChange,
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+  const [isEntered, setIsEntered] = useState(false);
+  const [showCustomPicker, setShowCustomPicker] = useState(false);
+  const [startDate, setStartDate] = useState(customRange?.startDate || '');
+  const [endDate, setEndDate] = useState(customRange?.endDate || '');
+  const [activeField, setActiveField] = useState<'start' | 'end' | null>(null);
+  const [errors, setErrors] = useState<{ start?: string; end?: string }>({});
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const startButtonRef = useRef<HTMLButtonElement>(null);
+  const endButtonRef = useRef<HTMLButtonElement>(null);
+  const wasOpen = useRef(false);
+
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => {
+      setStartDate(customRange?.startDate || '');
+      setEndDate(customRange?.endDate || '');
+      setErrors({});
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [customRange?.startDate, customRange?.endDate]);
+
+  useEffect(() => {
+    if (isOpen) {
+      let enterRaf = 0;
+      const mountRaf = requestAnimationFrame(() => {
+        setIsMounted(true);
+        enterRaf = requestAnimationFrame(() => setIsEntered(true));
+      });
+      const focusRaf = requestAnimationFrame(() => {
+        if (showCustomPicker) startButtonRef.current?.focus();
+        else dropdownRef.current?.querySelector<HTMLButtonElement>('[data-date-range-option]')?.focus();
+      });
+      wasOpen.current = true;
+      return () => {
+        cancelAnimationFrame(mountRaf);
+        cancelAnimationFrame(enterRaf);
+        cancelAnimationFrame(focusRaf);
+      };
+    }
+    const closeRaf = requestAnimationFrame(() => {
+      setIsEntered(false);
+      setActiveField(null);
+      if (wasOpen.current) {
+        triggerRef.current?.focus();
+        wasOpen.current = false;
+      }
+    });
+    return () => cancelAnimationFrame(closeRaf);
+  }, [isOpen, showCustomPicker]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+        setShowCustomPicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSelectOption = (option: DateRange) => {
+    onDateRangeChange(option);
+    if (onCustomRangeChange) onCustomRangeChange(null);
+    setIsOpen(false);
+    setShowCustomPicker(false);
+  };
+
+  const handleApplyCustomRange = (e: React.FormEvent) => {
+    e.preventDefault();
+    const start = parseISODate(startDate);
+    const end = parseISODate(endDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const nextErrors: { start?: string; end?: string } = {};
+    if (!start) nextErrors.start = 'Enter a valid date in YYYY-MM-DD format.';
+    if (!end) nextErrors.end = 'Enter a valid date in YYYY-MM-DD format.';
+    if (start && end && start > end) {
+      nextErrors.start = 'Start date must be on or before the end date.';
+      nextErrors.end = 'End date must be on or after the start date.';
+    }
+    if (end && end > today) nextErrors.end = 'End date cannot be in the future.';
+    setErrors(nextErrors);
+
+    if (nextErrors.start || nextErrors.end) {
+      requestAnimationFrame(() => {
+        (nextErrors.start ? startButtonRef : endButtonRef).current?.focus();
+      });
+    } else if (onCustomRangeChange) {
+      onCustomRangeChange({ startDate, endDate });
+      setIsOpen(false);
+      setShowCustomPicker(false);
+    }
+  };
+
+  const displayText = customRange
+    ? `${customRange.startDate} - ${customRange.endDate}`
+    : dateRange;
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      setIsOpen(false);
+      setShowCustomPicker(false);
+    }
+  };
+
+  return (
+    <div className="relative font-body" ref={dropdownRef} onKeyDown={handleKeyDown}>
+      <Button
+        ref={triggerRef}
+        size="sm"
+        variant="outline"
+        onClick={() => setIsOpen((open) => !open)}
+        aria-expanded={isOpen}
+      >
+        <CalendarIcon size={14} />
+        <span>{displayText}</span>
+        <CaretDownIcon
+          size={12}
+          className={`transition-transform duration-150 ease-out ${isOpen ? 'rotate-180' : 'rotate-0'}`}
+        />
+      </Button>
+
+      {isMounted && (
+        <div
+          onTransitionEnd={() => { if (!isOpen) setIsMounted(false); }}
+          className={`absolute left-0 right-auto origin-top-left md:left-auto md:right-0 md:origin-top-right mt-2 w-64 max-w-[calc(100vw-2rem)] rounded-xl bg-surface border border-border shadow-xl z-50 p-2 text-xs transition-[opacity,transform] duration-150 ease-out ${
+            isEntered ? 'opacity-100 scale-100' : 'pointer-events-none opacity-0 scale-95'
+          }`}
+        >
+          {!showCustomPicker ? (
+            <>
+              {DATE_RANGE_OPTIONS.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  data-date-range-option
+                  onClick={() => handleSelectOption(option)}
+                  className={`w-full flex items-center justify-between px-3.5 py-2 rounded-xs text-left font-medium transition-colors duration-150 cursor-pointer active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                    dateRange === option && !customRange
+                      ? 'bg-accent text-accent-foreground'
+                      : 'hover:bg-surface-secondary text-foreground'
+                  }`}
+                >
+                  <span>{option}</span>
+                  {dateRange === option && !customRange && <CheckIcon size={14} />}
+                </button>
+              ))}
+              {onCustomRangeChange && (
+                <div className="border-t border-border pt-1.5 mt-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setShowCustomPicker(true)}
+                    className="w-full text-left px-3.5 py-2 rounded-xs text-foreground font-medium hover:bg-surface-secondary transition-colors duration-150 cursor-pointer active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    Custom Range...
+                  </button>
+                </div>
+              )}
+            </>
+          ) : (
+            <form onSubmit={handleApplyCustomRange} className="p-2 space-y-3">
+              <div className="font-medium text-foreground border-b border-border pb-2 text-sm">
+                Select Custom Dates
+              </div>
+
+              <DateField
+                label="Start Date"
+                value={startDate}
+                isActive={activeField === 'start'}
+                onToggle={() => setActiveField((f) => (f === 'start' ? null : 'start'))}
+                buttonRef={startButtonRef}
+                error={errors.start}
+                onChange={(date) => {
+                  setStartDate(date);
+                  setErrors((current) => ({ ...current, start: undefined }));
+                  setActiveField(null);
+                  requestAnimationFrame(() => endButtonRef.current?.focus());
+                }}
+              />
+
+              <DateField
+                label="End Date"
+                value={endDate}
+                isActive={activeField === 'end'}
+                onToggle={() => setActiveField((f) => (f === 'end' ? null : 'end'))}
+                buttonRef={endButtonRef}
+                error={errors.end}
+                onChange={(date) => {
+                  setEndDate(date);
+                  setErrors((current) => ({ ...current, end: undefined }));
+                  setActiveField(null);
+                  requestAnimationFrame(() => endButtonRef.current?.focus());
+                }}
+              />
+
+              <div className="flex gap-2 pt-2">
+                <Button type="button" size="sm" variant="outline" onClick={() => setShowCustomPicker(false)} className="flex-1">
+                  Back
+                </Button>
+                <Button size="sm" type="submit" className="flex-1">
+                  Apply
+                </Button>
+              </div>
+            </form>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default DateRangePicker;

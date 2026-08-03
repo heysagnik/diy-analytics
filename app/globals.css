@@ -1,21 +1,410 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Centralized design tokens — see design.md ("Linear-design-analysis",
+ * light-mode adaptation). These feed shadcn/ui's component variables
+ * directly via @theme inline below. Don't re-style shadcn components with
+ * custom classes — use their variants/props and these tokens instead.
+ */
+@theme {
+  --font-display: var(--font-sans), "Inter", sans-serif;
+  --font-body: var(--font-sans), "Inter", sans-serif;
+
+  /* Type ramp and 4px spacing base. */
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1.4;
+  --text-sm: 0.875rem;
+  --text-sm--line-height: 1.5;
+  --text-base: 1rem;
+  --text-base--line-height: 1.5;
+  --text-lg: 1.25rem;
+  --text-lg--line-height: 1.4;
+  --text-xl: 1.75rem;
+  --text-xl--line-height: 1.2;
+  --text-2xl: 2.5rem;
+  --text-2xl--line-height: 1.15;
+  --text-3xl: 3.5rem;
+  --text-3xl--line-height: 1.1;
+  --text-4xl: 5rem;
+  --text-4xl--line-height: 1.05;
+
+  /* Shared tracking for compact labels. */
+  --tracking-label: 0.06em;
+  --tracking-kicker: 0.025rem;
 }
 
 @theme inline {
-  --color-background: var(--background);
+  --font-heading: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-background: var(--background);
+  --color-danger: var(--destructive);
+  --color-danger-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  /* Semantic surface hierarchy. */
+  --color-surface: var(--surface-1);
+  --color-surface-foreground: var(--foreground);
+  --color-surface-secondary: var(--surface-2);
+  --color-surface-secondary-foreground: var(--foreground);
+  --color-surface-tertiary: var(--surface-3);
+  --color-surface-tertiary-foreground: var(--foreground);
+  --color-overlay: var(--popover);
+  --color-overlay-foreground: var(--popover-foreground);
+  --color-default: var(--surface-2);
+  --color-default-foreground: var(--foreground);
+  --color-field-background: var(--background);
+  --color-field-foreground: var(--foreground);
+  --color-focus: var(--ring);
+  --color-link: var(--primary);
+  /* Shared radius scale for controls and surfaces. */
+  --radius-xs: 0.25rem;
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: var(--radius);
+  --radius-xl: 0.75rem;
+  --radius-2xl: 1rem;
+  --radius-3xl: 1.5rem;
+  --radius-4xl: 9999px;
 }
 
-/* Dark mode removed */
+:root {
+  --radius: 0.5rem;
 
+  --background: #ffffff;
+  --foreground: #08090a;
+
+  /* Light surface ladder. */
+  --surface-1: #f5f6f6;
+  --surface-2: #f6f7f7;
+  --surface-3: #eef0f2;
+  --surface-4: #e9ebee;
+
+  --card: var(--surface-1);
+  --card-foreground: #08090a;
+  --popover: #ffffff;
+  --popover-foreground: #08090a;
+
+  --primary: #4c56c4;
+  --primary-foreground: #ffffff;
+
+  --secondary: #f4f5f8;
+  --secondary-foreground: #08090a;
+
+  --muted: #f7f8fa;
+  --muted-foreground: #62666d;
+
+  --accent: #4c56c4;
+  --accent-foreground: #ffffff;
+
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+
+  --success: #16a34a;
+  --success-foreground: #ffffff;
+  --warning: #d97706;
+  --warning-foreground: #ffffff;
+
+  --border: rgba(8, 9, 10, 0.08);
+  --input: rgba(8, 9, 10, 0.1);
+  --ring: #4c56c4;
+
+  --chart-1: #4c56c4;
+  --chart-2: #2f9e8f;
+  --chart-3: #d98a3d;
+  --chart-4: #c25b8f;
+  --chart-5: #8a8f98;
+
+  --sidebar: #ffffff;
+  --sidebar-foreground: #08090a;
+  --sidebar-primary: #4c56c4;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f4f5f8;
+  --sidebar-accent-foreground: #08090a;
+  --sidebar-border: rgba(8, 9, 10, 0.08);
+  --sidebar-ring: #4c56c4;
+
+  --surface-shadow: 0 1px 2px 0 rgba(8, 9, 10, 0.04), 0 0 0 1px rgba(8, 9, 10, 0.06);
+  --overlay-shadow: 0 4px 12px 0 rgba(8, 9, 10, 0.08), 0 0 0 1px rgba(8, 9, 10, 0.06);
+
+  /* Shared slide-from-edge easing. */
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+
+  /* Identicon tint ladder (VisitorAvatar) — hue is per-user, lightness/
+     saturation are theme tokens so every hash clears contrast in both modes. */
+  --avatar-bg-s: 45%;
+  --avatar-bg-l: 93%;
+  --avatar-cell-s: 55%;
+  --avatar-cell-l: 50%;
+}
+
+/*
+ * Dark mode — the near-black Linear canvas documented in design.md, not a
+ * straight inversion of the light ladder. Lavender accent is unchanged
+ * (already dark enough at #5e6ad2 to hold white foreground text in both
+ * modes); success/warning/destructive brighten and switch to dark text so
+ * they still clear contrast against near-black.
+ */
+.dark {
+  --background: #010102;
+  --foreground: #f7f8f8;
+
+  --surface-1: #0f1011;
+  --surface-2: #141516;
+  --surface-3: #18191a;
+  --surface-4: #191a1b;
+
+  --card: var(--surface-1);
+  --card-foreground: #f7f8f8;
+  --popover: #0f1011;
+  --popover-foreground: #f7f8f8;
+
+  --primary: #5e6ad2;
+  --primary-foreground: #ffffff;
+
+  --secondary: #141516;
+  --secondary-foreground: #f7f8f8;
+
+  --muted: #141516;
+  --muted-foreground: #8a8f98;
+
+  --accent: #5e6ad2;
+  --accent-foreground: #ffffff;
+
+  --destructive: #e05555;
+  --destructive-foreground: #010102;
+
+  --success: #27a644;
+  --success-foreground: #010102;
+  --warning: #e2a238;
+  --warning-foreground: #010102;
+
+  --border: #23252a;
+  --input: #34343a;
+  --ring: #828fff;
+
+  --chart-1: #828fff;
+  --chart-2: #45b3a3;
+  --chart-3: #e2a35a;
+  --chart-4: #d67fab;
+  --chart-5: #8a8f98;
+
+  --sidebar: #0f1011;
+  --sidebar-foreground: #f7f8f8;
+  --sidebar-primary: #5e6ad2;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #141516;
+  --sidebar-accent-foreground: #f7f8f8;
+  --sidebar-border: #23252a;
+  --sidebar-ring: #828fff;
+
+  --surface-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.32), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  --overlay-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.48), 0 0 0 1px rgba(255, 255, 255, 0.06);
+
+  --avatar-bg-s: 30%;
+  --avatar-bg-l: 20%;
+  --avatar-cell-s: 50%;
+  --avatar-cell-l: 62%;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+/* Compact scrollbar for internally scrolling panels. */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(8, 9, 10, 0.2) transparent;
+}
+.scrollbar-thin::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 9999px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: color-mix(in oklch, var(--foreground), transparent 85%);
+  border-radius: 9999px;
+  transition: background-color 0.15s ease-out;
+}
+.dark .scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.18);
+}
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background-color: var(--accent);
+}
+
+html,
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Display and body use one type family with tighter display tracking. */
+.font-display {
+  font-family: var(--font-display), "Inter", sans-serif;
+  letter-spacing: -0.02em;
+}
+
+.font-body {
+  font-family: var(--font-body), "Inter", sans-serif;
+}
+
+/* Compact uppercase labels; color remains contextual. */
+.label-eyebrow {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-label);
+}
+
+/* Small rounded icon container used to lead a labeled section or row
+   (profile stats, technology rows, empty states). Size via `size-*`. */
+.icon-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: var(--radius-lg);
+  background-color: color-mix(in oklch, var(--accent), transparent 90%);
+  color: var(--accent);
+}
+
+/* Hides the scrollbar on horizontally-scrollable strips (tab switchers, chip rows)
+   while keeping them scrollable via touch/trackpad/drag. */
+.scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Bordered data tile used for stat pairs, technology rows, and session
+   entries inside the visitor detail panel — a structural grouping border,
+   not a stand-in for elevation (see make-interfaces-feel-better principle 3). */
+.surface-tile {
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background-color: var(--background);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out both;
+}
+
+/* Contextual icon swap (e.g. copy -> check, loading -> done). Both icons
+   stay mounted and cross-fade via opacity+scale+blur instead of unmounting
+   one and mounting the other, so the transition is interruptible and never
+   pops. See make-interfaces-feel-better principle 7. */
+.icon-crossfade {
+  position: relative;
+  display: inline-flex;
+}
+.icon-crossfade > * {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  transition: opacity 200ms cubic-bezier(0.2, 0, 0, 1), transform 200ms cubic-bezier(0.2, 0, 0, 1), filter 200ms cubic-bezier(0.2, 0, 0, 1);
+}
+.icon-crossfade > .icon-crossfade-hidden {
+  opacity: 0;
+  transform: scale(0.25);
+  filter: blur(4px);
+  pointer-events: none;
+}
+
+@keyframes countUpdate {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-count-update {
+  animation: countUpdate 150ms ease-out both;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-6px); }
+  40%, 80% { transform: translateX(6px); }
+}
+.animate-shake {
+  animation: shake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .animate-fade-in,
+  .animate-count-update,
+  .animate-shake {
+    animation: none !important;
+  }
 }

@@ -3,9 +3,10 @@ import { Types } from 'mongoose';
 import Project from '../../../../models/Project';
 import PageView from '../../../../models/PageView';
 import Event from '../../../../models/Event';
+import { normalizeProjectUrl } from '../../../../utils/url';
 
 export interface TrackingPayload {
-  siteId: string; // Add siteId to payload
+  siteId: string;
   domain: string;
   type: 'pageview' | 'event';
   url: string;
@@ -44,6 +45,8 @@ interface DeviceInfo {
 
 interface GeoData {
   country: string;
+  region?: string;
+  city?: string;
   language: string;
 }
 
@@ -66,6 +69,8 @@ interface ProjectDocument {
   domain?: string;
   url?: string;
   trackingCode: string;
+  excludedIPs?: string[];
+  excludedPaths?: string[];
 }
 
 interface SessionInfo {
@@ -77,14 +82,12 @@ export class TrackingService {
   private uaParser: UAParser;
   private sessionCache = new Map<string, SessionInfo>();
   private readonly SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes
+  private lastCleanupAt = 0;
 
   constructor() {
     this.uaParser = new UAParser();
-    
-    // Clean up expired sessions every 5 minutes
-    setInterval(() => {
-      this.cleanupExpiredSessions();
-    }, 5 * 60 * 1000);
+    // NOTE: deliberately no setInterval — that pattern leaks in serverless.
+    // Stale sessions are pruned lazily on each write (see touchSessionCache).
   }
 
   /**
@@ -125,6 +128,16 @@ export class TrackingService {
         };
       }
 
+      // Exclude the project owner's own IPs / paths if configured
+      const ip = context.ip?.split(',')[0]?.trim() || context.ip;
+      if (this.isExcludedIP(ip, project.excludedIPs)) {
+        return { success: true, details: { reason: 'excluded-ip' } };
+      }
+      const path = (() => { try { return new URL(payload.url).pathname; } catch { return ''; } })();
+      if (this.isExcludedPath(path, project.excludedPaths)) {
+        return { success: true, details: { reason: 'excluded-path' } };
+      }
+
       // Process user agent and generate session
       const deviceInfo = this.parseUserAgent(context.userAgent);
       const sessionId = this.getOrCreateSession(payload, context);
@@ -134,7 +147,7 @@ export class TrackingService {
       if (payload.type === 'pageview') {
         await this.trackPageView(project._id, payload, context, deviceInfo, sessionId, geoData, urlData);
       } else if (payload.type === 'event') {
-        await this.trackEvent(project._id, payload, context, deviceInfo, sessionId, geoData);
+        await this.trackEvent(project._id, payload, deviceInfo, sessionId, geoData);
       }
 
       return { 
@@ -157,15 +170,39 @@ export class TrackingService {
     }
   }
 
+  private static readonly MAX_STRING_LENGTHS = {
+    siteId: 100,
+    domain: 255,
+    url: 2048,
+    referrer: 2048,
+    eventName: 128,
+    sessionId: 100,
+    uid: 100
+  } as const;
+
+  private isBoundedString(value: unknown, maxLength: number): value is string {
+    return typeof value === 'string' && value.length > 0 && value.length <= maxLength;
+  }
+
   /**
-   * Validate tracking payload
+   * Validate tracking payload. This is the boundary for a public,
+   * unauthenticated endpoint — every field is treated as attacker-
+   * controlled, so types/lengths are checked explicitly rather than
+   * trusting the TypeScript type (which only describes the shape of
+   * well-formed JSON, not what an arbitrary POST body actually contains).
    */
   private validatePayload(payload: TrackingPayload): string | null {
-    if (!payload.siteId || typeof payload.siteId !== 'string') {
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      return 'Payload must be a JSON object';
+    }
+
+    const { MAX_STRING_LENGTHS: LEN } = TrackingService;
+
+    if (!this.isBoundedString(payload.siteId, LEN.siteId)) {
       return 'Site ID is required and must be a string';
     }
 
-    if (!payload.domain || typeof payload.domain !== 'string') {
+    if (!this.isBoundedString(payload.domain, LEN.domain)) {
       return 'Domain is required and must be a string';
     }
 
@@ -173,25 +210,56 @@ export class TrackingService {
       return 'Type must be either "pageview" or "event"';
     }
 
-    if (!payload.url || typeof payload.url !== 'string') {
+    if (!this.isBoundedString(payload.url, LEN.url)) {
       return 'URL is required and must be a string';
     }
 
+    let parsedUrl: URL;
     try {
-      new URL(payload.url);
+      parsedUrl = new URL(payload.url);
     } catch {
       return 'Invalid URL format';
     }
-
-    if (payload.type === 'event' && !payload.eventName) {
-      return 'Event name is required for event tracking';
+    if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+      return 'URL must use http or https';
     }
 
-    if (payload.eventData && typeof payload.eventData === 'object') {
-      try {
-        JSON.stringify(payload.eventData);
-      } catch {
-        return 'Event data must be JSON serializable';
+    if (payload.referrer !== undefined && payload.referrer !== null && !this.isBoundedString(payload.referrer, LEN.referrer)) {
+      return 'Referrer must be a string within length limits';
+    }
+
+    if (payload.sessionId !== undefined && !this.isBoundedString(payload.sessionId, LEN.sessionId)) {
+      return 'Session ID must be a string within length limits';
+    }
+
+    if (payload.uid !== undefined && !this.isBoundedString(payload.uid, LEN.uid)) {
+      return 'uid must be a string within length limits';
+    }
+
+    if (payload.type === 'event') {
+      if (!this.isBoundedString(payload.eventName, LEN.eventName)) {
+        return 'Event name is required and must be a string within length limits';
+      }
+    }
+
+    if (payload.eventData !== undefined) {
+      if (typeof payload.eventData !== 'object' && typeof payload.eventData !== 'string') {
+        return 'Event data must be an object or a JSON string';
+      }
+      if (typeof payload.eventData === 'object' && payload.eventData !== null) {
+        try {
+          JSON.stringify(payload.eventData);
+        } catch {
+          return 'Event data must be JSON serializable';
+        }
+      }
+    }
+
+    if (payload.timestamp !== undefined) {
+      const t = payload.timestamp;
+      const validType = typeof t === 'string' || typeof t === 'number' || t instanceof Date;
+      if (!validType) {
+        return 'Timestamp must be a string, number, or Date';
       }
     }
 
@@ -210,17 +278,26 @@ export class TrackingService {
    */
   private validateDomainAuthorization(project: ProjectDocument, requestDomain: string): string | null {
     const allowedDomains = [project.domain, project.url].filter(Boolean);
-    
+
     if (allowedDomains.length === 0) {
       return 'Project has no authorized domains configured';
     }
 
-    const normalizedRequestDomain = requestDomain.replace(/^(?:https?:\/\/)?(?:www\.)?/i, "").split('/')[0];
-    
+    // Uses the same hostname-normalization as project creation/update
+    // (utils/url.ts) so a domain authorized in Settings and a domain
+    // reported by the tracker are compared the same way. Falls back to the
+    // simpler strip-only comparison for inputs that don't parse as a URL
+    // (e.g. bare "localhost" without a scheme in some edge deployments),
+    // preserving prior behavior rather than rejecting them outright.
+    const normalizeDomain = (value: string) =>
+      normalizeProjectUrl(value)?.hostname ?? value.replace(/^(?:https?:\/\/)?(?:www\.)?/i, '').split('/')[0];
+
+    const normalizedRequestDomain = normalizeDomain(requestDomain);
+
     const isAuthorized = allowedDomains.some(domain => {
       if (!domain) return false;
-      const normalizedDomain = domain.replace(/^(?:https?:\/\/)?(?:www\.)?/i, "").split('/')[0];
-      return normalizedRequestDomain === normalizedDomain || 
+      const normalizedDomain = normalizeDomain(domain);
+      return normalizedRequestDomain === normalizedDomain ||
              normalizedRequestDomain.endsWith('.' + normalizedDomain);
     });
 
@@ -264,19 +341,35 @@ export class TrackingService {
   }
 
   /**
-   * Get or create session ID
+   * Get or create session ID.
+   *
+   * NOTE: this.sessionCache is process-local (a plain in-memory Map). The
+   * tracker always sends its own sessionId once bootstrapped, so this
+   * fallback path only matters for the very first request or a client
+   * without sessionStorage — but on a horizontally-scaled deployment,
+   * different instances won't see each other's cache, so the fallback
+   * degrades to "usually creates a new session per instance" rather than
+   * true cross-instance continuity. That's an acceptable degrade for a
+   * self-hosted analytics tool (no user-visible correctness issue, just a
+   * slight session-count over-count under scale-out), not worth the
+   * complexity of a shared store for what's already a best-effort path.
    */
   private getOrCreateSession(payload: TrackingPayload, context: TrackingContext): string {
-    // Use provided session ID if valid
+    this.touchSessionCache();
+
+    // Use provided session ID if valid (tracker-sent sid)
     if (payload.sessionId && this.isValidSessionId(payload.sessionId)) {
       this.updateSessionActivity(payload.sessionId);
       return payload.sessionId;
     }
 
-    // Check for existing session based on user ID or IP
-    const cacheKey = payload.uid || context.ip;
+    // Check for existing session based on user ID or IP, scoped to the
+    // site — without the siteId prefix, two different projects sharing an
+    // IP (or, less likely, colliding uid) could be handed the same
+    // fallback session.
+    const cacheKey = `${payload.siteId}:${payload.uid || context.ip}`;
     const existingSession = this.sessionCache.get(cacheKey);
-    
+
     if (existingSession && this.isSessionActive(existingSession.lastSeen)) {
       this.updateSessionActivity(existingSession.sessionId);
       return existingSession.sessionId;
@@ -296,7 +389,7 @@ export class TrackingService {
    * Generate unique session ID
    */
   private generateSessionId(): string {
-    return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    return `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
   }
 
   /**
@@ -326,6 +419,17 @@ export class TrackingService {
   }
 
   /**
+   * Prune expired sessions lazily (at most once per minute) so we don't
+   * need a long-lived interval that leaks in serverless environments.
+   */
+  private touchSessionCache(): void {
+    const now = Date.now();
+    if (now - this.lastCleanupAt < 60 * 1000) return;
+    this.lastCleanupAt = now;
+    this.cleanupExpiredSessions();
+  }
+
+  /**
    * Clean up expired sessions from cache
    */
   private cleanupExpiredSessions(): void {
@@ -337,19 +441,36 @@ export class TrackingService {
     }
   }
 
-  /**
-   * Extract geo data from request context
-   */
+  /** Extract best-effort geo data from request context and supported edge headers. City and region remain unset when those headers are unavailable. */
   private extractGeoData(context: TrackingContext): GeoData {
     return {
-      country: context.country || 
-               context.headers['x-vercel-ip-country'] || 
-               context.headers['cf-ipcountry'] || 
+      country: context.country ||
+               context.headers['x-vercel-ip-country'] ||
+               context.headers['cf-ipcountry'] ||
                'Unknown',
-      language: context.language || 
-                context.headers['accept-language']?.split(',')[0]?.trim() || 
+      region: context.headers['x-vercel-ip-country-region'] || undefined,
+      city: context.headers['x-vercel-ip-city']
+        ? decodeURIComponent(context.headers['x-vercel-ip-city'])
+        : undefined,
+      language: context.language ||
+                context.headers['accept-language']?.split(',')[0]?.trim() ||
                 'en'
     };
+  }
+
+  /**
+   * Derive a stable, groupable traffic source from a raw referrer URL —
+   * the hostname, or 'Direct' when there's no referrer. Computed once at
+   * write time so queries can $group/$match on an indexed field instead of
+   * regex-parsing `referrer` on every analytics request.
+   */
+  private deriveSource(referrer?: string | null): string {
+    if (!referrer) return 'Direct';
+    try {
+      return new URL(referrer).hostname.replace(/^www\./, '') || 'Direct';
+    } catch {
+      return 'Direct';
+    }
   }
 
   /**
@@ -390,12 +511,14 @@ export class TrackingService {
       url: urlData.href,
       path: urlData.pathname,
       referrer: payload.referrer || null,
+      source: urlData.utm.source || this.deriveSource(payload.referrer),
       userAgent: context.userAgent,
       browser: deviceInfo.browser,
       os: deviceInfo.os,
       device: deviceInfo.device,
       country: geoData.country,
-      language: geoData.language,
+      region: geoData.region,
+      city: geoData.city,
       sessionId,
       userId: payload.uid || sessionId,
       utmSource: urlData.utm.source,
@@ -416,25 +539,33 @@ export class TrackingService {
   private async trackEvent(
     projectId: Types.ObjectId,
     payload: TrackingPayload,
-    context: TrackingContext,
     deviceInfo: DeviceInfo,
     sessionId: string,
     geoData: GeoData
   ): Promise<void> {
     const urlData = this.parseUrl(payload.url);
-    
+
     const eventData = {
       projectId,
       name: payload.eventName!,
       url: urlData.href,
       path: urlData.pathname,
-      data: this.serializeEventData(payload.eventData),
+      data: this.normalizeEventData(payload.eventData),
       sessionId,
       userId: payload.uid || sessionId,
       country: geoData.country,
+      region: geoData.region,
+      city: geoData.city,
       browser: deviceInfo.browser,
       os: deviceInfo.os,
       device: deviceInfo.device,
+      referrer: payload.referrer || null,
+      source: urlData.utm.source || this.deriveSource(payload.referrer),
+      utmSource: urlData.utm.source,
+      utmMedium: urlData.utm.medium,
+      utmCampaign: urlData.utm.campaign,
+      utmTerm: urlData.utm.term,
+      utmContent: urlData.utm.content,
       timestamp: this.parseTimestamp(payload.timestamp)
     };
 
@@ -442,67 +573,98 @@ export class TrackingService {
     await event.save();
   }
 
+  // Event.data is a Mixed field with no schema-level size limit — cap the
+  // serialized payload so a buggy or hostile trackEvent() call can't write
+  // an unbounded blob per event.
+  private static readonly MAX_EVENT_DATA_BYTES = 8 * 1024;
+
   /**
-   * Serialize event data
+   * Serialize event data into a plain object to match the Event schema's
+   * Mixed field. Strings are wrapped so they survive the round-trip; invalid
+   * strings become { value: <string> }. Oversized payloads are replaced
+   * with a marker rather than silently truncated (partial JSON would be
+   * misleading to consumers).
    */
-  private serializeEventData(data?: Record<string, unknown> | string): string | undefined {
-    if (!data) return undefined;
-    
+  private normalizeEventData(data?: Record<string, unknown> | string): Record<string, unknown> | undefined {
+    if (data === undefined || data === null) return undefined;
+
+    let normalized: Record<string, unknown>;
     if (typeof data === 'string') {
       try {
-        // Validate that it's valid JSON
-        JSON.parse(data);
-        return data;
+        const parsed = JSON.parse(data);
+        normalized = parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+          ? (parsed as Record<string, unknown>)
+          : { value: parsed };
       } catch {
-        // If not valid JSON, wrap it as a string value
-        return JSON.stringify({ value: data });
+        normalized = { value: data };
       }
+    } else {
+      normalized = data as Record<string, unknown>;
     }
-    
-    return JSON.stringify(data);
+
+    if (Buffer.byteLength(JSON.stringify(normalized)) > TrackingService.MAX_EVENT_DATA_BYTES) {
+      return { _truncated: true, _originalSizeExceeded: true };
+    }
+    return normalized;
   }
 
   /**
-   * Parse timestamp from various formats
+   * Check exclusion helpers — used by the project owner to drop their own
+   * traffic from analytics. Path patterns support a trailing wildcard "*".
+   */
+  private isExcludedIP(ip: string, excluded?: string[]): boolean {
+    if (!excluded || excluded.length === 0 || !ip || ip === 'unknown') return false;
+    return excluded.some((entry) => entry.trim() === ip);
+  }
+
+  private isExcludedPath(path: string, excluded?: string[]): boolean {
+    if (!excluded || excluded.length === 0 || !path) return false;
+    return excluded.some((pattern) => {
+      const p = pattern.trim();
+      if (!p) return false;
+      if (p.endsWith('*')) return path.startsWith(p.slice(0, -1));
+      return path === p;
+    });
+  }
+
+  // A client-supplied timestamp is trusted only within this skew window;
+  // outside it we fall back to server-receive time. Without this, a buggy
+  // or hostile client can backdate/future-date events indefinitely,
+  // corrupting historical reports, retention cohorts, and alert windows.
+  private static readonly MAX_PAST_SKEW_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+  private static readonly MAX_FUTURE_SKEW_MS = 5 * 60 * 1000; // 5 minutes
+
+  /**
+   * Parse timestamp from various formats, bounded to a plausible window
+   * around "now" (see MAX_*_SKEW_MS above).
    */
   private parseTimestamp(timestamp?: string | number | Date): Date {
-    if (!timestamp) return new Date();
-    
-    if (timestamp instanceof Date) return timestamp;
-    
-    if (typeof timestamp === 'number') {
+    const now = new Date();
+    if (!timestamp) return now;
+
+    let parsed: Date;
+    if (timestamp instanceof Date) {
+      parsed = timestamp;
+    } else if (typeof timestamp === 'number') {
       // Handle both milliseconds and seconds
       const ts = timestamp > 1e10 ? timestamp : timestamp * 1000;
-      return new Date(ts);
-    }
-    
-    if (typeof timestamp === 'string') {
-      const parsed = new Date(timestamp);
-      return isNaN(parsed.getTime()) ? new Date() : parsed;
-    }
-    
-    return new Date();
-  }
-
-  /**
-   * Get session statistics
-   */
-  getSessionStats(): { activeSessions: number; oldestSession: number; newestSession: number } {
-    const sessions = Array.from(this.sessionCache.values());
-    if (sessions.length === 0) {
-      return {
-        activeSessions: 0,
-        oldestSession: 0,
-        newestSession: 0
-      };
+      parsed = new Date(ts);
+    } else if (typeof timestamp === 'string') {
+      parsed = new Date(timestamp);
+    } else {
+      return now;
     }
 
-    return {
-      activeSessions: this.sessionCache.size,
-      oldestSession: Math.min(...sessions.map(s => s.lastSeen.getTime())),
-      newestSession: Math.max(...sessions.map(s => s.lastSeen.getTime()))
-    };
+    if (isNaN(parsed.getTime())) return now;
+
+    const delta = parsed.getTime() - now.getTime();
+    if (delta > TrackingService.MAX_FUTURE_SKEW_MS || delta < -TrackingService.MAX_PAST_SKEW_MS) {
+      return now;
+    }
+
+    return parsed;
   }
+
 }
 
 // Export singleton instance

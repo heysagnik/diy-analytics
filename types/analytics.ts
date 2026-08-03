@@ -1,64 +1,57 @@
-// Core Analytics Types
-export type DateRange = 
+// ====================================================================
+// Client-facing analytics types — canonical source for the frontend.
+// Server-side analytics implementation types live in
+// app/api/analytics/types.ts; only the few needed here are imported, and
+// `AnalyticsResponse`/`TimeRange` are re-declared below rather than
+// re-exported as-is, because the server types use `Date` for
+// `timeRange.start`/`end` while the actual wire format (this API
+// serializes with JSON.stringify, which has no Date type) is ISO strings.
+// Typing the client response as `Date` let code call Date methods on a
+// value that's actually a string at runtime.
+// ====================================================================
+
+import type {
+  AnalyticsResponse as ServerAnalyticsResponse,
+} from '../app/api/analytics/types';
+
+export interface TimeRange {
+  start: string;
+  end: string;
+}
+
+export type AnalyticsResponse = Omit<ServerAnalyticsResponse, 'timeRange'> & {
+  timeRange: TimeRange;
+};
+
+export type DateRange =
   | "Last Hour"
-  | "Last 24 hours" 
+  | "Last 24 hours"
   | "Last 7 days"
   | "Last 30 days"
   | "Last 6 months"
-  | "Last 12 months";
+  | "Last 12 months"
+  | "All Time";
 
-export interface MetricData {
-  total: number;
-  change: number;
-  data: number[];
-}
+export type {
+  BrowserData,
+  CampaignData,
+  CountryData,
+  DeviceData,
+  EventData,
+  GoalConversionData,
+  MetricData,
+  PageData,
+  RecentEvent,
+  SourceData,
+  WebVitalData,
+} from '../app/api/analytics/types';
 
-export interface PageData {
-  path: string;
-  users: number;
-  views: number;
-}
+export type AnalyticsData = Omit<AnalyticsResponse, 'timeRange' | 'granularity'>;
 
-export interface SourceData {
-  name: string;
-  users: number;
-}
-
-export interface CountryData {
-  country: string;
-  users: number;
-}
-
-export interface BrowserData {
-  browser: string;
-  users: number;
-}
-
-export interface DeviceData {
-  device: string;
-  users: number;
-}
-
-export interface Event {
-  _id: string;
-  name: string;
-  url: string;
-  path: string;
-  data?: string;
-  sessionId: string;
-  timestamp: string;
-}
-
-export interface TopEvent {
-  name: string;
-  count: number;
-}
-
-export interface EventAnalytics {
-  topEvents: TopEvent[];
-  recentEvents: Event[];
-}
-
+// --------------------------------------------------------------------
+// Canonical Project type — the single source of truth used across the
+// frontend and the REST API client.
+// --------------------------------------------------------------------
 export interface Project {
   _id: string;
   name: string;
@@ -66,30 +59,19 @@ export interface Project {
   domain?: string;
   trackingCode: string;
   publicMode?: boolean;
+  excludedIPs?: string[];
+  excludedPaths?: string[];
   createdAt: string;
+  analytics?: ProjectAnalytics;
 }
 
-export interface AnalyticsData {
-  uniqueUsers: MetricData;
-  pageViews: MetricData;
-  pages: PageData[];
-  sources: SourceData[];
-  usersByCountry: CountryData[];
-  usersByBrowser: BrowserData[];
-  usersByDevice: DeviceData[];
-  eventAnalytics: EventAnalytics;
-  labels: string[];
+interface ProjectAnalytics {
+  views: number;
+  users: number;
+  growth: string;
 }
 
-// Re-export new API types
-export * from '../app/api/analytics/types';
-
-// Date range mapping for API compatibility
-export const legacyToNewDateRangeMap: Record<string, string> = {
-  'Last Hour': 'LAST_HOUR',
-  'Last 24 hours': 'LAST_24_HOURS',
-  'Last 7 days': 'LAST_7_DAYS',
-  'Last 30 days': 'LAST_30_DAYS',
-  'Last 6 months': 'LAST_6_MONTHS',
-  'Last 12 months': 'LAST_12_MONTHS'
-};
+export interface NewProjectData {
+  name: string;
+  url: string;
+}

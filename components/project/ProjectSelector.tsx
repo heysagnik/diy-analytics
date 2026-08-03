@@ -4,31 +4,58 @@ import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { CaretDownIcon } from "@phosphor-icons/react";
-import ErrorBoundary from "../layout/ErrorBoundary";
-import { Theme } from "../../utils/theme";
+import { CaretDownIcon, PlusIcon } from "@phosphor-icons/react";
+import { Badge } from "@/components/ui/badge";
+import { normalizeProjectUrl } from "@/utils/url";
+import { Button } from "@/components/ui/button";
 
 interface ProjectSelectorProps {
   projectId: string;
   projectName: string;
   projectUrl: string;
-  theme: Theme;
+  workspaceId: string;
+  workspaceSlug: string;
 }
 
-export default function ProjectSelector({ projectId, projectName, projectUrl, theme }: ProjectSelectorProps) {
+function ProjectAvatar({ name, url }: { name: string; url: string }) {
+  const [showFavicon, setShowFavicon] = useState(true);
+  const hostname = normalizeProjectUrl(url)?.hostname;
+
+  if (showFavicon && hostname) {
+    return (
+      <div className="w-5 h-5 rounded-full flex-shrink-0 relative overflow-hidden bg-surface-secondary outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10">
+        <Image
+          src={`https://icons.duckduckgo.com/ip3/${encodeURIComponent(hostname)}.ico`}
+          alt={`${name} favicon`}
+          width={20}
+          height={20}
+          className="rounded-full"
+          onError={() => setShowFavicon(false)}
+          unoptimized
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-5 h-5 rounded-full bg-accent flex items-center justify-center text-accent-foreground text-xs font-bold flex-shrink-0">
+      {name ? name.charAt(0).toUpperCase() : '#'}
+    </div>
+  );
+}
+
+export default function ProjectSelector({ projectId, projectName, projectUrl, workspaceId, workspaceSlug }: ProjectSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [projects, setProjects] = useState<Array<{_id: string, name: string, url: string}>>([]);
   const [loading, setLoading] = useState(false);
-  const [showFavicon, setShowFavicon] = useState(true);
   const router = useRouter();
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Fetch projects on component mount
   useEffect(() => {
     const fetchProjects = async () => {
       setLoading(true);
       try {
-        const response = await fetch('/api/projects');
+        const response = await fetch(`/api/projects?workspaceId=${encodeURIComponent(workspaceId)}`);
         if (response.ok) {
           const data = await response.json();
           setProjects(data);
@@ -43,9 +70,8 @@ export default function ProjectSelector({ projectId, projectName, projectUrl, th
     };
 
     fetchProjects();
-  }, []);
+  }, [workspaceId]);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -59,125 +85,82 @@ export default function ProjectSelector({ projectId, projectName, projectUrl, th
     };
   }, []);
 
-  // Navigate to selected project
-  const handleProjectSelect = (projectId: string) => {
-    router.push(`/projects/${projectId}`);
+  const handleProjectSelect = (id: string) => {
+    router.push(`/${workspaceSlug}/projects/${id}`);
     setIsOpen(false);
   };
 
-  const handleImageError = () => {
-    setShowFavicon(false);
-  };
-
   return (
-    <ErrorBoundary>
-      <div className="px-4 py-4 relative" ref={dropdownRef}>
-        {/* Toggle Button */}
-        <button
-          className="w-full flex items-center gap-2 px-3 py-2.5 rounded-md border text-left"
-          style={{ 
-            background: theme.cardBg, 
-            color: theme.accent, 
-            borderColor: theme.sidebarBorder,
-          }}
+      <div className="px-3 py-2.5 relative" ref={dropdownRef}>
+        <Button
+          variant="outline"
+          size="lg"
+          type="button"
+          className="w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-md border border-border bg-surface text-foreground hover:bg-surface-secondary transition-colors text-left cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           onClick={() => setIsOpen(!isOpen)}
           aria-expanded={isOpen}
         >
-          {showFavicon ? (
-            <div className="w-6 h-6 rounded flex-shrink-0 relative">
-              <Image
-                src={`https://icons.duckduckgo.com/ip3/${projectUrl}.ico`}
-                alt={`${projectName} favicon`}
-                width={24}
-                height={24}
-                className="rounded"
-                onError={handleImageError}
-                unoptimized
-              />
-            </div>
-          ) : (
-            <div
-              className="w-6 h-6 rounded flex items-center justify-center text-white text-xs font-medium flex-shrink-0"
-              style={{ background: theme.projectIconBg }}
-            >
-              {projectName ? projectName.charAt(0).toUpperCase() : '#'}
-            </div>
-          )}
-          <span className="font-medium flex-1 truncate">{projectName}</span>
-          <CaretDownIcon 
-            size={16} 
-            className="flex-shrink-0 opacity-70"
-            style={{ 
-              transform: isOpen ? 'rotate(180deg)' : 'rotate(0)', 
-              transition: 'transform 0.15s ease' 
-            }} 
+          <ProjectAvatar name={projectName} url={projectUrl} />
+          <span className="font-medium text-sm flex-1 truncate text-foreground">{projectName}</span>
+          <CaretDownIcon aria-hidden="true"
+            size={16}
+             className={`flex-shrink-0 text-muted-foreground transition-transform duration-200 ease-out ${isOpen ? 'rotate-180' : ''}`}
           />
-        </button>
+        </Button>
 
-        {/* Dropdown */}
-        {isOpen && (
-          <div 
-            className="absolute mt-1 left-4 right-4 rounded-md border bg-white shadow-sm z-50 max-h-72 overflow-y-auto"
-            style={{ borderColor: theme.cardBorder }}
-          >
-            {loading ? (
-              <div className="p-4 text-center text-sm" style={{ color: theme.textLight }}>
-                Loading projects...
-              </div>
-            ) : projects.length === 0 ? (
-              <div className="p-4 text-center text-sm" style={{ color: theme.textLight }}>
-                No projects available
-              </div>
-            ) : (
-              <>
-                {projects.map((project) => (
-                  <button
-                    key={project._id}
-                    className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-gray-50"
-                    style={{
-                      backgroundColor: project._id === projectId ? theme.lightAccent : 'transparent',
-                      color: theme.text,
-                      borderBottom: `1px solid ${theme.cardBorder}`
-                    }}
-                    onClick={() => handleProjectSelect(project._id)}
-                  >
-                    <div
-                      className="w-6 h-6 rounded flex items-center justify-center text-white text-xs font-medium flex-shrink-0"
-                      style={{ background: theme.projectIconBg }}
-                    >
-                      {project.name ? project.name.charAt(0).toUpperCase() : '#'}
-                    </div>
-                    <div className="flex-1 overflow-hidden">
-                      <span className="block truncate">{project.name || 'Unnamed Project'}</span>
-                    </div>
-                    {project._id === projectId && (
-                      <span 
-                        className="text-xs py-0.5 px-2 rounded flex-shrink-0" 
-                        style={{ backgroundColor: theme.accent, color: 'white' }}
+          {isOpen && (
+          <div className="absolute mt-2 left-3 right-3 origin-top rounded-xl border border-border bg-surface shadow-xl z-50 flex flex-col overflow-hidden transition-[opacity,transform] duration-200 ease-out starting:opacity-0 starting:scale-95">
+            <div className="max-h-56 overflow-y-auto scrollbar-thin p-1.5">
+              {loading ? (
+                <div className="p-4 text-center text-xs text-muted-foreground">
+                  Loading projects...
+                </div>
+              ) : projects.length === 0 ? (
+                <div className="p-4 text-center text-xs text-muted-foreground">
+                  No projects available
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  {projects.map((project) => {
+                    const isActive = project._id === projectId;
+                    return (
+                      <button
+                        key={project._id}
+                        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-xs transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                          isActive
+                            ? 'bg-surface-tertiary text-foreground font-medium'
+                            : 'text-muted-foreground hover:bg-surface-secondary'
+                        }`}
+                        onClick={() => handleProjectSelect(project._id)}
                       >
-                        Active
-                      </span>
-                    )}
-                  </button>
-                ))}
-                
-                <Link
-                  href="/"
-                  className="block w-full px-3 py-2.5 text-sm text-center hover:bg-gray-50"
-                  style={{ 
-                    borderTop: `1px solid ${theme.cardBorder}`,
-                    color: theme.accent,
-                    backgroundColor: theme.lightAccent
-                  }}
-                  onClick={() => setIsOpen(false)}
-                >
-                  Create New Project
-                </Link>
-              </>
-            )}
+                        <ProjectAvatar name={project.name} url={project.url} />
+                        <div className="flex-1 overflow-hidden">
+                          <span className="block truncate">{project.name || 'Unnamed Project'}</span>
+                        </div>
+                        {isActive && (
+                          <Badge className="bg-accent text-accent-foreground">
+                            Active
+                          </Badge>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="p-1.5 pt-1 border-t border-border shrink-0">
+              <Link
+                 href={`/${workspaceSlug}`}
+                className="flex items-center justify-center gap-1.5 w-full px-3 py-2 text-xs font-medium text-accent-foreground bg-accent hover:opacity-90 rounded-md transition-colors"
+                onClick={() => setIsOpen(false)}
+              >
+                <PlusIcon size={14} weight="bold" />
+                Create New Project
+              </Link>
+            </div>
           </div>
         )}
       </div>
-    </ErrorBoundary>
   );
 }

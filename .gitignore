@@ -13,6 +13,8 @@
 # testing
 /coverage
 
+.agents/
+
 # next.js
 /.next/
 /out/
@@ -23,6 +25,7 @@
 # misc
 .DS_Store
 *.pem
+/db-backup-*/
 
 # debug
 npm-debug.log*
@@ -30,9 +33,12 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files (keep secrets out of git)
 .env
-
+.env.local
+.env.*.local
+.env.production
+.env.development
 
 # vercel
 .vercel

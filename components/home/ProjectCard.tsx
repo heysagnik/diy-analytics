@@ -1,89 +1,93 @@
 import React from 'react';
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { Card, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { ArrowRightIcon } from '@phosphor-icons/react';
 import { Project } from '@/lib/api/projects';
-import { Theme } from '@/utils/theme';
+import { normalizeProjectUrl } from '@/utils/url';
 
 interface ProjectCardProps {
   project: Project;
-  theme: Theme;
+  workspaceSlug: string;
 }
 
-export const ProjectCard: React.FC<ProjectCardProps> = ({ project, theme }) => {
-  const router = useRouter();
+export const ProjectCard: React.FC<ProjectCardProps> = ({ project, workspaceSlug }) => {
+  const projectHref = `/${workspaceSlug}/projects/${project._id}`;
+  const websiteHref = normalizeProjectUrl(project.url)?.href;
+  const hasData = (project.analytics?.views ?? 0) > 0;
 
   return (
-    <div 
-      key={project._id} 
-      className="rounded-lg p-5 transition-all shadow-sm hover:shadow-lg cursor-pointer group"
-      style={{ 
-        backgroundColor: theme.cardBg,
-        border: `1px solid ${theme.cardBorder}`
-      }}
-      onClick={() => router.push(`/projects/${project._id}`)}
-    >
-      <div className="flex justify-between items-start mb-5">
+    <Card className="group relative p-6 hover:bg-surface-secondary hover:ring-foreground/20 transition-[background-color,box-shadow]">
+      <Link
+        href={projectHref}
+        aria-label={`View analytics for ${project.name}`}
+        className="absolute inset-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+      />
+
+      <div className="pointer-events-none relative z-10 flex justify-between items-start mb-6">
         <div className="overflow-hidden">
-          <h3 className="text-lg font-semibold tracking-tight group-hover:text-primary transition-colors truncate" 
-            style={{ color: theme.accent }}>
+          <CardTitle className="font-display text-lg font-medium tracking-[-0.02em] text-foreground truncate">
             {project.name}
-          </h3>
-          <a 
-            href={`https://${project.url}`} 
-            className="text-xs hover:underline transition-opacity truncate block mt-1"
-            style={{ color: theme.textLight }}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {project.url}
-          </a>
+          </CardTitle>
+          {websiteHref ? (
+            <a
+              href={websiteHref}
+              className="pointer-events-auto relative z-20 text-xs text-muted-foreground hover:text-foreground truncate block mt-1 font-body transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-sm"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {project.url}
+            </a>
+          ) : (
+            <span className="text-xs text-muted-foreground truncate block mt-1 font-body">
+              {project.url}
+            </span>
+          )}
         </div>
-        <span className="ml-2 p-1.5 rounded-full hover:bg-opacity-80 transition-colors" 
-          style={{ backgroundColor: theme.background }}>
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke={theme.textLight}
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M5 12h14"></path>
-            <path d="M12 5l7 7-7 7"></path>
-          </svg>
+        <span
+          aria-hidden
+          className="grid place-items-center size-8 rounded-full border border-border text-foreground group-hover:border-primary/40 group-hover:text-primary group-hover:translate-x-0.5 transition-[border-color,color,transform] flex-shrink-0"
+        >
+          <ArrowRightIcon size={14} weight="bold" />
         </span>
       </div>
-      
-      <div className="flex items-center justify-between mt-auto">
+
+      <div className="pointer-events-none relative z-10 flex items-center justify-between mt-auto pt-4 border-t border-border">
         <div className="flex space-x-6">
           <div>
-            <div className="text-xs font-medium uppercase tracking-wider" style={{ color: theme.textLight }}>
+            <span className="text-xs font-semibold uppercase tracking-label text-muted-foreground block">
               Views
-            </div>
-            <div className="text-base font-semibold mt-1" style={{ color: theme.accent }}>
+            </span>
+            <span className="font-display text-lg text-foreground mt-0.5 block tabular-nums">
               {project.analytics?.views.toLocaleString() || '0'}
-            </div>
+            </span>
           </div>
           <div>
-            <div className="text-xs font-medium uppercase tracking-wider" style={{ color: theme.textLight }}>
+            <span className="text-xs font-semibold uppercase tracking-label text-muted-foreground block">
               Users
-            </div>
-            <div className="text-base font-semibold mt-1" style={{ color: theme.accent }}>
+            </span>
+            <span className="font-display text-lg text-foreground mt-0.5 block tabular-nums">
               {project.analytics?.users.toLocaleString() || '0'}
-            </div>
+            </span>
           </div>
         </div>
-        
-        <div className={`text-sm font-medium px-3 py-1 rounded-full ${
-          project.analytics?.growth.startsWith("+") 
-          ? "bg-emerald-100 text-emerald-700" 
-          : "bg-rose-100 text-rose-700"
-        }`}>
-          {project.analytics?.growth || "+0%"}
-        </div>
+
+        {hasData ? (
+          <Badge
+            className={
+              project.analytics?.growth.startsWith("+")
+                ? "bg-success/10 text-success"
+                : "bg-danger/10 text-danger"
+            }
+          >
+            <span className="tabular-nums">{project.analytics?.growth}</span>
+          </Badge>
+        ) : (
+          <Badge variant="secondary" className="text-muted-foreground">
+            No data
+          </Badge>
+        )}
       </div>
-    </div>
+    </Card>
   );
 };

@@ -103,6 +103,17 @@ export function generateLabels(dateRange: DateRange): GeneratedLabels {
         }
         break;
       }
+      case 'All Time': {
+        // Matches the server's ALL_TIME config (60 monthly buckets, see
+        // DATE_RANGES in app/api/analytics/types.ts) — only used as a
+        // placeholder before the real, authoritative labels arrive.
+        for (let i = 59; i >= 0; i--) {
+          const d = new Date(now);
+          d.setMonth(d.getMonth() - i);
+          labels.push(d.toLocaleDateString([], { year: '2-digit', month: 'short' }));
+        }
+        break;
+      }
       default: {
         for (let i = 29; i >= 0; i--) {
           const d = new Date(now);

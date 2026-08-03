@@ -1,16 +1,28 @@
 import React from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Card } from '@/components/ui/card';
 
 export const ProjectListSkeleton: React.FC = () => {
   return (
-    <div className="flex justify-center items-center py-20">
-      <div className="space-y-4 w-full max-w-md">
-        <div className="h-8 bg-gray-200 rounded animate-pulse w-1/3 mx-auto"></div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {[1, 2, 3, 4].map(i => (
-            <div key={i} className="h-32 rounded-lg bg-gray-200 animate-pulse" style={{ animationDelay: `${i * 0.1}s` }}></div>
-          ))}
-        </div>
-      </div>
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 lg:gap-6">
+      {Array.from({ length: 6 }).map((_, index) => (
+        <Card key={index} className="p-5 space-y-4">
+          <div className="flex justify-between items-start">
+            <div className="space-y-2 flex-1">
+              <Skeleton className="h-5 w-3/4 rounded-lg" />
+              <Skeleton className="h-3.5 w-1/2 rounded-md" />
+            </div>
+            <Skeleton className="h-8 w-8 rounded-full" />
+          </div>
+          <div className="pt-4 border-t border-border flex justify-between items-center">
+            <div className="flex gap-4">
+              <Skeleton className="h-8 w-16 rounded-md" />
+              <Skeleton className="h-8 w-16 rounded-md" />
+            </div>
+            <Skeleton className="h-6 w-12 rounded-full" />
+          </div>
+        </Card>
+      ))}
     </div>
   );
 };

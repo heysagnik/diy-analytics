@@ -1,0 +1,86 @@
+import React from 'react';
+
+interface AuthBrandPanelProps {
+  headline: string;
+  subtext: string;
+}
+
+const SPARKLINE_POINTS = '0,38 14,34 28,36 42,24 56,27 70,14 84,18 100,4';
+
+/**
+ * Left-hand brand panel for the split auth layout. Deliberately dark
+ * (`.dark`-scoped) regardless of the form side, which stays light per
+ * product decision — this is a fixed brand moment, not a themeable surface.
+ */
+export default function AuthBrandPanel({ headline, subtext }: AuthBrandPanelProps) {
+  return (
+    <div className="dark relative hidden overflow-hidden bg-background text-foreground lg:flex lg:w-[44%] lg:flex-col lg:justify-between lg:p-10 xl:w-2/5 xl:p-12">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background: [
+            'radial-gradient(620px 460px at 12% -8%, color-mix(in oklch, var(--primary), transparent 62%), transparent 62%)',
+            'radial-gradient(480px 420px at 100% 100%, color-mix(in oklch, var(--primary), transparent 82%), transparent 70%)',
+          ].join(', '),
+        }}
+      />
+      {/* Faint technical grid — reinforces the "quietly technical" brand
+          register from design.md without introducing a second accent. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 opacity-[0.05]"
+        style={{
+          backgroundImage:
+            'linear-gradient(var(--foreground) 1px, transparent 1px), linear-gradient(90deg, var(--foreground) 1px, transparent 1px)',
+          backgroundSize: '32px 32px',
+        }}
+      />
+
+      <div className="relative z-10 font-display text-sm font-semibold tracking-[-0.03em]">
+        <span className="text-accent">DIY</span> Analytics
+      </div>
+
+      <div className="relative z-10 max-w-sm">
+        <h2 className="text-balance font-display text-3xl font-semibold leading-[1.15] tracking-tight xl:text-[2.25rem]">
+          {headline}
+        </h2>
+        <p className="mt-3 text-pretty text-sm leading-relaxed text-muted-foreground">{subtext}</p>
+
+        <div
+          className="mt-8 rounded-xl border border-border p-4 shadow-[var(--overlay-shadow)]"
+          style={{ backgroundColor: 'var(--surface-2)' }}
+        >
+          <div className="flex items-baseline justify-between">
+            <p className="text-xs font-medium text-muted-foreground">Pageviews this week</p>
+            <p className="flex items-center gap-1 text-xs font-medium text-success">
+              <span aria-hidden="true">▲</span> 18%
+            </p>
+          </div>
+          <p className="mt-1 font-mono text-2xl font-semibold tabular-nums">12,406</p>
+          <svg viewBox="0 0 100 40" className="mt-3 h-10 w-full overflow-visible" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="auth-sparkline-fill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="var(--chart-1)" stopOpacity="0.35" />
+                <stop offset="100%" stopColor="var(--chart-1)" stopOpacity="0" />
+              </linearGradient>
+            </defs>
+            <polyline points={`${SPARKLINE_POINTS} 100,40 0,40`} fill="url(#auth-sparkline-fill)" stroke="none" />
+            <polyline
+              points={SPARKLINE_POINTS}
+              fill="none"
+              stroke="var(--chart-1)"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </div>
+      </div>
+
+      <p className="relative z-10 text-xs text-muted-foreground">
+        No cookies. No tracking scripts. Just the numbers that matter.
+      </p>
+    </div>
+  );
+}

@@ -1,301 +1,120 @@
 import React, { useState } from 'react';
-import { Project, Theme } from '../../types/settings';
-import { Button } from '../ui/Button';
-import { FileCsvIcon, CaretRightIcon } from '@phosphor-icons/react';
+import { Project } from '../../types/settings';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { DownloadSimpleIcon } from '@phosphor-icons/react';
+import { SettingsGroup } from './SettingsGroup';
+import { SettingsRow } from './SettingsRow';
+import { isAnalyticsResponse } from '@/lib/api/analytics';
 
 interface DataManagementSectionProps {
   project: Project;
-  onProjectUpdate: (updatedProject: Partial<Project>) => void;
-  theme: Theme;
   showToast: (type: 'success' | 'error' | 'info', message: string) => void;
-  simplified?: boolean;
 }
 
-export const DataManagementSection: React.FC<DataManagementSectionProps> = ({ 
-  project, 
-  onProjectUpdate, 
-  theme, 
+function escapeCsvValue(v: string | number): string {
+  const s = String(v ?? '');
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function toCsvSection(title: string, headers: string[], rows: (string | number)[][]): string {
+  if (rows.length === 0) return '';
+  const lines = [title, headers.join(','), ...rows.map((r) => r.map(escapeCsvValue).join(','))];
+  return lines.join('\n');
+}
+
+export const DataManagementSection: React.FC<DataManagementSectionProps> = ({
+  project,
   showToast,
-  simplified = false
 }) => {
   const [isExporting, setIsExporting] = useState(false);
-  const [exportTimeframe, setExportTimeframe] = useState('last30days');
-  const [showAdvanced, setShowAdvanced] = useState(false);
-  const [retentionDays, setRetentionDays] = useState(project?.dataRetentionDays?.toString() || '90');
-  const [isUpdatingRetention, setIsUpdatingRetention] = useState(false);
-  
-  // Export data based on selected timeframe
+
   const handleExportData = async () => {
     if (!project?._id) return;
-    
     setIsExporting(true);
-    
     try {
-      // Calculate date parameters based on selection
-      let startDate = '';
-      let endDate = '';
-      
-      const today = new Date();
-      
-      switch(exportTimeframe) {
-        case 'last7days':
-          startDate = getDateNDaysAgo(7);
-          break;
-        case 'last30days':
-          startDate = getDateNDaysAgo(30);
-          break;
-        case 'last90days':
-          startDate = getDateNDaysAgo(90);
-          break;
-        case 'thisMonth': {
-          const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-          startDate = firstDay.toISOString().split('T')[0];
-          break;
-        }
-        case 'lastMonth': {
-          const firstDayLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-          const lastDayLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
-          startDate = firstDayLastMonth.toISOString().split('T')[0];
-          endDate = lastDayLastMonth.toISOString().split('T')[0];
-          break;
-        }
-      }
-      
-      // Create API URL with parameters
-      let url = `/api/projects/${project._id}/export`;
-      const params = new URLSearchParams();
-      if (startDate) params.append('startDate', startDate);
-      if (endDate) params.append('endDate', endDate);
-      if (params.toString()) url += `?${params.toString()}`;
-      
-      const response = await fetch(url);
-      
+      const params = new URLSearchParams({ projectId: project._id, dateRange: 'ALL_TIME' });
+      const response = await fetch(`/api/analytics?${params.toString()}`);
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to export data');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Failed to export data (${response.status})`);
       }
-      
-      // Download the file
-      const blob = await response.blob();
-      const url2 = window.URL.createObjectURL(blob);
+      const result: unknown = await response.json();
+      if (typeof result !== 'object' || result === null || !('data' in result) || !isAnalyticsResponse(result.data)) {
+        throw new Error('Analytics export returned an invalid response');
+      }
+      const data = result.data;
+
+      const sections = [
+        toCsvSection('Pages', ['Path', 'Views', 'Users'],
+          data.pages.map((p) => [p.path, p.views, p.users])),
+        toCsvSection('Entry Pages', ['Path', 'Views', 'Users'],
+          data.entryPages.map((p) => [p.path, p.views, p.users])),
+        toCsvSection('Exit Pages', ['Path', 'Views', 'Users'],
+          data.exitPages.map((p) => [p.path, p.views, p.users])),
+        toCsvSection('Sources', ['Source', 'Users', 'Sessions'],
+          data.sources.map((s) => [s.name, s.users, s.sessions])),
+        toCsvSection('Campaigns', ['Campaign', 'Users', 'Sessions'],
+          data.campaigns.map((c) => [c.name, c.users, c.sessions])),
+        toCsvSection('Countries', ['Country', 'Users', 'Sessions'],
+          data.countries.map((c) => [c.country, c.users, c.sessions])),
+        toCsvSection('Browsers', ['Browser', 'Users', 'Sessions'],
+          data.browsers.map((b) => [b.browser, b.users, b.sessions])),
+        toCsvSection('Devices', ['Device', 'Users', 'Sessions'],
+          data.devices.map((d) => [d.device, d.users, d.sessions])),
+        toCsvSection('Goals', ['Goal', 'Conversions', 'Total Sessions', 'Rate %'],
+          data.goals.map((g) => [g.name, g.conversions, g.totalSessions, g.rate])),
+        toCsvSection('Top Events', ['Event', 'Count', 'Unique Users'],
+          data.topEvents.map((e) => [e.name, e.count, e.uniqueUsers])),
+      ].filter(Boolean);
+
+      const csv = sections.join('\n\n');
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.style.display = 'none';
-      a.href = url2;
-      const dateStr = new Date().toISOString().split('T')[0];
-      a.download = `analytics-${project.name}-${dateStr}.csv`;
+      a.href = url;
+      a.download = `analytics-${project.name}-all-time-${new Date().toISOString().split('T')[0]}.csv`;
       document.body.appendChild(a);
       a.click();
-      window.URL.revokeObjectURL(url2);
+      URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      
-      showToast('success', 'Your data has been exported successfully!');
+
+      showToast('success', 'All-time aggregate analytics exported successfully.');
     } catch (error: unknown) {
-      showToast('error', error instanceof Error ? error.message : 'Could not export data');
+      console.error('Could not export analytics:', error);
+      showToast('error', 'Could not export analytics. Please try again.');
     } finally {
       setIsExporting(false);
     }
   };
-  
-  // Helper to get date string for N days ago
-  const getDateNDaysAgo = (days: number) => {
-    const date = new Date();
-    date.setDate(date.getDate() - days);
-    return date.toISOString().split('T')[0];
-  };
-  
-  // Update data retention setting
-  const handleUpdateRetention = async () => {
-    if (!project?._id) return;
-    
-    const days = parseInt(retentionDays);
-    if (isNaN(days) || days < 0) {
-      showToast('error', 'Please select a valid retention period');
-      return;
-    }
-    
-    setIsUpdatingRetention(true);
-    
-    try {
-      const response = await fetch(`/api/projects/${project._id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dataRetentionDays: days }),
-      });
-      
-      if (!response.ok) {
-        throw new Error('Could not update data retention setting');
-      }
-      
-      const updatedProject = await response.json();
-      onProjectUpdate({ dataRetentionDays: updatedProject.dataRetentionDays });
-      
-      showToast('success', `Data retention period updated`);
-    } catch (error: unknown) {
-      showToast('error', error instanceof Error ? error.message : 'An error occurred');
-    } finally {
-      setIsUpdatingRetention(false);
-    }
-  };
 
-  // Super simplified version
   return (
-    <div className={`space-y-${simplified ? '3' : '4'}`}>
-      {/* Export Section - Simplified UI */}
-      <div className="bg-white p-3 sm:p-5 rounded-lg shadow-sm border border-gray-100">
-        <div className="flex items-center gap-2 mb-4">
-          <FileCsvIcon size={20} style={{ color: theme.accent }} weight="fill" />
-          <h3 className="font-medium">Export Analytics</h3>
-        </div>
-        
-        {/* Simple Time Period Selection */}
-        <div className="mb-4">
-          <label className="block text-sm mb-1 text-gray-500">
-            Select time period
-          </label>
-          <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 gap-2">
-            <TimeButton 
-              active={exportTimeframe === 'last7days'} 
-              onClick={() => setExportTimeframe('last7days')}
-              theme={theme}
-            >
-              Last 7 days
-            </TimeButton>
-            <TimeButton 
-              active={exportTimeframe === 'last30days'} 
-              onClick={() => setExportTimeframe('last30days')}
-              theme={theme}
-            >
-              Last 30 days
-            </TimeButton>
-            <TimeButton 
-              active={exportTimeframe === 'last90days'} 
-              onClick={() => setExportTimeframe('last90days')}
-              theme={theme}
-            >
-              Last 90 days
-            </TimeButton>
-            <TimeButton 
-              active={exportTimeframe === 'thisMonth'} 
-              onClick={() => setExportTimeframe('thisMonth')}
-              theme={theme}
-            >
-              This month
-            </TimeButton>
-            <TimeButton 
-              active={exportTimeframe === 'lastMonth'} 
-              onClick={() => setExportTimeframe('lastMonth')}
-              theme={theme}
-            >
-              Last month
-            </TimeButton>
-            <TimeButton 
-              active={exportTimeframe === 'all'} 
-              onClick={() => setExportTimeframe('all')}
-              theme={theme}
-            >
-              All time
-            </TimeButton>
-          </div>
-        </div>
-
-        {/* Download Button */}
-        <Button
-          onClick={handleExportData}
-          variant="primary"
-          isLoading={isExporting}
-          disabled={isExporting}
-          theme={theme}
-          icon={<FileCsvIcon size={16} />}
-          fullWidth
-        >
-          Download CSV
-        </Button>
-      </div>
-
-      {/* Advanced Toggle */}
-      <button
-        className="flex items-center gap-2 text-sm font-medium mt-2"
-        style={{ color: theme.accent }}
-        onClick={() => setShowAdvanced(!showAdvanced)}
-      >
-        <CaretRightIcon 
-          size={16} 
-          style={{ 
-            transform: showAdvanced ? 'rotate(90deg)' : 'rotate(0)', 
-            transition: 'transform 0.2s ease' 
-          }} 
-        />
-        Advanced settings
-      </button>
-      
-      {/* Data Retention - Hidden by Default */}
-      {showAdvanced && (
-        <div className="bg-white p-3 sm:p-5 rounded-lg shadow-sm border border-gray-100">
-          <h3 className="text-base font-medium mb-3">Data Retention</h3>
-          
-          <div className="mb-4">
-            <label className="block text-sm mb-1 text-gray-500">
-              Keep analytics data for
-            </label>
-            <select 
-              className="w-full p-2 border rounded-md"
-              style={{ 
-                borderColor: theme.cardBorder,
-              }}
-              value={retentionDays}
-              onChange={(e) => setRetentionDays(e.target.value)}
-              disabled={isUpdatingRetention}
-            >
-              <option value="30">30 days</option>
-              <option value="90">90 days</option>
-              <option value="180">6 months</option>
-              <option value="365">1 year</option>
-              <option value="0">Forever</option>
-            </select>
-          </div>
-          
+    <SettingsGroup
+      title="Data"
+      headerAction={
+        <Badge variant="secondary" className="hidden sm:inline-flex">
+          Aggregate Snapshot
+        </Badge>
+      }
+    >
+      <SettingsRow
+        label="Export Aggregate Analytics"
+        description="Download an all-time CSV snapshot of aggregate pages, acquisition, audience, goals, and top-event metrics. Raw visitor and session telemetry is not included."
+        action={
           <Button
-            onClick={handleUpdateRetention}
-            variant="secondary"
-            isLoading={isUpdatingRetention}
-            disabled={isUpdatingRetention}
-            theme={theme}
             size="sm"
+            onClick={handleExportData}
+            disabled={isExporting}
           >
-            Save Setting
+            <DownloadSimpleIcon size={14} />
+            <span>{isExporting ? 'Preparing...' : 'Download CSV'}</span>
           </Button>
-          
-          <p className="text-xs text-gray-500 mt-2">
-            Data older than the selected period will be automatically removed
-          </p>
-        </div>
-      )}
-    </div>
+        }
+      >
+        <p className="text-xs text-muted-foreground">Generated on demand; may take a moment for large datasets.</p>
+      </SettingsRow>
+    </SettingsGroup>
   );
 };
-
-// Helper component for time period selection
-interface TimeButtonProps {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-  theme: Theme;
-}
-
-const TimeButton: React.FC<TimeButtonProps> = ({ active, onClick, children, theme }) => (
-  <button
-    onClick={onClick}
-    className={`text-sm p-2 rounded-md text-center transition-colors ${
-      active 
-        ? 'bg-blue-50 border-blue-200 font-medium' 
-        : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
-    }`}
-    style={{ 
-      borderWidth: '1px',
-      color: active ? theme.accent : theme.textLight
-    }}
-    type="button"
-  >
-    {children}
-  </button>
-);

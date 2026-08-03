@@ -53,6 +53,23 @@ export const DATE_RANGES: Record<string, DateRangeConfig> = {
     duration: 12 * 30 * 24 * 60 * 60 * 1000, // 12 months (approx)
     granularity: 'month',
     dataPoints: 12
+  },
+  // All-time — used by the CSV export, which has no UI date picker of its
+  // own. 5 years comfortably covers any self-hosted deployment's history.
+  'ALL_TIME': {
+    key: 'ALL_TIME',
+    label: 'All Time',
+    duration: 5 * 365 * 24 * 60 * 60 * 1000,
+    granularity: 'month',
+    dataPoints: 60
+  },
+  // Custom range — actual window comes from startDate/endDate on the request.
+  'CUSTOM': {
+    key: 'CUSTOM',
+    label: 'Custom Range',
+    duration: 30 * 24 * 60 * 60 * 1000,
+    granularity: 'day',
+    dataPoints: 30
   }
 };
 
@@ -77,6 +94,27 @@ export interface SourceData {
   users: number;
   sessions: number;
   conversion?: number;
+}
+
+export interface CampaignData {
+  name: string;
+  users: number;
+  sessions: number;
+}
+
+export interface GoalConversionData {
+  goalId: string;
+  name: string;
+  type: 'page' | 'event';
+  conversions: number;
+  totalSessions: number;
+  rate: number;
+}
+
+export interface WebVitalData {
+  metric: 'LCP' | 'CLS' | 'INP';
+  p75: number;
+  samples: number;
 }
 
 export interface CountryData {
@@ -107,7 +145,6 @@ export interface EventData {
   avgValue?: number;
 }
 
-// Define specific types for event data
 export type EventDataValue = string | number | boolean | null | undefined;
 export type EventDataRecord = Record<string, EventDataValue | EventDataValue[] | Record<string, EventDataValue>>;
 
@@ -118,7 +155,9 @@ export interface RecentEvent {
   path: string;
   data?: EventDataRecord;
   sessionId: string;
-  timestamp: Date;
+  // ISO 8601 string — JSON has no Date type, and the API serializes with
+  // JSON.stringify, so consumers receive a string over the wire.
+  timestamp: string;
   country?: string;
   browser?: string;
   device?: string;
@@ -137,6 +176,11 @@ export interface AnalyticsResponse {
   countries: CountryData[];
   browsers: BrowserData[];
   devices: DeviceData[];
+  campaigns: CampaignData[];
+  entryPages: PageData[];
+  exitPages: PageData[];
+  goals: GoalConversionData[];
+  webVitals: WebVitalData[];
   topEvents: EventData[];
   recentEvents: RecentEvent[];
 }
@@ -145,67 +189,33 @@ export interface QueryOptions {
   projectId: string;
   dateRange: string;
   timezone?: string;
+  // Optional custom absolute range. When both are present, the selected
+  // preset's `dateRange` is only used to choose granularity; the actual
+  // window is overridden by these dates.
+  startDate?: string;
+  endDate?: string;
   filters?: {
     country?: string[];
     browser?: string[];
     device?: string[];
     source?: string[];
+    page?: string[];
+    utmSource?: string[];
+    utmMedium?: string[];
+    utmCampaign?: string[];
   };
 }
 
-// Define specific types for MongoDB aggregation pipelines
-export interface MongoMatchCondition {
-  [key: string]: string | number | boolean | Date | RegExp | {
-    $in?: (string | number)[];
-    $nin?: (string | number)[];
-    $gt?: string | number | Date;
-    $gte?: string | number | Date;
-    $lt?: string | number | Date;
-    $lte?: string | number | Date;
-    $exists?: boolean;
-    $regex?: string | RegExp;
-    $options?: string;
-    $ne?: string | number | boolean | Date;
-    $or?: MongoMatchCondition[];
-    $and?: MongoMatchCondition[];
-  };
+export interface RealtimeVisitor {
+  sessionId: string;
+  path: string;
+  country?: string;
+  lastActiveAt: string;
 }
 
-export interface MongoGroupStage {
-  _id: string | Record<string, string | number | {
-    $dateToString?: {
-      format: string;
-      date: string;
-      timezone?: string;
-    };
-    $year?: string;
-    $month?: string;
-    $dayOfMonth?: string;
-    $hour?: string;
-    $minute?: string;
-  }> | null;
-  [key: string]: {
-    $sum?: number | string;
-    $avg?: string;
-    $count?: Record<string, never>;
-    $addToSet?: string;
-    $first?: string;
-    $last?: string;
-    $max?: string;
-    $min?: string;
-    $push?: string | Record<string, string>;
-  } | string | Record<string, unknown> | null;
-}
-
-export interface MongoSortStage {
-  [key: string]: 1 | -1;
-}
-
-export interface AggregationPipeline {
-  match: MongoMatchCondition;
-  group: MongoGroupStage;
-  sort?: MongoSortStage;
-  limit?: number;
+export interface RealtimeResponse {
+  count: number;
+  visitors: RealtimeVisitor[];
 }
 
 export interface ErrorResponse {
@@ -215,33 +225,6 @@ export interface ErrorResponse {
   timestamp: Date;
 }
 
-// Additional utility types for better type safety
 export type MetricKey = 'uniqueUsers' | 'pageViews' | 'sessions' | 'bounceRate' | 'avgSessionDuration';
 export type DeviceCategory = 'desktop' | 'mobile' | 'tablet';
 export type GranularityType = 'minute' | 'hour' | 'day' | 'week' | 'month';
-
-// Helper type for aggregation results
-export interface AggregationResult {
-  _id: string | Record<string, unknown> | null;
-  count?: number;
-  sum?: number;
-  avg?: number;
-  users?: number;
-  sessions?: number;
-  value?: number;
-  date?: string;
-  [key: string]: unknown;
-}
-
-// Type for database query filters
-export interface DatabaseFilters {
-  projectId: string;
-  timestamp: {
-    $gte: Date;
-    $lte: Date;
-  };
-  country?: { $in: string[] };
-  browser?: { $in: string[] };
-  device?: { $in: string[] };
-  utmSource?: { $in: string[] };
-}

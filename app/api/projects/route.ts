@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import connectToDatabase from "../../../lib/mongodb";
-import Project from "../../../models/Project";
-import PageView from "../../../models/PageView"; // Added for analytics
-import mongoose from "mongoose"; // Added for analytics
+import connectToDatabase from "@/lib/mongodb";
+import Project from "@/models/Project";
+import PageView from "@/models/PageView";
+import mongoose from "mongoose";
+import type { NewProjectData } from "@/lib/api/projects";
+import { normalizeProjectUrl } from "@/utils/url";
+import { requireUser } from '@/lib/serverAuth';
+import WorkspaceMember from '@/models/WorkspaceMember';
 
-// Helper function to get analytics summary for a project
 async function getAnalyticsSummary(projectId: mongoose.Types.ObjectId) {
   try {
     const now = new Date();
@@ -31,13 +34,11 @@ async function getAnalyticsSummary(projectId: mongoose.Types.ObjectId) {
       PageView.distinct('sessionId', { projectId, timestamp: { $gte: previousPeriodStartDate, $lte: previousPeriodEndDate } }).then(sessions => sessions.length),
     ]);
 
-    const calculateChange = (current: number, previous: number) => {
-      if (previous === 0) return current > 0 ? 100 : 0;
-      return Math.round(((current - previous) / previous) * 100);
-    };
+    const uniqueUsersChange =
+      totalUniqueUsersPrevious === 0
+        ? (totalUniqueUsersCurrent > 0 ? 100 : 0)
+        : Math.round(((totalUniqueUsersCurrent - totalUniqueUsersPrevious) / totalUniqueUsersPrevious) * 100);
 
-    const uniqueUsersChange = calculateChange(totalUniqueUsersCurrent, totalUniqueUsersPrevious);
-    
     return {
       views: totalPageViewsCurrent || 0,
       users: totalUniqueUsersCurrent || 0,
@@ -45,16 +46,20 @@ async function getAnalyticsSummary(projectId: mongoose.Types.ObjectId) {
     };
   } catch (error) {
     console.error(`Error fetching analytics for project ${projectId}:`, error);
-    return { views: 0, users: 0, growth: "+0%" }; // Default values on error
+    return { views: 0, users: 0, growth: "+0%" };
   }
 }
 
-
-// Get all projects
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     await connectToDatabase();
-    const projectsFromDB = await Project.find().sort({ createdAt: -1 }).lean(); // Use .lean() for plain JS objects
+    const user = await requireUser(req);
+    if (user instanceof NextResponse) return user;
+    const workspaceId = req.nextUrl.searchParams.get('workspaceId');
+    if (!workspaceId || !mongoose.Types.ObjectId.isValid(workspaceId)) return NextResponse.json({ error: 'Invalid workspace ID' }, { status: 400 });
+    const membership = await WorkspaceMember.exists({ userId: user.id, workspaceId });
+    if (!membership) return NextResponse.json({ error: 'Workspace not found' }, { status: 404 });
+    const projectsFromDB = await Project.find({ workspaceId }).sort({ createdAt: -1 }).lean();
 
     const projectsWithAnalytics = await Promise.all(
       projectsFromDB.map(async (project) => {
@@ -73,32 +78,38 @@ export async function GET() {
   }
 }
 
-import { NewProjectData } from "../../../lib/api/projects"; // Import NewProjectData
-
-// Create a new project
 export async function POST(req: NextRequest) {
   try {
-    // Type the request body according to NewProjectData
-    const body: NewProjectData = await req.json();
-    const { name, url } = body;
-    
+    await connectToDatabase();
+    const user = await requireUser(req);
+    if (user instanceof NextResponse) return user;
+    const body = await req.json() as NewProjectData & { workspaceId: string };
+    const { name, url, workspaceId } = body;
+
     if (!name || !url) {
       return NextResponse.json({ error: 'Name and URL are required' }, { status: 400 });
     }
-    
-    await connectToDatabase();
-    
-    // Create clean URL without protocol
-    const cleanUrl = url.replace(/^(https?:\/\/)?(www\.)?/, '');
-    
+    const normalized = normalizeProjectUrl(url);
+    if (!normalized) {
+      return NextResponse.json({ error: 'Invalid URL' }, { status: 400 });
+    }
+
+    if (!workspaceId || !mongoose.Types.ObjectId.isValid(workspaceId)) return NextResponse.json({ error: 'Invalid workspace ID' }, { status: 400 });
+    const membership = await WorkspaceMember.findOne({ workspaceId, userId: user.id, role: { $in: ['owner', 'admin', 'member'] } }).lean();
+    if (!membership) return NextResponse.json({ error: 'Workspace access denied' }, { status: 403 });
+
     const project = new Project({
-      name,
-      url: cleanUrl
+      name: name.trim(),
+      workspaceId: membership.workspaceId,
+      url: normalized.hostname
     });
-    
+
     await project.save();
     return NextResponse.json(project);
   } catch (error) {
+    if (error instanceof SyntaxError) {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
     console.error('Error creating project:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }

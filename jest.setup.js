@@ -1,2 +1,1 @@
-// jest.setup.js
-require('jest-fetch-mock').enableMocks();
+// Reserved for shared Jest setup.

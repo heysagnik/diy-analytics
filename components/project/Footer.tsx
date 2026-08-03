@@ -2,8 +2,6 @@
 
 import React from "react";
 import Link from "next/link";
-import ErrorBoundary from "../layout/ErrorBoundary";
-import { Theme } from "../../utils/theme";
 
 export interface FooterLink {
   icon: React.ReactNode;
@@ -14,50 +12,23 @@ export interface FooterLink {
 interface FooterProps {
   footerLinks: FooterLink[];
   onLinkClick: () => void;
-  theme: Theme;
 }
 
-export default function Footer({ footerLinks, onLinkClick, theme }: FooterProps) {
+export default function Footer({ footerLinks, onLinkClick }: FooterProps) {
   return (
-    <ErrorBoundary>
-      <div 
-        className="p-3 space-y-1 mt-auto border-t" 
-        style={{ 
-          borderColor: theme.cardBorder,
-          background: theme.navBg
-        }}
-      >
-        {footerLinks.map((link, i) => (
-          <Link 
-            key={i} 
+      <div className="p-2.5 space-y-0.5 mt-auto border-t border-border">
+        {footerLinks.map((link) => (
+          <Link
+            key={link.href}
             href={link.href}
-            className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm transition-all hover:bg-opacity-80"
             onClick={onLinkClick}
-            style={{ color: theme.textLight }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.backgroundColor = theme.lightAccent;
-              e.currentTarget.style.color = theme.accent;
-              e.currentTarget.style.transform = 'translateX(3px)';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
-              e.currentTarget.style.color = theme.textLight;
-              e.currentTarget.style.transform = 'translateX(0)';
-            }}
-            onFocus={(e) => {
-              e.currentTarget.style.backgroundColor = theme.lightAccent;
-              e.currentTarget.style.color = theme.accent;
-            }}
-            onBlur={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
-              e.currentTarget.style.color = theme.textLight;
-            }}
+            aria-label={link.label}
+            className="flex items-center gap-3 px-3 py-2.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-surface-tertiary rounded-md transition-colors duration-150"
           >
-            <span className="flex-shrink-0">{link.icon}</span>
+            <span className="flex-shrink-0 text-muted-foreground">{link.icon}</span>
             <span className="truncate">{link.label}</span>
           </Link>
         ))}
       </div>
-    </ErrorBoundary>
   );
 }

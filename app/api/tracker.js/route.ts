@@ -1,13 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import connectToDatabase from "@/lib/mongodb";
 import Project from "@/models/Project";
-
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
-  "Access-Control-Max-Age": "86400"
-};
+import { PUBLIC_CORS_HEADERS as CORS_HEADERS } from "@/lib/corsHeaders";
 
 interface ProjectForScript {
   trackingCode: string;
@@ -48,9 +42,8 @@ export async function GET(request: NextRequest) {
 
     await connectToDatabase();
 
-    // Find project by tracking code
     const project = await Project.findOne({ trackingCode: siteId }).lean() as ProjectDocument | null;
-    
+
     if (!project) {
       const errorMessage = 'DIY Analytics Error: Invalid site-id. Please check your tracking code.';
       return new NextResponse(
@@ -65,7 +58,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Generate the tracking script with project-specific configuration
+    // Generate the tracking script with project-specific configuration.
+    // The script body is a template literal containing its own backtick /
+    // ${...} sequences (escaped here as \` and \${) so the in-browser
+    // payload keeps readable template-literal syntax.
     const projectForScript: ProjectForScript = {
       trackingCode: project.trackingCode,
       domain: project.domain,
@@ -99,16 +95,23 @@ export async function GET(request: NextRequest) {
 }
 
 function generateTrackingScript(project: ProjectForScript) {
+  if (!process.env.NEXT_PUBLIC_SITE_URL && process.env.NODE_ENV === 'production') {
+    console.warn('[tracker.js] NEXT_PUBLIC_SITE_URL is not set — generated scripts will point at http://localhost:3000/api/track, which will fail for real visitors.');
+  }
   const endpoint = `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/track`;
   const siteId = project.trackingCode;
   const allowedDomains = [project.domain, project.url].filter(Boolean);
-  
+
+  // Every injected value goes through JSON.stringify rather than raw
+  // template interpolation, so a value containing a quote/backslash can't
+  // break out of the string literal and inject script into every page
+  // that loads this tracker.
   return `
 (function() {
   const SV = "2.0.0";
   const DBG = false;
-  const EP = "${endpoint}";
-  const SITE_ID = "${siteId}";
+  const EP = ${JSON.stringify(endpoint)};
+  const SITE_ID = ${JSON.stringify(siteId)};
   const ALLOWED_DOMAINS = ${JSON.stringify(allowedDomains)};
   const TIMEOUT = 20 * 60 * 1000;
   const OPT_KEY = '_ia_optout';
@@ -118,10 +121,9 @@ function generateTrackingScript(project: ProjectForScript) {
   const log = (...a) => DBG && console.log('[A]', ...a);
   const err = (...a) => DBG && console.error('[A]', ...a);
 
-  log('Init', SV, EP, SITE_ID);
-  
-  // Validate domain authorization
-  function isAuthorizedDomain() {
+   log('Init', SV, EP, SITE_ID);
+
+   function isAuthorizedDomain() {
     const currentDomain = location.hostname;
     return ALLOWED_DOMAINS.some(domain => {
       if (!domain) return false;
@@ -177,43 +179,40 @@ function generateTrackingScript(project: ProjectForScript) {
   
   function getBrowserInfo() {
     const ua = navigator.userAgent;
-    let browser = 'Unknown';
-    let os = 'Unknown';
-    let device = 'desktop';
-    
-    // Browser detection
-    if (/Firefox/i.test(ua)) browser = 'Firefox';
-    else if (/Chrome/i.test(ua) && !/Edg|Edge/i.test(ua)) browser = 'Chrome';
-    else if (/Edg|Edge/i.test(ua)) browser = 'Edge';
-    else if (/Safari/i.test(ua) && !/Chrome/i.test(ua)) browser = 'Safari';
-    else if (/MSIE|Trident/i.test(ua)) browser = 'IE';
-    else if (/Opera|OPR/i.test(ua)) browser = 'Opera';
-    
-    // OS detection
-    if (/Windows/i.test(ua)) os = 'Windows';
-    else if (/Macintosh|Mac OS X/i.test(ua)) os = 'macOS';
-    else if (/Linux/i.test(ua)) os = 'Linux';
-    else if (/Android/i.test(ua)) os = 'Android';
-    else if (/iOS|iPhone|iPad|iPod/i.test(ua)) os = 'iOS';
-    
-    // Device detection
-    if (/Mobi|Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua)) {
-      device = /iPad|tablet|Tablet/i.test(ua) ? 'tablet' : 'mobile';
-    }
+     let browser = 'Unknown';
+     let os = 'Unknown';
+     let device = 'desktop';
+     
+     if (/Firefox/i.test(ua)) browser = 'Firefox';
+     else if (/Chrome/i.test(ua) && !/Edg|Edge/i.test(ua)) browser = 'Chrome';
+     else if (/Edg|Edge/i.test(ua)) browser = 'Edge';
+     else if (/Safari/i.test(ua) && !/Chrome/i.test(ua)) browser = 'Safari';
+     else if (/MSIE|Trident/i.test(ua)) browser = 'IE';
+     else if (/Opera|OPR/i.test(ua)) browser = 'Opera';
+     
+     if (/Windows/i.test(ua)) os = 'Windows';
+     else if (/Macintosh|Mac OS X/i.test(ua)) os = 'macOS';
+     else if (/Linux/i.test(ua)) os = 'Linux';
+     else if (/Android/i.test(ua)) os = 'Android';
+     else if (/iOS|iPhone|iPad|iPod/i.test(ua)) os = 'iOS';
+     
+     if (/Mobi|Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua)) {
+       device = /iPad|tablet|Tablet/i.test(ua) ? 'tablet' : 'mobile';
+     }
     
     return { browser, os, device };
   }
   
-  ["mousedown", "keydown", "touchstart", "scroll"].forEach(e => 
-    window.addEventListener(e, refresh, { passive: true }));
-  
-  function pageview() {
-    if (!sid) return;
-    refresh();
-    if (!sid) return;
-    
-    const params = new URLSearchParams(window.location.search);
-    const { browser, os, device } = getBrowserInfo();
+   ["mousedown", "keydown", "touchstart", "scroll"].forEach(e => 
+     window.addEventListener(e, refresh, { passive: true }));
+   
+   function pageview() {
+     if (!sid) return;
+     refresh();
+     if (!sid) return;
+     
+     const params = new URLSearchParams(window.location.search);
+     const { browser, os, device } = getBrowserInfo();
     
     const payload = {
       siteId: SITE_ID,
@@ -335,11 +334,62 @@ function generateTrackingScript(project: ProjectForScript) {
   document.addEventListener('visibilitychange', handleVisibilityChange);
   window.addEventListener('popstate', handlePopState);
   
-  // Initial pageview
-  pageview();
-  
-  // Opt-out functionality
-  window.optOutAnalytics = function() {
+   // Initial pageview
+   pageview();
+
+   // LCP/CLS/INP via native PerformanceObserver — no external web-vitals
+   // dependency. Reported through trackEvent with a reserved __web_vital
+   // name so the dashboard can distinguish them from user-defined events.
+   (function initWebVitals() {
+    if (typeof PerformanceObserver === 'undefined') return;
+
+    let lcpValue = null;
+    let clsValue = 0;
+    let inpValue = null;
+    let reported = false;
+
+    try {
+      new PerformanceObserver((list) => {
+        const entries = list.getEntries();
+        const last = entries[entries.length - 1];
+        if (last) lcpValue = last.renderTime || last.startTime;
+      }).observe({ type: 'largest-contentful-paint', buffered: true });
+    } catch (e) { /* unsupported */ }
+
+    try {
+      new PerformanceObserver((list) => {
+        for (const entry of list.getEntries()) {
+          if (!entry.hadRecentInput) clsValue += entry.value;
+        }
+      }).observe({ type: 'layout-shift', buffered: true });
+    } catch (e) { /* unsupported */ }
+
+    try {
+      new PerformanceObserver((list) => {
+        for (const entry of list.getEntries()) {
+          const duration = entry.duration;
+          if (inpValue === null || duration > inpValue) inpValue = duration;
+        }
+      }).observe({ type: 'event', buffered: true, durationThreshold: 40 });
+    } catch (e) { /* unsupported */ }
+
+    function report() {
+      if (reported || !sid) return;
+      reported = true;
+      if (lcpValue !== null) window.trackEvent('__web_vital', { metric: 'LCP', value: Math.round(lcpValue), path: location.pathname });
+      if (clsValue > 0) window.trackEvent('__web_vital', { metric: 'CLS', value: Math.round(clsValue * 1000) / 1000, path: location.pathname });
+      if (inpValue !== null) window.trackEvent('__web_vital', { metric: 'INP', value: Math.round(inpValue), path: location.pathname });
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') report();
+    });
+    window.addEventListener('pagehide', report);
+  })();
+
+   // Public opt-out / opt-in hooks — used by the dashboard's "don't track
+   // my visits" toggle.
+   window.optOutAnalytics = function() {
     localStorage.setItem(OPT_KEY, '1');
     sessionStorage.removeItem(SID_KEY);
     localStorage.removeItem(UID_KEY);

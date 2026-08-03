@@ -13,10 +13,6 @@ interface ErrorBoundaryState {
   error: Error | null;
 }
 
-/**
- * Error boundary component that catches errors in its child component tree
- * and displays a fallback UI instead of crashing the entire app
- */
 export default class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
@@ -38,13 +34,13 @@ export default class ErrorBoundary extends React.Component<ErrorBoundaryProps, E
       }
       
       return (
-        <div className="p-4 m-4 border rounded-md bg-red-50 border-red-200">
-          <div className="flex items-center gap-2 text-red-700 mb-2">
-            <Warning size={24} />
-            <h3 className="font-medium">Something went wrong</h3>
+        <div className="m-4 rounded-xl border border-destructive/20 bg-destructive/5 p-4">
+          <div className="mb-2 flex items-center gap-2 text-destructive">
+            <Warning size={20} weight="bold" />
+            <h3 className="font-medium text-sm">Something went wrong</h3>
           </div>
-          <p className="text-sm text-red-600">
-            {this.state.error?.message || "An unexpected error occurred"}
+          <p className="text-sm text-destructive/80">
+            This part of the page couldn&apos;t load. Please refresh and try again.
           </p>
         </div>
       );
@@ -52,4 +48,4 @@ export default class ErrorBoundary extends React.Component<ErrorBoundaryProps, E
 
     return this.props.children;
   }
-} 
+}

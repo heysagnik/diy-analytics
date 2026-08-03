@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import connectToDatabase from '@/lib/mongodb';
 import PageView from '@/models/PageView';
 import mongoose, { isValidObjectId, PipelineStage } from 'mongoose';
+import { parseBoundedInt } from '@/lib/parseIntParam';
+import { requireProjectAccess } from '@/lib/serverAuth';
 
 interface PageViewFilter {
   projectId: mongoose.Types.ObjectId;
@@ -19,6 +21,7 @@ interface QueryFilters {
   country?: string;
   lastSeen?: string;
   activity?: string;
+  search?: string;
 }
 
 class UserAnalyticsHandler {
@@ -62,11 +65,8 @@ class UserAnalyticsHandler {
   }
 
   private extractPaginationParams(searchParams: URLSearchParams): PaginationParams {
-    const page = Math.max(1, parseInt(searchParams.get('page') || String(UserAnalyticsHandler.DEFAULT_PAGE)));
-    const limit = Math.min(
-      UserAnalyticsHandler.MAX_LIMIT,
-      Math.max(1, parseInt(searchParams.get('limit') || String(UserAnalyticsHandler.DEFAULT_LIMIT)))
-    );
+    const page = parseBoundedInt(searchParams.get('page'), UserAnalyticsHandler.DEFAULT_PAGE, 1, Number.MAX_SAFE_INTEGER);
+    const limit = parseBoundedInt(searchParams.get('limit'), UserAnalyticsHandler.DEFAULT_LIMIT, 1, UserAnalyticsHandler.MAX_LIMIT);
     const skip = (page - 1) * limit;
 
     return { page, limit, skip };
@@ -76,7 +76,8 @@ class UserAnalyticsHandler {
     return {
       country: searchParams.get('country') || undefined,
       lastSeen: searchParams.get('lastSeen') || undefined,
-      activity: searchParams.get('activity') || undefined
+      activity: searchParams.get('activity') || undefined,
+      search: searchParams.get('search')?.trim() || undefined,
     };
   }
 
@@ -106,14 +107,36 @@ class UserAnalyticsHandler {
     return [{ $match: { activityCount: condition } }];
   }
 
+  private buildSearchFilter(search?: string): PipelineStage[] {
+    if (!search) return [];
+
+    const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = { $regex: escaped, $options: 'i' };
+    return [{ $match: { $or: [
+      { userId: regex },
+      { country: regex },
+      { browser: regex },
+      { device: regex },
+      { os: regex },
+    ] } }];
+  }
+
+  /**
+   * Groups by the persistent visitor identity (`userId`, the localStorage
+   * uid the tracker assigns) rather than `sessionId` — a returning visitor
+   * across multiple sessions is one row, not one row per session. Falls
+   * back to sessionId for the rare pageview predating the userId field.
+   * Session count is tracked separately so the UI can show "3 sessions"
+   * per visitor instead of collapsing that history away.
+   */
   private createBasePipeline(filter: PageViewFilter): PipelineStage[] {
     return [
       { $match: filter },
       { $sort: { timestamp: -1 } },
       {
         $group: {
-          _id: '$sessionId',
-          userId: { $first: '$sessionId' },
+          _id: { $ifNull: ['$userId', '$sessionId'] },
+          userId: { $first: { $ifNull: ['$userId', '$sessionId'] } },
           country: { $first: '$country' },
           lastSeen: { $max: '$timestamp' },
           firstSeen: { $min: '$timestamp' },
@@ -121,7 +144,13 @@ class UserAnalyticsHandler {
           device: { $first: '$device' },
           os: { $first: '$os' },
           paths: { $addToSet: '$path' },
+          sessionIds: { $addToSet: '$sessionId' },
           activityCount: { $sum: 1 }
+        }
+      },
+      {
+        $addFields: {
+          sessionCount: { $size: '$sessionIds' }
         }
       }
     ];
@@ -131,13 +160,13 @@ class UserAnalyticsHandler {
     return {
       $lookup: {
         from: 'events',
-        let: { userSessionId: '$_id', pId: projectId },
+        let: { userSessionIds: '$sessionIds', pId: projectId },
         pipeline: [
           {
             $match: {
               $expr: {
                 $and: [
-                  { $eq: ['$sessionId', '$$userSessionId'] },
+                  { $in: ['$sessionId', '$$userSessionIds'] },
                   { $eq: ['$projectId', '$$pId'] }
                 ]
               }
@@ -156,11 +185,13 @@ class UserAnalyticsHandler {
     baseFilter: PageViewFilter,
     projectId: mongoose.Types.ObjectId,
     activityFilter: PipelineStage[],
+    searchFilter: PipelineStage[],
     pagination: PaginationParams
   ): PipelineStage[] {
     return [
       ...this.createBasePipeline(baseFilter),
       ...activityFilter,
+      ...searchFilter,
       this.createRecentEventsLookup(projectId),
       {
         $project: {
@@ -173,6 +204,7 @@ class UserAnalyticsHandler {
           device: 1,
           os: 1,
           pathCount: { $size: '$paths' },
+          sessionCount: 1,
           activityCount: 1,
           recentEvents: 1
         }
@@ -183,11 +215,35 @@ class UserAnalyticsHandler {
     ];
   }
 
-  private createCountPipeline(baseFilter: PageViewFilter, activityFilter: PipelineStage[]): PipelineStage[] {
+  private createCountPipeline(baseFilter: PageViewFilter, activityFilter: PipelineStage[], searchFilter: PipelineStage[]): PipelineStage[] {
     return [
       ...this.createBasePipeline(baseFilter),
       ...activityFilter,
+      ...searchFilter,
       { $count: 'total' }
+    ];
+  }
+
+  /**
+   * Visitor-level rollup for the summary cards: how many distinct people
+   * (not sessions) showed up, how many came back for a second session, and
+   * average engagement — the "advanced analytics" the raw per-page table
+   * can't answer on its own.
+   */
+  private createSummaryPipeline(baseFilter: PageViewFilter, activityFilter: PipelineStage[], searchFilter: PipelineStage[]): PipelineStage[] {
+    return [
+      ...this.createBasePipeline(baseFilter),
+      ...activityFilter,
+      ...searchFilter,
+      {
+        $group: {
+          _id: null,
+          totalVisitors: { $sum: 1 },
+          returningVisitors: { $sum: { $cond: [{ $gt: ['$sessionCount', 1] }, 1, 0] } },
+          avgSessionsPerVisitor: { $avg: '$sessionCount' },
+          avgActivityPerVisitor: { $avg: '$activityCount' }
+        }
+      }
     ];
   }
 
@@ -204,10 +260,11 @@ class UserAnalyticsHandler {
 
   async handleRequest(request: NextRequest, context: { params: Promise<{ id: string }> }): Promise<NextResponse> {
     try {
-      await connectToDatabase();
-
       const { id: projectIdString } = await context.params;
       const projectId = this.validateProjectId(projectIdString);
+      const access = await requireProjectAccess(request, projectIdString);
+      if (access instanceof NextResponse) return access;
+      await connectToDatabase();
 
       const searchParams = request.nextUrl.searchParams;
       const pagination = this.extractPaginationParams(searchParams);
@@ -215,18 +272,22 @@ class UserAnalyticsHandler {
 
       const baseFilter = this.buildBaseFilter(projectId, queryFilters);
       const activityFilter = this.buildActivityFilter(queryFilters.activity);
+      const searchFilter = this.buildSearchFilter(queryFilters.search);
 
-      const usersPipeline = this.createUsersPipeline(baseFilter, projectId, activityFilter, pagination);
-      const countPipeline = this.createCountPipeline(baseFilter, activityFilter);
+      const usersPipeline = this.createUsersPipeline(baseFilter, projectId, activityFilter, searchFilter, pagination);
+      const countPipeline = this.createCountPipeline(baseFilter, activityFilter, searchFilter);
+      const summaryPipeline = this.createSummaryPipeline(baseFilter, activityFilter, searchFilter);
 
-      const [users, totalResult, countries] = await Promise.all([
+      const [users, totalResult, countries, summaryResult] = await Promise.all([
         PageView.aggregate(usersPipeline),
         PageView.aggregate(countPipeline),
-        this.fetchCountries(projectId)
+        this.fetchCountries(projectId),
+        PageView.aggregate(summaryPipeline)
       ]);
 
       const total = totalResult.length > 0 ? totalResult[0].total : 0;
       const totalPages = Math.ceil(total / pagination.limit);
+      const summary = summaryResult[0] || { totalVisitors: 0, returningVisitors: 0, avgSessionsPerVisitor: 0, avgActivityPerVisitor: 0 };
 
       return NextResponse.json({
         users,
@@ -238,6 +299,13 @@ class UserAnalyticsHandler {
         },
         filters: {
           countries
+        },
+        summary: {
+          totalVisitors: summary.totalVisitors,
+          returningVisitors: summary.returningVisitors,
+          newVisitors: summary.totalVisitors - summary.returningVisitors,
+          avgSessionsPerVisitor: Math.round((summary.avgSessionsPerVisitor || 0) * 100) / 100,
+          avgActivityPerVisitor: Math.round((summary.avgActivityPerVisitor || 0) * 100) / 100
         }
       });
     } catch (error) {

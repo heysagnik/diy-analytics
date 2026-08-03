@@ -1,97 +1,69 @@
-import { useState, useEffect, useCallback } from "react";
-import { AnalyticsData, DateRange, legacyToNewDateRangeMap } from "../types/analytics";
-import { adaptNewToLegacyAnalytics, createEmptyAnalyticsData } from "../utils/analytics";
-import type { AnalyticsResponse } from "../app/api/analytics/types";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { AnalyticsData, DateRange } from "../types/analytics";
+import { createEmptyAnalyticsData } from "../utils/analytics";
+import type { CustomDateRange } from "../components/analytics/DateRangePicker";
+import { fetchAnalytics as requestAnalytics, normalizeAnalyticsError } from "../lib/api/analytics";
 
 interface UseAnalyticsOptions {
   timezone?: string;
+  customRange?: CustomDateRange | null;
   filters?: {
     country?: string[];
     browser?: string[];
     device?: string[];
     source?: string[];
+    page?: string[];
+    utmSource?: string[];
+    utmMedium?: string[];
+    utmCampaign?: string[];
   };
 }
 
 export function useAnalytics(
-  projectId: string, 
-  dateRange: DateRange, 
+  projectId: string,
+  dateRange: DateRange,
   options: UseAnalyticsOptions = {}
 ) {
-  const { timezone = 'UTC', filters } = options;
+  const { timezone = 'UTC', customRange, filters } = options;
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData>(createEmptyAnalyticsData(dateRange));
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [error, setError] = useState<string | null>(null);
+  const requestController = useRef<AbortController | null>(null);
 
   const fetchAnalytics = useCallback(async (showLoadingState = true) => {
     if (!projectId) {
       setLoading(false);
       return;
     }
+    if (showLoadingState) setRefreshing(true);
+    requestController.current?.abort();
+    const controller = new AbortController();
+    requestController.current = controller;
 
-    if (showLoadingState) {
-      setRefreshing(true);
-    }
-    
     try {
       setError(null);
-      
-      // Convert legacy date range to new format
-      const newDateRange = legacyToNewDateRangeMap[dateRange] || 'LAST_7_DAYS';
-
-      // Build query parameters
-      const params = new URLSearchParams({
-        projectId,
-        dateRange: newDateRange,
-        timezone
-      });
-
-      // Add filters to query params
-      if (filters?.country?.length) {
-        params.append('country', filters.country.join(','));
-      }
-      if (filters?.browser?.length) {
-        params.append('browser', filters.browser.join(','));
-      }
-      if (filters?.device?.length) {
-        params.append('device', filters.device.join(','));
-      }
-      if (filters?.source?.length) {
-        params.append('source', filters.source.join(','));
-      }
-
-      const response = await fetch(`/api/analytics?${params.toString()}`);
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `HTTP error ${response.status}`);
-      }
-      
-      const result = await response.json();
-      
-      if (!result.success) {
-        throw new Error(result.error || 'Error fetching analytics data');
-      }
-
-      // Adapt new API response to legacy format
-      const adaptedData = adaptNewToLegacyAnalytics(result.data as AnalyticsResponse);
-      setAnalyticsData(adaptedData);
+      const data = await requestAnalytics('/api/analytics', { projectId, dateRange, timezone, customRange, filters }, controller.signal);
+      setAnalyticsData(data);
       setLastUpdated(new Date());
-    } catch (error) {
-      console.error('Error fetching analytics:', error);
-      setError(error instanceof Error ? error.message : 'Failed to fetch analytics');
+    } catch (err) {
+      const message = normalizeAnalyticsError(err);
+      if (message) setError(message);
     } finally {
-      setRefreshing(false);
+      if (requestController.current === controller) {
+        setRefreshing(false);
+        setLoading(false);
+      }
     }
-  }, [projectId, dateRange, timezone, filters]);
-  
-  // Initial data fetch
+  }, [projectId, dateRange, timezone, customRange, filters]);
+
   useEffect(() => {
     setLoading(true);
-    fetchAnalytics().finally(() => setLoading(false));
+    void fetchAnalytics();
   }, [fetchAnalytics]);
+
+  useEffect(() => () => requestController.current?.abort(), []);
 
   return {
     analyticsData,
@@ -102,6 +74,6 @@ export function useAnalytics(
     fetchAnalytics,
     formatLastUpdated: () => lastUpdated.toLocaleTimeString(),
     retry: () => fetchAnalytics(true),
-    hasData: analyticsData.uniqueUsers.total > 0 || analyticsData.pageViews.total > 0
+    hasData: analyticsData.uniqueUsers.total > 0 || analyticsData.pageViews.total > 0,
   };
-} 
+}

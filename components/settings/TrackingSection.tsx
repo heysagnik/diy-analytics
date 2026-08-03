@@ -1,55 +1,55 @@
 import React, { useState, useEffect } from 'react';
-import { Project, Theme } from '../../types/settings';
-import { Button } from '../ui/Button';
-import { CaretRightIcon, CodeIcon } from '@phosphor-icons/react';
-import { ToggleSwitch } from '../ui/ToggleSwitch';
-import { InputField } from '../ui/InputField';
-import { CopyableField } from '../ui/CopyableField';
+import { Project } from '../../types/settings';
+import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
+import { Button } from '@/components/ui/button';
+import { CopyIcon, CheckIcon } from '@phosphor-icons/react';
+import { SettingsGroup } from './SettingsGroup';
+import { SettingsRow } from './SettingsRow';
+import { updateProject } from '@/lib/api/projects';
 
 interface TrackingSectionProps {
   project: Project;
   onProjectUpdate: (updatedProject: Partial<Project>) => void;
-  theme: Theme;
   showToast: (type: 'success' | 'error' | 'info', message: string) => void;
-  simplified?: boolean;
 }
 
-export const TrackingSection: React.FC<TrackingSectionProps> = ({ 
-  project, 
-  onProjectUpdate, 
-  theme, 
+export const TrackingSection: React.FC<TrackingSectionProps> = ({
+  project,
+  onProjectUpdate,
   showToast,
 }) => {
   const [excludedPaths, setExcludedPaths] = useState(project?.excludedPaths?.join(', ') || '');
   const [isUpdating, setIsUpdating] = useState(false);
-  const [showAdvanced, setShowAdvanced] = useState(false);
   const [excludeMyIP, setExcludeMyIP] = useState(false);
   const [myIP, setMyIP] = useState('');
-  
+  const [copiedScript, setCopiedScript] = useState(false);
+
   useEffect(() => {
     setExcludedPaths(project?.excludedPaths?.join(', ') || '');
-    
-    // Check if user's IP is in excluded IPs
-    fetch('https://api.ipify.org?format=json')
-      .then(response => response.json())
-      .then(data => {
+
+    let cancelled = false;
+    fetch('/api/whoami')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled || !data?.ip) return;
         setMyIP(data.ip);
         setExcludeMyIP(project?.excludedIPs?.includes(data.ip) || false);
       })
-      .catch(err => console.error("Could not fetch IP", err));
+      .catch((err) => console.error('Could not determine visitor IP', err));
+    return () => {
+      cancelled = true;
+    };
   }, [project]);
 
   const handleExcludeMyIP = async (checked: boolean) => {
     if (!project?._id || !myIP) return;
-    
+
     setExcludeMyIP(checked);
     setIsUpdating(true);
-    
+
     try {
-      // Get current IPs
       const currentIPs = project.excludedIPs || [];
-      
-      // Add or remove the user's IP
       let newIPs = [...currentIPs];
       if (checked) {
         if (!newIPs.includes(myIP)) {
@@ -58,27 +58,17 @@ export const TrackingSection: React.FC<TrackingSectionProps> = ({
       } else {
         newIPs = newIPs.filter(ip => ip !== myIP);
       }
-      
-      const response = await fetch(`/api/projects/${project._id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ excludedIPs: newIPs }),
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to update tracking settings');
-      }
-      
-      const updatedProject = await response.json();
+
+      const updatedProject = await updateProject(project._id, { excludedIPs: newIPs }, 'Failed to update tracking settings');
       onProjectUpdate({ excludedIPs: updatedProject.excludedIPs });
-      
+
       showToast('success', `Your visits will ${checked ? 'no longer' : 'now'} be tracked`);
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error 
-        ? error.message 
+      const errorMessage = error instanceof Error
+        ? error.message
         : 'An error occurred';
       showToast('error', errorMessage);
-      setExcludeMyIP(!checked); // Revert on error
+      setExcludeMyIP(!checked);
     } finally {
       setIsUpdating(false);
     }
@@ -86,37 +76,24 @@ export const TrackingSection: React.FC<TrackingSectionProps> = ({
 
   const handleUpdateExclusions = async () => {
     if (!project?._id) return;
-    
-    // Parse comma-separated paths into array
+
     const parsedPaths = excludedPaths
       .split(',')
       .map(path => path.trim())
       .filter(path => path);
-    
+
     setIsUpdating(true);
-    
+
     try {
-      const response = await fetch(`/api/projects/${project._id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          excludedPaths: parsedPaths
-        }),
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to update tracking exclusions');
-      }
-      
-      const updatedProject = await response.json();
-      onProjectUpdate({ 
+      const updatedProject = await updateProject(project._id, { excludedPaths: parsedPaths }, 'Failed to update tracking exclusions');
+      onProjectUpdate({
         excludedPaths: updatedProject.excludedPaths
       });
-      
+
       showToast('success', 'Exclusion settings saved');
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error 
-        ? error.message 
+      const errorMessage = error instanceof Error
+        ? error.message
         : 'An error occurred';
       showToast('error', errorMessage);
     } finally {
@@ -125,119 +102,85 @@ export const TrackingSection: React.FC<TrackingSectionProps> = ({
   };
 
   const getTrackingScript = () => {
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : (process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000');
     return `<script async defer src="${baseUrl}/api/tracker.js?site-id=${project.trackingCode}"></script>`;
   };
 
-  return (
-    <div className="space-y-6">
-      {/* Tracking Code Section */}
-      <div className="p-3 sm:p-5 bg-white rounded-lg border border-gray-100 shadow-sm">
-        <div className="flex items-center gap-3 mb-4">
-          <CodeIcon size={20} style={{ color: theme.accent }} />
-          <h3 className="font-medium">Tracking Code</h3>
-        </div>
-        
-        <div className="space-y-4">
-          <div>
-            <CopyableField
-              label="Site ID"
-              value={project.trackingCode}
-              theme={theme}
-            />
-          </div>
-          
-          <div>
-            <CopyableField
-              label="Tracking Script"
-              value={getTrackingScript()}
-              theme={theme}
-              hint="Add this script to your website's <head> section to start tracking"
-            />
-          </div>
-        </div>
-      </div>
+  const copyToClipboard = async (text: string, setCopied: (v: boolean) => void) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      showToast('error', 'Failed to copy');
+    }
+  };
 
-      {/* Exclude My Visits - Primary Setting */}
-      <div className="p-3 sm:p-5 bg-white rounded-lg border border-gray-100 shadow-sm">
-        <div className="flex items-center gap-3 mb-4">
-          <h3 className="font-medium">Privacy Settings</h3>
-        </div>
-        
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-gray-50 p-3 rounded-md gap-2">
-          <div>
-            <p className="font-medium text-sm">Don&apos;t track my own visits</p>
-            <p className="text-xs text-gray-500">
-              Your IP: {myIP || "Loading..."}
-            </p>
-          </div>
-          <ToggleSwitch
-            enabled={excludeMyIP}
-            onChange={handleExcludeMyIP}
-            theme={theme}
-            label=''
+  return (
+    <SettingsGroup title="Tracking & Privacy">
+      <SettingsRow
+        label="Don't track my own visits"
+        description={
+          <span className="flex items-center gap-1.5">
+            <span>Detected IP:</span>
+            <code className="font-mono bg-surface-secondary px-2 py-0.5 rounded-full border border-border text-foreground">
+              {myIP || 'Detecting IP...'}
+            </code>
+          </span>
+        }
+        action={
+          <Switch
+            checked={excludeMyIP}
+            onCheckedChange={(checked) => handleExcludeMyIP(checked)}
             disabled={isUpdating || !myIP}
+            aria-label="Exclude my visits toggle"
           />
-        </div>
-      </div>
-      
-      {/* Advanced settings toggle */}
-      <button
-        className="flex items-center gap-2 text-sm font-medium"
-        style={{ color: theme.accent }}
-        onClick={() => setShowAdvanced(!showAdvanced)}
+        }
+      />
+
+      <SettingsRow
+        label="URL Path Exclusions"
+        description="Comma-separated path patterns that should never record page views or session telemetry."
       >
-        <CaretRightIcon 
-          size={16} 
-          style={{ 
-            transform: showAdvanced ? 'rotate(90deg)' : 'rotate(0)', 
-            transition: 'transform 0.2s ease' 
-          }} 
-        />
-        Advanced exclusion rules
-      </button>
-      
-      {/* Advanced settings (hidden by default) */}
-      {showAdvanced && (
-        <div className="p-3 sm:p-5 bg-white rounded-lg border border-gray-100 shadow-sm">
-          <div className="flex items-center gap-3 mb-4">
-            
-            <h3 className="font-medium">URL Path Exclusions</h3>
-          </div>
-          
-          <div className="mb-5">
-            <InputField
-              label="Excluded Paths"
-              value={excludedPaths}
-              onChange={(e) => setExcludedPaths(e.target.value)}
-              placeholder="/admin, /login, /internal"
-              theme={theme}
-              hint="Comma-separated list of URL paths that won't be tracked"
-              disabled={isUpdating}
-            />
-          </div>
-          
-          <Button
-            onClick={handleUpdateExclusions}
-            variant="secondary"
-            isLoading={isUpdating}
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Input
+            value={excludedPaths}
+            onChange={(e) => setExcludedPaths(e.target.value)}
+            placeholder="/admin/*, /login, /internal/*"
             disabled={isUpdating}
-            theme={theme}
+            aria-label="Excluded paths"
+          />
+          <Button
             size="sm"
+            onClick={handleUpdateExclusions}
+            disabled={isUpdating}
           >
-            Save Exclusions
+            Save
           </Button>
-          
-          {/* Tip box */}
-          <div className="mt-5 bg-blue-50 p-2 sm:p-3 rounded-md flex items-start gap-2 text-xs">
-            <CodeIcon size={16} className="mt-0.5" style={{ color: theme.accent }} />
-            <div className="text-gray-600">
-              <p className="font-medium mb-0.5">Tip: You can use patterns with wildcards</p>
-              <p>Example: <code>/admin/*</code> will exclude all pages in the admin section</p>
-            </div>
-          </div>
         </div>
-      )}
-    </div>
+      </SettingsRow>
+
+      <SettingsRow
+        label="Tracking Snippet"
+        description="Paste this into your site's HTML <head> tag to start collecting analytics."
+        action={
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => copyToClipboard(getTrackingScript(), setCopiedScript)}
+          >
+            <span className="icon-crossfade size-3.5">
+              <CopyIcon size={14} className={`size-3.5 ${copiedScript ? 'icon-crossfade-hidden' : ''}`} />
+              <CheckIcon size={14} className={`size-3.5 text-success ${copiedScript ? '' : 'icon-crossfade-hidden'}`} />
+            </span>
+            <span>{copiedScript ? 'Copied' : 'Copy Snippet'}</span>
+          </Button>
+        }
+      >
+        <div className="bg-surface-secondary rounded-lg p-3 font-mono text-xs text-foreground break-all border border-border">
+          {getTrackingScript()}
+        </div>
+      </SettingsRow>
+    </SettingsGroup>
   );
 };

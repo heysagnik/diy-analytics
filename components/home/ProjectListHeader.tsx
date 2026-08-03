@@ -1,74 +1,67 @@
 import React from 'react';
-import { Theme } from '@/utils/theme';
+import { Button } from '@/components/ui/button';
+import { MagnifyingGlassIcon, PlusIcon } from '@phosphor-icons/react';
+import { Input } from '@/components/ui/input';
+import Link from 'next/link';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
+import { VisitorAvatar } from '@/components/analytics/visitors/VisitorAvatar';
 
 interface ProjectListHeaderProps {
+  workspaceSlug: string;
+  userId: string;
   searchQuery: string;
   onSearchChange: (query: string) => void;
   onNewSiteClick: () => void;
-  theme: Theme;
 }
 
-export const ProjectListHeader: React.FC<ProjectListHeaderProps> = ({ searchQuery, onSearchChange, onNewSiteClick, theme }) => {
+export const ProjectListHeader: React.FC<ProjectListHeaderProps> = ({
+  searchQuery,
+  workspaceSlug,
+  userId,
+  onSearchChange,
+  onNewSiteClick
+}) => {
   return (
-    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-      <h1 className="text-2xl sm:text-3xl font-bold" style={{ color: theme.accent }}>
-        Projects
-      </h1>
-      
-      <div className="flex flex-col xs:flex-row w-full sm:w-auto items-stretch xs:items-center gap-3 mt-2 sm:mt-0">
-        <div className="relative flex-1 xs:w-64">
-          <input
+    <header className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 mb-6">
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-medium tracking-kicker text-accent">Workspace</p>
+        <h1 className="text-balance font-display text-2xl font-semibold tracking-tight text-foreground sm:text-[28px]">
+          Projects
+        </h1>
+      </div>
+
+      <div className="flex flex-col sm:flex-row w-full md:w-auto items-stretch sm:items-center gap-3">
+        <div className="relative flex-1 sm:w-64">
+          <label htmlFor="project-search" className="sr-only">Search projects</label>
+           <Input
+            id="project-search"
             type="text"
             placeholder="Search projects..."
-            className="w-full pl-10 pr-4 py-2.5 border rounded-full text-sm focus:outline-none focus:ring-1 transition-colors"
-            style={{ 
-              backgroundColor: theme.cardBg, 
-              borderColor: theme.cardBorder,
-              "--tw-ring-color": theme.primary
-            } as React.CSSProperties}
+             className="w-full pl-10 pr-4 bg-background"
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
           />
-          <svg
-            className="absolute left-4 top-3"
-            width="16"
-            height="16"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke={theme.accent}
-            opacity="0.6"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-            />
-          </svg>
+          <MagnifyingGlassIcon
+            size={18}
+            className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+            aria-hidden="true"
+          />
         </div>
-        
-        <button 
-          className="flex items-center justify-center gap-2 px-5 py-2.5 text-white rounded-full transition-all hover:shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2"
-          style={{ 
-            background: theme.primary,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-            transition: 'all 0.2s ease-in-out',
-            "--tw-ring-color": theme.primary,
-          } as React.CSSProperties}
-          onClick={onNewSiteClick}
+
+        <ThemeToggle variant="outline" size="icon" />
+
+        <Link
+          href={`/${workspaceSlug}/profile`}
+          aria-label="View profile"
+          className="inline-flex size-8 items-center justify-center rounded-lg outline-none transition-[box-shadow,transform] duration-150 focus-visible:ring-3 focus-visible:ring-ring/50 active:scale-[0.96]"
         >
-          <svg 
-            xmlns="http://www.w3.org/2000/svg" 
-            width="16" 
-            height="16"
-            fill="currentColor" 
-            viewBox="0 0 256 256"
-          >
-            <path d="M224,128a8,8,0,0,1-8,8H136v80a8,8,0,0,1-16,0V136H40a8,8,0,0,1,0-16h80V40a8,8,0,0,1,16,0v80h80A8,8,0,0,1,224,128Z"></path>
-          </svg>
-          <span className="text-sm font-medium whitespace-nowrap">New Site</span>
-        </button>
+          <VisitorAvatar userId={userId} size={26} />
+        </Link>
+        <Button onClick={onNewSiteClick}>
+          <PlusIcon size={18} weight="bold" />
+          <span>New Site</span>
+        </Button>
       </div>
-    </div>
+    </header>
   );
 };
