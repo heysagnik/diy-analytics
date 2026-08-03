@@ -14,7 +14,11 @@ const RATE_LIMIT = 60; // requests
 const RATE_LIMIT_WINDOW_MS = 10 * 1000;
 
 export async function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
+  const response = new NextResponse(null, { status: 204 });
+  for (const [key, value] of Object.entries(CORS_HEADERS)) {
+    response.headers.set(key, value);
+  }
+  return response;
 }
 
 function getClientIp(req: NextRequest): string {
