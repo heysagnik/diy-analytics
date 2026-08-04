@@ -6,10 +6,8 @@ interface LiveVisitorsProps {
   projectId: string;
 }
 
-// Matches the server's realtime window in getRealtime's default windowMs.
 const REALTIME_WINDOW_MS = 5 * 60 * 1000;
 
-/** Polls /api/analytics/realtime every 10 seconds for visitors active within the server-defined realtime window. */
 export const LiveVisitors: React.FC<LiveVisitorsProps> = ({ projectId }) => {
   const [count, setCount] = useState<number | null>(null);
   const lastSuccessAt = useRef<number>(0);

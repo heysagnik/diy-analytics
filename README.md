@@ -29,7 +29,17 @@ Prefer manual setup? Follow the **Quick Setup** below.
 
 - **⚡ Super Lightweight** – Tracking script is under 2KB. Blazing fast.
 
-- **📈 Insightful Dashboard** – Get traffic data that actually matters.
+- **📈 Insightful Dashboard** – Traffic, pages, sources, campaigns, countries, devices, and browsers at a glance, with click-to-filter breakdowns and a live visitor counter.
+
+- **🕒 Live & Historical Views** – Real-time visitor tracking plus hourly/daily/monthly granularity with per-project timezone support.
+
+- **🎯 Goals & Funnels** – Define conversion goals, build multi-step funnels, and track retention over time.
+
+- **🔔 Alerts** – Get notified when traffic or conversions cross a threshold you set.
+
+- **🌐 Public Dashboards** – Optionally share a read-only, filterable analytics dashboard for a project via a public link — no login required.
+
+- **👥 Workspaces & Team Access** – Organize projects under workspaces with role-based member access (viewer/member/admin/owner).
 
 - **✅ GDPR & CCPA Friendly** – Compliance built-in, not bolted on.
 
@@ -64,8 +74,9 @@ npm run dev
 Copy the snippet from your dashboard and paste it into your site’s `<head>`.
 <img src="https://github.com/user-attachments/assets/55b84635-32a3-48e5-aef4-8b9510090762" width='500'/>
 
+## 🌐 Share a Public Dashboard
 
-
+Enable public mode for a project in its settings to get a shareable, read-only dashboard at `/public/<projectId>` — visitors can change the date range and filters without needing an account.
 
 ## 🤝 Join Our Community & Contribute
 
