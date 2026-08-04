@@ -84,10 +84,10 @@ export default function Sidebar({
 
   return (
       <aside
-        className={`fixed inset-y-0 left-0 z-50 lg:static flex flex-col h-screen flex-shrink-0 overflow-hidden border-r border-border bg-surface transition-[width,opacity,border-color,transform] duration-300 ease-in-out ${
-          isCollapsed ? "lg:w-0 lg:border-r-0 lg:opacity-0" : "lg:w-64 lg:opacity-100"
+        className={`fixed inset-y-0 left-0 z-50 lg:static flex flex-col h-screen w-64 flex-shrink-0 overflow-hidden border-r border-border bg-surface transition-[transform,opacity] duration-300 ease-in-out ${
+          isCollapsed ? "lg:-translate-x-full lg:opacity-0 lg:-mr-64" : "lg:translate-x-0 lg:opacity-100"
         } ${
-          isOpen ? "w-64 translate-x-0 shadow-2xl" : "w-64 -translate-x-full lg:translate-x-0"
+          isOpen ? "translate-x-0 shadow-[var(--overlay-shadow)]" : "-translate-x-full lg:translate-x-0"
         }`}
          tabIndex={isHidden ? -1 : undefined}
         onKeyDown={handleKeyDown}
@@ -104,30 +104,30 @@ export default function Sidebar({
             </span>
           </div>
 
-          <div className="flex items-center gap-0.5">
-            <ThemeToggle className="text-muted-foreground hover:bg-surface-tertiary" />
+          <div className="flex items-center gap-2">
+            <ThemeToggle className="relative text-muted-foreground hover:bg-surface-tertiary after:absolute after:-inset-1 after:content-['']" />
 
             <Button
               variant="ghost"
               size="icon-xs"
               onClick={onToggleCollapsed}
-              className="relative hidden lg:flex text-muted-foreground hover:bg-surface-tertiary"
+              className="relative hidden lg:flex text-muted-foreground hover:bg-surface-tertiary after:absolute after:-inset-1 after:content-['']"
               aria-label="Collapse sidebar"
             >
               <SidebarSimpleIcon size={16} weight="bold" />
             </Button>
-          </div>
 
-           <Button
-             variant="ghost"
-             size="icon-xs"
-             onClick={onClose}
-             ref={closeButtonRef}
-             className="relative lg:hidden text-muted-foreground hover:bg-surface-tertiary"
-            aria-label="Close sidebar"
-          >
-            <XIcon size={16} weight="bold" />
-           </Button>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              onClick={onClose}
+              ref={closeButtonRef}
+              className="relative lg:hidden text-muted-foreground hover:bg-surface-tertiary after:absolute after:-inset-1 after:content-['']"
+              aria-label="Close sidebar"
+            >
+              <XIcon size={16} weight="bold" />
+            </Button>
+          </div>
         </div>
 
         <div className="w-64 border-b border-border">

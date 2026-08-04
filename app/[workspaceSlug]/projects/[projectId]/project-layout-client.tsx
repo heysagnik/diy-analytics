@@ -24,34 +24,87 @@ interface ProjectLayoutProps {
   projectId: string;
 }
 
+// Mirrors the real Sidebar/Header/MetricsGrid/MainChart shapes (not just
+// generic bars) so there's no layout jump when the loaded content swaps in,
+// and the page reads as "this page is loading" rather than a placeholder.
 const ProjectLoadingSkeleton = () => (
-  <div className="min-h-screen bg-background flex">
-    <div className="hidden lg:block w-64 bg-surface border-r border-border p-4 space-y-4">
-      <Skeleton className="h-8 w-32 rounded-lg" />
-      <div className="space-y-2 pt-4">
-        {Array.from({ length: 3 }, (_, i) => (
-          <Skeleton key={i} className="h-10 w-full rounded-lg" />
+  <div className="h-screen w-full flex overflow-hidden bg-background">
+    <div className="hidden lg:flex w-64 flex-shrink-0 flex-col border-r border-border bg-surface">
+      <div className="h-14 px-4 flex items-center justify-between border-b border-border">
+        <Skeleton className="h-4 w-24 rounded-sm" />
+        <div className="flex items-center gap-2">
+          <Skeleton className="size-6 rounded-md" />
+          <Skeleton className="size-6 rounded-md" />
+        </div>
+      </div>
+
+      <div className="px-3 py-2.5 border-b border-border">
+        <div className="flex items-center gap-2.5 px-2.5 py-2.5">
+          <Skeleton className="size-5 rounded-full flex-shrink-0" />
+          <Skeleton className="h-3.5 flex-1 rounded-sm" />
+          <Skeleton className="size-3.5 rounded-sm flex-shrink-0" />
+        </div>
+      </div>
+
+      <div className="flex-1 px-2 py-3 space-y-1">
+        {[16, 14, 20, 12, 18].map((w, i) => (
+          <div key={i} className="flex items-center gap-2.5 px-4 py-2.5">
+            <Skeleton className="size-[18px] rounded-sm flex-shrink-0" />
+            <Skeleton className="h-3.5 rounded-sm" style={{ width: `${w * 0.25}rem` }} />
+          </div>
+        ))}
+      </div>
+
+      <div className="p-2.5 space-y-0.5 border-t border-border">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="flex items-center gap-3 px-3 py-2.5">
+            <Skeleton className="size-[18px] rounded-sm flex-shrink-0" />
+            <Skeleton className="h-3 w-20 rounded-sm" />
+          </div>
         ))}
       </div>
     </div>
-    <div className="flex-1 flex flex-col">
-      <div className="bg-surface border-b border-border h-14 px-6 flex items-center justify-between">
-        <Skeleton className="h-6 w-48 rounded-md" />
-        <Skeleton className="h-8 w-8 rounded-full" />
+
+    <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="lg:hidden px-3 py-3 flex items-center gap-3 bg-surface-secondary/90 border-b border-border">
+        <Skeleton className="size-7 rounded-md flex-shrink-0" />
+        <Skeleton className="h-5 w-40 rounded-sm" />
       </div>
-      <div className="p-6 space-y-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          {Array.from({ length: 5 }, (_, i) => (
-            <Card key={i} className="p-4 bg-surface space-y-2">
-              <Skeleton className="h-4 w-20 rounded-md" />
-              <Skeleton className="h-8 w-16 rounded-md" />
-            </Card>
-          ))}
+
+      <div className="flex-1 overflow-y-auto">
+        <div className="px-4 py-10 sm:px-6 sm:py-16 lg:px-8 space-y-4 max-w-6xl mx-auto w-full">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {Array.from({ length: 4 }, (_, i) => (
+              <Card key={i} className="p-4 flex flex-col justify-between gap-3">
+                <div className="flex items-center justify-between">
+                  <Skeleton className="h-3 w-16 rounded-sm" />
+                  <Skeleton className="size-6 rounded-md" />
+                </div>
+                <div className="flex items-baseline justify-between">
+                  <Skeleton className="h-6 w-14 rounded-sm" />
+                  <Skeleton className="h-5 w-12 rounded-full" />
+                </div>
+              </Card>
+            ))}
+          </div>
+
+          <Card className="p-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
+              <div className="space-y-2">
+                <Skeleton className="h-5 w-36 rounded-sm" />
+                <Skeleton className="h-3 w-48 rounded-sm" />
+              </div>
+              <div className="flex items-center gap-6">
+                <Skeleton className="h-7 w-28 rounded-lg" />
+                <div className="hidden sm:flex items-center gap-4">
+                  <Skeleton className="h-3 w-20 rounded-sm" />
+                  <Skeleton className="h-3 w-24 rounded-sm" />
+                </div>
+              </div>
+            </div>
+            <Skeleton className="h-56 sm:h-64 w-full rounded-lg" />
+          </Card>
         </div>
-        <Card className="p-6 bg-surface rounded-2xl space-y-4">
-          <Skeleton className="h-6 w-40 rounded-md" />
-          <Skeleton className="h-80 w-full rounded-xl" />
-        </Card>
       </div>
     </div>
   </div>
@@ -213,7 +266,7 @@ export default function ProjectLayoutClient({ children, workspaceId, workspaceSl
                 variant="ghost"
                 size="icon"
                 onClick={toggleSidebarCollapsed}
-                className="h-8 w-8 text-muted-foreground hover:text-foreground active:scale-[0.96] transition-transform"
+                className="relative h-8 w-8 text-muted-foreground hover:text-foreground active:scale-[0.96] transition-transform after:absolute after:-inset-1.5 after:content-['']"
                 aria-label="Expand sidebar"
               >
                 <SidebarSimpleIcon size={18} weight="bold" />

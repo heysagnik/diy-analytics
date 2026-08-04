@@ -31,10 +31,11 @@ export default function Navigation({
             <Link
               key={item.id}
               href={item.href}
-              className={`flex items-center gap-2.5 px-4 py-2.5 rounded-md text-sm font-medium transition-colors ${
+              aria-current={isActive ? 'page' : undefined}
+              className={`relative flex items-center gap-2.5 px-4 py-2.5 rounded-md text-sm transition-colors before:absolute before:left-1 before:inset-y-2 before:w-[3px] before:rounded-full before:bg-accent before:transition-[opacity,transform] before:duration-200 before:ease-out ${
                 isActive
-                  ? 'bg-accent text-accent-foreground'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-surface-tertiary/60'
+                  ? 'bg-accent/10 text-accent font-semibold before:opacity-100 before:scale-y-100'
+                  : 'font-medium text-muted-foreground hover:text-foreground hover:bg-surface-tertiary/60 before:opacity-0 before:scale-y-50'
               }`}
               onClick={() => onNavItemClick(item.id, item.href)}
             >
@@ -42,7 +43,7 @@ export default function Navigation({
                 <IconComponent
                   size={18}
                   weight={isActive ? "bold" : "regular"}
-                  className={isActive ? 'text-accent-foreground' : ''}
+                  className={isActive ? 'text-accent' : ''}
                 />
               </div>
               <span>{item.label}</span>

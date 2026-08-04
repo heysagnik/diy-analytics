@@ -24,7 +24,12 @@ export function useAnalytics(
   dateRange: DateRange,
   options: UseAnalyticsOptions = {}
 ) {
-  const { timezone = 'UTC', customRange, filters } = options;
+  // Falling back to a hardcoded 'UTC' here (instead of the browser's own
+  // timezone) meant every chart bucket/label was computed in UTC regardless
+  // of where the viewer actually is — a visit at 10am IST would land on the
+  // "4am" bucket. No caller in this codebase passes `timezone` explicitly,
+  // so this default is what every dashboard view actually uses.
+  const { timezone = Intl.DateTimeFormat().resolvedOptions().timeZone, customRange, filters } = options;
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData>(createEmptyAnalyticsData(dateRange));
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);

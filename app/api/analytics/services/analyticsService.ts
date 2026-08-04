@@ -138,15 +138,17 @@ export class AnalyticsService {
   private static readonly ALL_TIME_MAX_MONTHS = 60;
 
   /**
-   * Project.createdAt — used as the start of "All Time" instead of a fixed
-   * lookback window. Without this, ALL_TIME always showed the same ~5-year
-   * window regardless of when the project was actually created, so a
-   * project added a few months ago would show years of empty leading
-   * buckets predating its own existence.
+   * Project.createdAt (used as the start of "All Time" instead of a fixed
+   * lookback window — without it ALL_TIME always showed the same ~5-year
+   * window regardless of when the project was actually created) and
+   * Project.timezone (the saved reporting timezone, if the project owner
+   * set one in Settings — see AnalyticsService.getAnalytics, where it takes
+   * priority over whatever timezone the individual viewer's browser
+   * reports, so every viewer of a given project sees the same buckets).
    */
-  private async resolveAllTimeStart(projectObjectId: Types.ObjectId): Promise<Date> {
-    const project = await Project.findById(projectObjectId).select('createdAt').lean<{ createdAt?: Date }>();
-    return project?.createdAt ?? new Date();
+  private async resolveProjectTimeContext(projectObjectId: Types.ObjectId): Promise<{ createdAt: Date; timezone?: string | null }> {
+    const project = await Project.findById(projectObjectId).select('createdAt timezone').lean<{ createdAt?: Date; timezone?: string | null }>();
+    return { createdAt: project?.createdAt ?? new Date(), timezone: project?.timezone };
   }
 
   private buildAllTimeRange(
@@ -194,9 +196,10 @@ export class AnalyticsService {
     }
 
     const projectObjectId = new Types.ObjectId(projectId);
-    const tzResolved = normalizeTimezone(timezone);
+    const { createdAt: projectCreatedAt, timezone: projectTimezone } = await this.resolveProjectTimeContext(projectObjectId);
+    const tzResolved = normalizeTimezone(projectTimezone || timezone);
     const allTimeStart = dateRange === 'ALL_TIME' && !startDate && !endDate
-      ? await this.resolveAllTimeStart(projectObjectId)
+      ? projectCreatedAt
       : undefined;
     const { timeRange, config, previousRange } = this.resolveTimeRange(dateRange, tzResolved, startDate, endDate, allTimeStart);
 

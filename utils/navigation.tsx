@@ -24,20 +24,20 @@ export const getNavigationItems = (projectBasePath: string): NavigationItem[] =>
   { id: 'analytics', label: 'Overview', icon: AnimatedHouseIcon, href: projectBasePath },
   { id: 'funnels', label: 'Funnels', icon: AnimatedFunnelIcon, href: `${projectBasePath}/funnels` },
   { id: 'retention', label: 'Retention', icon: AnimatedRetentionIcon, href: `${projectBasePath}/retention` },
-  { id: 'users', label: 'Users', icon: AnimatedUserIcon, href: `${projectBasePath}/users` },
+  { id: 'users', label: 'Visitors', icon: AnimatedUserIcon, href: `${projectBasePath}/users` },
   { id: 'settings', label: 'Settings', icon: AnimatedGearIcon, href: `${projectBasePath}/settings` },
 ];
 
 export const getFooterLinks = (workspaceSlug: string): FooterLink[] => [
   {
-    icon: <FileTextIcon size={20} />,
+    icon: <FileTextIcon size={18} />,
     label: 'Documentation',
     href: 'https://github.com/heysagnik/diy-analytics#readme',
   },
   {
-    icon: <ChatCenteredIcon size={20} />,
+    icon: <ChatCenteredIcon size={18} />,
     label: 'Give Feedback',
     href: 'https://github.com/heysagnik/diy-analytics/issues',
   },
-  { icon: <ArrowBendUpLeftIcon size={20} />, label: 'Return to Home', href: `/${workspaceSlug}` },
+  { icon: <ArrowBendUpLeftIcon size={18} />, label: 'Return to Home', href: `/${workspaceSlug}` },
 ];

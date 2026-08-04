@@ -22,6 +22,10 @@ const ProjectSchema = new Schema(
         Math.random().toString(36).slice(2, 10),
     },
     publicMode: { type: Boolean, default: false },
+    // Reporting timezone (IANA name, e.g. "Asia/Kolkata"). Unset (null)
+    // means "use each viewer's own browser timezone" — see
+    // AnalyticsService.getAnalytics, which only overrides with this when set.
+    timezone: { type: String, default: null },
     excludedIPs: { type: [String], default: [] },
     excludedPaths: { type: [String], default: [] },
     createdAt: { type: Date, default: Date.now },

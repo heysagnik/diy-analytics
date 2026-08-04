@@ -67,9 +67,21 @@ export async function PATCH(
       publicMode?: boolean;
       excludedIPs?: string[];
       excludedPaths?: string[];
+      timezone?: string | null;
     } = {};
 
     if (typeof body.name === "string") updateData.name = body.name.trim();
+    if (body.timezone === null) {
+      updateData.timezone = null;
+    } else if (typeof body.timezone === "string") {
+      const tz = body.timezone.trim();
+      try {
+        Intl.DateTimeFormat(undefined, { timeZone: tz });
+      } catch {
+        return NextResponse.json({ error: "Invalid timezone" }, { status: 400 });
+      }
+      updateData.timezone = tz;
+    }
     if (typeof body.url === "string") {
       const normalized = normalizeProjectUrl(body.url);
       if (!normalized) {

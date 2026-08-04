@@ -155,7 +155,7 @@ function VisitorRow({ user, isSelected, onSelect }: { user: Visitor; isSelected:
       <div className="flex min-w-0 items-center gap-2">
         <VisitorAvatar userId={user.userId} size={26} />
         <span className="truncate font-mono text-xs font-medium text-foreground" title={user.userId}>
-          {user.userId.substring(0, 10)}...
+          {user.userId}
         </span>
         {user.activityCount > HIGH_ACTIVITY_THRESHOLD && (
           <Badge className="gap-1 bg-success/10 text-success">

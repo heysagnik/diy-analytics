@@ -61,6 +61,7 @@ export interface Project {
   domain?: string;
   trackingCode: string;
   publicMode?: boolean;
+  timezone?: string | null;
   excludedIPs?: string[];
   excludedPaths?: string[];
   createdAt: string;

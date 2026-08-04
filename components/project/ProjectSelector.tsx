@@ -126,7 +126,7 @@ export default function ProjectSelector({ projectId, projectName, projectUrl, wo
                     return (
                       <button
                         key={project._id}
-                        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-xs transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-sm text-left text-xs transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
                           isActive
                             ? 'bg-surface-tertiary text-foreground font-medium'
                             : 'text-muted-foreground hover:bg-surface-secondary'

@@ -1,13 +1,35 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Project } from '../../types/settings';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { LinkIcon, FloppyDiskIcon, CopyIcon, CheckIcon } from '@phosphor-icons/react';
 import { SettingsGroup } from './SettingsGroup';
 import { SettingsRow } from './SettingsRow';
 import { updateProject } from '@/lib/api/projects';
+
+// Sentinel value for "no project timezone saved" — falls back to each
+// viewer's own browser timezone (see AnalyticsService.getAnalytics).
+const AUTO_TIMEZONE = 'auto';
+
+const FALLBACK_TIMEZONES = [
+  'UTC', 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
+  'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'Asia/Kolkata', 'Asia/Dubai',
+  'Asia/Shanghai', 'Asia/Singapore', 'Asia/Tokyo', 'Australia/Sydney',
+];
+
+function listTimezones(): string[] {
+  if (typeof Intl.supportedValuesOf === 'function') {
+    try {
+      return Intl.supportedValuesOf('timeZone');
+    } catch {
+      // fall through to the curated list below
+    }
+  }
+  return FALLBACK_TIMEZONES;
+}
 
 interface GeneralSectionProps {
   project: Project;
@@ -71,6 +93,39 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({
     }
   };
 
+  const [browserTimezone, setBrowserTimezone] = useState('');
+  useEffect(() => {
+    setBrowserTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone);
+  }, []);
+
+  const [timezone, setTimezone] = useState(project?.timezone || AUTO_TIMEZONE);
+  const [isSavingTimezone, setIsSavingTimezone] = useState(false);
+  useEffect(() => {
+    setTimezone(project?.timezone || AUTO_TIMEZONE);
+  }, [project?.timezone]);
+
+  const timezoneOptions = useMemo(() => listTimezones(), []);
+
+  const handleSaveTimezone = async () => {
+    if (!project?._id) return;
+    setIsSavingTimezone(true);
+    try {
+      const updatedProject = await updateProject(
+        project._id,
+        { timezone: timezone === AUTO_TIMEZONE ? null : timezone },
+        'Failed to update timezone.'
+      );
+      onProjectUpdate({ timezone: updatedProject.timezone });
+      showToast('success', 'Timezone updated — this applies to everyone viewing this project.');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update timezone.';
+      showToast('error', errorMessage);
+      setTimezone(project?.timezone || AUTO_TIMEZONE);
+    } finally {
+      setIsSavingTimezone(false);
+    }
+  };
+
   const publicDashboardUrl = project?.publicMode ? `/public/${project._id}` : '';
   const fullShareUrl = typeof window !== 'undefined' ? window.location.origin + publicDashboardUrl : publicDashboardUrl;
 
@@ -119,6 +174,35 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({
               <CheckIcon size={14} className={`size-3.5 text-success ${copiedId ? '' : 'icon-crossfade-hidden'}`} />
             </span>
             <span>{copiedId ? 'Copied' : 'Copy'}</span>
+          </Button>
+        </div>
+      </SettingsRow>
+
+      <SettingsRow
+        label="Timezone"
+        description="Charts and reports are bucketed and labeled in this timezone for everyone who views the project. Leave on Automatic to use each viewer's own browser timezone instead."
+      >
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Select value={timezone} onValueChange={(v) => typeof v === 'string' && setTimezone(v)} disabled={isSavingTimezone}>
+            <SelectTrigger className="w-full sm:max-w-xs" aria-label="Timezone">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={AUTO_TIMEZONE}>
+                Automatic {browserTimezone && `(${browserTimezone})`}
+              </SelectItem>
+              {timezoneOptions.map((tz) => (
+                <SelectItem key={tz} value={tz}>{tz}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            size="sm"
+            onClick={handleSaveTimezone}
+            disabled={isSavingTimezone || timezone === (project?.timezone || AUTO_TIMEZONE)}
+          >
+            <FloppyDiskIcon size={14} />
+            <span>Save</span>
           </Button>
         </div>
       </SettingsRow>
