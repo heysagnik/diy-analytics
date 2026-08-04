@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { PUBLIC_CORS_HEADERS } from '@/lib/corsHeaders';
+
 const AUTH_COOKIE = 'diy_session';
 
 const PUBLIC_PATH_PATTERNS: Array<RegExp> = [
@@ -20,11 +22,18 @@ async function verify(request: NextRequest): Promise<boolean> {
 }
 
 export async function proxy(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
+
   if (request.method === 'OPTIONS') {
-    return new NextResponse(null, { status: 204 });
+    const response = new NextResponse(null, { status: 204 });
+    if (/^\/api\/track(\/.*)?$/.test(pathname) || /^\/api\/tracker\.js(\/.*)?$/.test(pathname)) {
+      for (const [key, value] of Object.entries(PUBLIC_CORS_HEADERS)) {
+        response.headers.set(key, value);
+      }
+    }
+    return response;
   }
 
-  const pathname = request.nextUrl.pathname;
   if (PUBLIC_PATH_PATTERNS.some((re) => re.test(pathname))) {
     return NextResponse.next();
   }
