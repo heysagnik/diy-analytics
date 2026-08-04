@@ -9,6 +9,7 @@ import {
   Tooltip,
 } from 'recharts';
 import { useCompactChart } from './useCompactChart';
+import { formatAxisLabel, formatTooltipLabel, type ChartGranularity } from './chartLabels';
 
 interface ChartSeries {
   name: string;
@@ -18,7 +19,7 @@ interface ChartSeries {
 
 interface ChartDataPoint {
   name: string;
-  originalName: string;
+  tooltipLabel: string;
   [seriesName: string]: string | number;
 }
 
@@ -37,6 +38,7 @@ interface TooltipProps {
 interface AreaChartProps {
   seriesData: ChartSeries[];
   labels: string[];
+  granularity?: ChartGranularity;
   height?: number;
   showGrid?: boolean;
   showTooltip?: boolean;
@@ -45,32 +47,13 @@ interface AreaChartProps {
   className?: string;
 }
 
-function formatDateLabel(dateStr: string, isCompact: boolean): string {
-  const date = new Date(dateStr);
-  if (isNaN(date.getTime())) return dateStr;
-
-  const diffDays = Math.abs((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24));
-
-  if (isCompact) {
-    if (diffDays < 7) {
-      return date.toLocaleDateString('en-US', { weekday: 'short' }).substring(0, 3);
-    }
-    return date.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
-  }
-
-  return date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    ...(diffDays > 365 && { year: '2-digit' })
-  });
-}
-
-function ChartTooltip({ active, payload, label }: TooltipProps) {
+function ChartTooltip({ active, payload }: TooltipProps) {
   if (!active || !payload?.length) return null;
+  const tooltipLabel = (payload[0] as unknown as { payload: ChartDataPoint }).payload.tooltipLabel;
 
   return (
     <div className="bg-popover border border-border rounded-lg shadow-lg p-3 text-xs pointer-events-none z-20 min-w-[140px]">
-      <p className="font-semibold text-foreground mb-2">{label}</p>
+      <p className="font-semibold text-foreground mb-2">{tooltipLabel}</p>
       {payload.map((entry) => (
         <div key={entry.dataKey} className="flex items-center justify-between gap-4 my-1">
           <span className="flex items-center gap-1.5 text-muted-foreground">
@@ -87,6 +70,7 @@ function ChartTooltip({ active, payload, label }: TooltipProps) {
 export default function AreaChart({
   seriesData,
   labels,
+  granularity = 'day',
   height = 300,
   showGrid = true,
   showTooltip = true,
@@ -102,8 +86,8 @@ export default function AreaChart({
 
     return labels.map((label, index) => {
       const point: ChartDataPoint = {
-        name: formatDateLabel(label, isCompact),
-        originalName: label
+        name: formatAxisLabel(label, granularity, isCompact),
+        tooltipLabel: formatTooltipLabel(label, granularity)
       };
 
       seriesData.forEach(series => {
@@ -112,7 +96,7 @@ export default function AreaChart({
 
       return point;
     });
-  }, [seriesData, labels, isCompact]);
+  }, [seriesData, labels, granularity, isCompact]);
 
   const chartSummary = useMemo(() => {
     const seriesSummary = seriesData.map((series) => {

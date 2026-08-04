@@ -1,14 +1,18 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 interface LiveVisitorsProps {
   projectId: string;
 }
 
+// Matches the server's realtime window in getRealtime's default windowMs.
+const REALTIME_WINDOW_MS = 5 * 60 * 1000;
+
 /** Polls /api/analytics/realtime every 10 seconds for visitors active within the server-defined realtime window. */
 export const LiveVisitors: React.FC<LiveVisitorsProps> = ({ projectId }) => {
   const [count, setCount] = useState<number | null>(null);
+  const lastSuccessAt = useRef<number>(0);
 
   useEffect(() => {
     if (!projectId) return;
@@ -17,11 +21,15 @@ export const LiveVisitors: React.FC<LiveVisitorsProps> = ({ projectId }) => {
     const poll = async () => {
       try {
         const res = await fetch(`/api/analytics/realtime?projectId=${projectId}`, { cache: 'no-store' });
-        if (!res.ok) return;
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const { data } = await res.json();
-        if (!cancelled) setCount(data.count ?? 0);
+        if (cancelled) return;
+        lastSuccessAt.current = Date.now();
+        setCount(data.count ?? 0);
       } catch {
-        // Silently ignore — the badge just stays at its last known value.
+        if (!cancelled && Date.now() - lastSuccessAt.current > REALTIME_WINDOW_MS) {
+          setCount(0);
+        }
       }
     };
 

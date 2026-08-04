@@ -165,7 +165,7 @@ export interface RecentEvent {
 
 export interface AnalyticsResponse {
   timeRange: TimeRange;
-  granularity: string;
+  granularity: GranularityType;
   uniqueUsers: MetricData;
   pageViews: MetricData;
   sessions: MetricData;

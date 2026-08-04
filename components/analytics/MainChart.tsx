@@ -101,6 +101,7 @@ export const MainChart: React.FC<MainChartProps> = ({ analyticsData, dateRange }
             <AreaChart
               seriesData={areaChartData}
               labels={labels}
+              granularity={analyticsData.granularity}
               height={chartHeight}
               showGrid
               showTooltip
@@ -111,6 +112,7 @@ export const MainChart: React.FC<MainChartProps> = ({ analyticsData, dateRange }
             <BarChart
               seriesData={barChartData}
               labels={labels}
+              granularity={analyticsData.granularity}
               height={chartHeight}
               showGrid
               showTooltip

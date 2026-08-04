@@ -46,7 +46,9 @@ export type {
   WebVitalData,
 } from '../app/api/analytics/types';
 
-export type AnalyticsData = Omit<AnalyticsResponse, 'timeRange' | 'granularity'>;
+export type { GranularityType as Granularity } from '../app/api/analytics/types';
+
+export type AnalyticsData = Omit<AnalyticsResponse, 'timeRange'>;
 
 // --------------------------------------------------------------------
 // Canonical Project type — the single source of truth used across the
