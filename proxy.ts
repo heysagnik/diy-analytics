@@ -8,6 +8,7 @@ const PUBLIC_PATH_PATTERNS: Array<RegExp> = [
   /^\/api\/tracker\.js(\/.*)?$/,
   /^\/api\/whoami(\/.*)?$/,
   /^\/api\/auth\/(login|register|logout|me)(\/.*)?$/,
+  /^\/api\/public(\/.*)?$/,
   /^\/public(\/.*)?$/,
   /^\/login(\/.*)?$/,
   /^\/register(\/.*)?$/,
