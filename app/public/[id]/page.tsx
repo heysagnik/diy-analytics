@@ -4,6 +4,8 @@ import Project from "@/models/Project";
 import { AnalyticsService } from "@/app/api/analytics/services/analyticsService";
 import { createEmptyAnalyticsData } from "@/utils/analytics";
 import type { AnalyticsData, DateRange } from "@/types/analytics";
+import { Card } from "@/components/ui/card";
+import { LockSimpleIcon } from "@phosphor-icons/react/dist/ssr";
 import PublicDashboardClient from "./PublicDashboardClient";
 
 export const dynamic = "force-dynamic";
@@ -32,18 +34,18 @@ export default async function PublicDashboardPage({ params }: PageProps) {
   if (project.publicMode !== true) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-6">
-        <div className="max-w-md w-full bg-surface rounded-xl border border-border p-8 text-center">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-surface-secondary text-muted-foreground mb-4">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 11c0-.552.448-1 1-1h3m-6 6v-5m-3 4V8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H6a2 2 0 01-2-2z" />
-            </svg>
+        <Card className="max-w-md w-full p-8 text-center animate-fade-in">
+          <div className="icon-chip size-12 mx-auto mb-4">
+            <LockSimpleIcon size={22} weight="bold" />
           </div>
-          <h1 className="font-display text-xl font-semibold text-foreground mb-1">Public dashboard is disabled</h1>
-          <p className="text-sm text-muted-foreground">
-            The owner of <strong>{project.name}</strong> hasn't turned on public access. Ask them to enable
-            it in their dashboard settings.
+          <h1 className="font-display text-xl font-semibold text-foreground mb-1 text-balance">
+            Public dashboard is disabled
+          </h1>
+          <p className="text-sm text-muted-foreground text-pretty">
+            The owner of <strong className="text-foreground font-medium">{project.name}</strong> hasn&apos;t turned
+            on public access. Ask them to enable it in their dashboard settings.
           </p>
-        </div>
+        </Card>
       </div>
     );
   }
