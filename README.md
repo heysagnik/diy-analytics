@@ -1,92 +1,71 @@
-# DIY Analytics ✨
+# DIY Analytics
 
-[![MIT License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Vercel](https://img.shields.io/badge/Vercel-Ready-black)](https://vercel.com/new/clone?repository-url=https://github.com/heysagnik/diy-analytics)
-[![GitHub Stars](https://img.shields.io/github/stars/heysagnik/diy-analytics?style=social)](https://github.com/heysagnik/diy-analytics)
+Self-hosted, privacy-friendly website analytics.
 
-> Privacy-friendly & Powerful website analytics in minutes — no coding, no complex setup , no fuss.
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/heysagnik/diy-analytics)
 
+> **Status:** alpha. The core dashboard is functional, but expect breaking
+> changes before `1.0.0`. See [CHANGELOG.md](CHANGELOG.md).
 
+![Dashboard screenshot](docs/images/overview-chart.jpg)
 
+## Features
 
-![localhost_3000_projects_6831e67f66e2968bb78db4ba](https://github.com/user-attachments/assets/6fd0f55d-74ea-4027-aec0-d78739fbb157)
+- No cookies, no personal data collected — GDPR/CCPA-friendly by design.
+- Tracking script under 2 KB, loaded asynchronously.
+- Traffic, pages, sources, campaigns, countries, devices, and browsers, with
+  click-to-filter breakdowns.
+- Live visitor count and historical views with per-project timezone support.
+- Goals, multi-step funnels, and retention cohorts.
+- Threshold-based alerts delivered via webhook.
+- Optional public, read-only dashboards via a shareable link.
+- Workspaces with role-based member access.
 
-> ⚠️ Disclaimer: This project is in alpha. Not recommended for production use yet. Expect rapid changes and bugs.
+## Getting started
 
+### Deploy
 
-## 🚀 Instant Setup
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/heysagnik/diy-analytics)
 
-Launch your own analytics tool in seconds:
+### Run locally
 
-Deploy to Vercel with one click: <br/> <br/>
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/heysagnik/diy-analytics)  <br/> 
-
-Prefer manual setup? Follow the **Quick Setup** below.
-
-## ✨ What Makes It Awesome
-
-- **🔒 100% Privacy-Respecting** – No personal data, no cookies, no pop-ups.
-
-- **⚡ Super Lightweight** – Tracking script is under 2KB. Blazing fast.
-
-- **📈 Insightful Dashboard** – Traffic, pages, sources, campaigns, countries, devices, and browsers at a glance, with click-to-filter breakdowns and a live visitor counter.
-
-- **🕒 Live & Historical Views** – Real-time visitor tracking plus hourly/daily/monthly granularity with per-project timezone support.
-
-- **🎯 Goals & Funnels** – Define conversion goals, build multi-step funnels, and track retention over time.
-
-- **🔔 Alerts** – Get notified when traffic or conversions cross a threshold you set.
-
-- **🌐 Public Dashboards** – Optionally share a read-only, filterable analytics dashboard for a project via a public link — no login required.
-
-- **👥 Workspaces & Team Access** – Organize projects under workspaces with role-based member access (viewer/member/admin/owner).
-
-- **✅ GDPR & CCPA Friendly** – Compliance built-in, not bolted on.
-
-- **🛠️ Easy Self-Hosting** – Deploy and integrate with a single line of code.
-
-## 💻 Quick Setup
-
-
-### 1. Clone the repository
 ```bash
 git clone https://github.com/heysagnik/diy-analytics.git
 cd diy-analytics
-```
-### 2. Set up environment variables
-Create a .env file similar to the .env.local.example
-Then, open .env.local and update MONGODB_URI with your actual MongoDB connection string.
-For local development, the default value might work if you have MongoDB running locally.
-For production, ensure you use your production database URI.
-
-### 3. Install dependencies
-```bash
+cp .env.local.example .env.local
 npm install
-```
-### 4. Run the development server
-```bash
 npm run dev
-# This will start the application on http://localhost:3000 (or the next available port).
 ```
 
-## 📊 Add to Your Site
+Set `MONGODB_URI` in `.env.local` to your MongoDB connection string, and
+`NEXT_PUBLIC_SITE_URL` to the URL the app will be served from (used when
+generating tracking snippets). The app runs at `http://localhost:3000`.
 
-Copy the snippet from your dashboard and paste it into your site’s `<head>`.
-<img src="https://github.com/user-attachments/assets/55b84635-32a3-48e5-aef4-8b9510090762" width='500'/>
+## Adding it to a site
 
-## 🌐 Share a Public Dashboard
+Create a project in the dashboard, then paste its tracking snippet into your
+site's `<head>`:
 
-Enable public mode for a project in its settings to get a shareable, read-only dashboard at `/public/<projectId>` — visitors can change the date range and filters without needing an account.
+```html
+<script async defer src="https://your-instance.example.com/api/tracker.js?site-id=YOUR_SITE_ID"></script>
+```
 
-## 🤝 Join Our Community & Contribute
+See [docs/integration.md](docs/integration.md) for framework-specific
+snippets, the custom-events API, and troubleshooting.
 
-We're building DIY Analytics as a community effort and welcome contributions of all kinds! Whether it's reporting a bug, suggesting a feature, improving documentation, or writing code, we'd love your help.
+## Documentation
 
-**How to contribute:**
-- **Found a bug?** [Open an issue](https://github.com/heysagnik/diy-analytics/issues).
-- **Have a feature idea?** [Start a discussion](https://github.com/heysagnik/diy-analytics/discussions) or open an issue.
-- **Ready to contribute code or documentation?** Fork the repository, create your feature branch, and then submit a pull request!
+Full documentation lives in [`docs/`](docs/):
 
-Check out our [open issues](https://github.com/heysagnik/diy-analytics/issues) to see where you can help.
+- [Features](docs/features.md) — a detailed reference for everything in the dashboard.
+- [Integration Guide](docs/integration.md) — installing the tracking script and custom events.
 
-Let's build something amazing together!
+## Contributing
+
+Issues and pull requests are welcome. Open an issue before starting
+significant work so the approach can be discussed first.
+
+## License
+
+[MIT](LICENSE)
