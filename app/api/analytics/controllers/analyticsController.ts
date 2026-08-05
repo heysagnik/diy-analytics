@@ -105,6 +105,71 @@ export class AnalyticsController {
     }
   }
 
+  /**
+   * On-demand event-property endpoint — not part of the main analytics
+   * bundle since it only runs when a user drills into a specific event in
+   * the UI. Two modes selected by query params:
+   *   ?eventName=X            -> which property keys exist on that event
+   *   ?eventName=X&propertyKey=Y -> value distribution for that key
+   */
+  async handleGetEventProperties(request: NextRequest): Promise<NextResponse> {
+    try {
+      await connectToDatabase();
+
+      const searchParams = request.nextUrl.searchParams;
+      const projectId = searchParams.get('projectId');
+      const eventName = searchParams.get('eventName');
+      const propertyKey = searchParams.get('propertyKey') || undefined;
+      const dateRange = searchParams.get('dateRange') || 'LAST_7_DAYS';
+      const timezone = searchParams.get('timezone');
+      const startDate = searchParams.get('startDate') || undefined;
+      const endDate = searchParams.get('endDate') || undefined;
+      const filters = this.parseFilters(searchParams);
+
+      if (!projectId) {
+        return this.createErrorResponse('Project ID is required', 400);
+      }
+      if (!eventName) {
+        return this.createErrorResponse('eventName is required', 400);
+      }
+      if (!DATE_RANGES[dateRange]) {
+        return this.createErrorResponse(`Invalid date range. Supported ranges: ${Object.keys(DATE_RANGES).join(', ')}`, 400);
+      }
+
+      const access = await requireProjectAccess(request, projectId);
+      if (access instanceof NextResponse) {
+        return access;
+      }
+
+      const baseOptions = {
+        projectId,
+        eventName,
+        dateRange,
+        timezone: normalizeTimezone(timezone || undefined),
+        startDate,
+        endDate,
+        filters
+      };
+
+      const data = propertyKey
+        ? await this.analyticsService.getEventPropertyBreakdown({ ...baseOptions, propertyKey })
+        : await this.analyticsService.getEventPropertyKeys(baseOptions);
+
+      return NextResponse.json({
+        success: true,
+        data,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Analytics Controller Error (event properties):', error);
+      return this.createErrorResponse(
+        'Failed to fetch event property data',
+        500,
+        error instanceof Error ? error.message : 'Unknown error'
+      );
+    }
+  }
+
   async handlePostAnalytics(request: NextRequest): Promise<NextResponse> {
     try {
       await connectToDatabase();
@@ -177,8 +242,8 @@ export class AnalyticsController {
 
     // Validate filters if provided
     if (params.filters) {
-      const { country, browser, device, source, page, utmSource, utmMedium, utmCampaign } = params.filters;
-      const dimensions = { country, browser, device, source, page, utmSource, utmMedium, utmCampaign };
+      const { country, browser, device, source, page, utmSource, utmMedium, utmCampaign, os, city } = params.filters;
+      const dimensions = { country, browser, device, source, page, utmSource, utmMedium, utmCampaign, os, city };
 
       for (const [key, value] of Object.entries(dimensions)) {
         if (value && (!Array.isArray(value) || value.some((v) => typeof v !== 'string'))) {
@@ -194,7 +259,7 @@ export class AnalyticsController {
     const filters: QueryOptions['filters'] = {};
     let hasFilters = false;
 
-    (['country', 'browser', 'device', 'source', 'page', 'utmSource', 'utmMedium', 'utmCampaign'] as const).forEach((key) => {
+    (['country', 'browser', 'device', 'source', 'page', 'utmSource', 'utmMedium', 'utmCampaign', 'os', 'city'] as const).forEach((key) => {
       const raw = searchParams.get(key);
       if (raw) {
         filters[key] = raw.split(',').map((v) => v.trim()).filter(Boolean);

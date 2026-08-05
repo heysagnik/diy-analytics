@@ -1,4 +1,5 @@
 import React from 'react';
+import { Empty, EmptyHeader, EmptyTitle, EmptyDescription } from '@/components/ui/empty';
 
 export interface RetentionCohort {
   cohortWeek: string;
@@ -23,12 +24,14 @@ function cellColor(pct: number): string {
 export const RetentionHeatmap: React.FC<RetentionHeatmapProps> = ({ cohorts, weeks }) => {
   if (!cohorts.length) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-center border border-border rounded-xl bg-surface shadow-[var(--surface-shadow)]">
-        <h3 className="text-sm font-medium text-foreground mb-1">Not enough data yet</h3>
-        <p className="text-xs text-muted-foreground max-w-sm">
-          Retention cohorts build up as returning visitors are tracked across weeks.
-        </p>
-      </div>
+      <Empty className="py-16 bg-surface shadow-[var(--surface-shadow)] border border-border rounded-xl">
+        <EmptyHeader>
+          <EmptyTitle className="text-sm font-medium text-foreground">Not enough data yet</EmptyTitle>
+          <EmptyDescription className="text-xs text-muted-foreground max-w-sm">
+            Retention cohorts build up as returning visitors are tracked across weeks.
+          </EmptyDescription>
+        </EmptyHeader>
+      </Empty>
     );
   }
 

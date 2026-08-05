@@ -87,7 +87,7 @@ export const GoalsSection: React.FC<GoalsSectionProps> = ({ project, showToast }
 
   return (
     <SettingsGroup title="Goals">
-      <div className="space-y-4 p-4 sm:px-5">
+      <div className="flex flex-col gap-4 p-4 sm:px-5">
         <p className="text-xs text-muted-foreground">
           Track conversions when visitors reach a specific page or fire a custom event.
         </p>

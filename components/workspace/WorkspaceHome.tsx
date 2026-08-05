@@ -12,6 +12,7 @@ import { ProjectListHeader } from '@/components/home/ProjectListHeader';
 import { ProjectListSkeleton } from '@/components/home/ProjectListSkeleton';
 import { EmptyState } from '@/components/home/EmptyState';
 import ProjectPageShell from '@/components/project/ProjectPageShell';
+import { WorkspaceStatsBar } from '@/components/workspace/WorkspaceStatsBar';
 
 export default function WorkspaceHome({ workspaceId, workspaceSlug, userId }: { workspaceId: string; workspaceSlug: string; userId: string }) {
   const queryClient = useQueryClient();
@@ -35,6 +36,7 @@ export default function WorkspaceHome({ workspaceId, workspaceSlug, userId }: { 
     <div className="min-h-screen bg-background text-foreground">
       <ProjectPageShell>
         <ProjectListHeader workspaceSlug={workspaceSlug} userId={userId} searchQuery={searchQuery} onSearchChange={setSearchQuery} onNewSiteClick={() => setShowNewProjectModal(true)} />
+        <WorkspaceStatsBar workspaceId={workspaceId} workspaceSlug={workspaceSlug} />
         {query.isLoading ? <ProjectListSkeleton /> : query.isError ? <ErrorState message={query.error.message} onRetry={() => query.refetch()} /> : filtered.length === 0 ? <EmptyState searchQuery={searchQuery} onNewSiteClick={() => setShowNewProjectModal(true)} /> : <ProjectGrid projects={filtered} workspaceSlug={workspaceSlug} />}
         <NewProjectModal isOpen={showNewProjectModal} onClose={() => setShowNewProjectModal(false)} onCreateProject={(project) => mutation.mutate(project)} />
       </ProjectPageShell>

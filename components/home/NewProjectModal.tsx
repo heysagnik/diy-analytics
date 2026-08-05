@@ -7,8 +7,8 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import { FieldGroup, Field, FieldLabel, FieldError } from '@/components/ui/field';
 import { normalizeProjectUrl } from '@/utils/url';
 
 interface NewProjectModalProps {
@@ -38,9 +38,9 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClos
           <DialogTitle className="font-display font-semibold text-lg text-foreground">Add New Website</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
-          <div className="space-y-5">
-            <div className="space-y-1.5">
-              <Label htmlFor="project-name">Project Name</Label>
+          <FieldGroup className="gap-5">
+            <Field>
+              <FieldLabel htmlFor="project-name">Project Name</FieldLabel>
               <Input
                 id="project-name"
                 required
@@ -48,15 +48,14 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClos
                 value={newProject.name}
                 onChange={(e) => setNewProject({ ...newProject, name: e.target.value })}
               />
-            </div>
+            </Field>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="project-url">Website URL</Label>
+            <Field data-invalid={!!urlError}>
+              <FieldLabel htmlFor="project-url">Website URL</FieldLabel>
               <Input
                 id="project-url"
                 required
                 aria-invalid={!!urlError}
-                aria-describedby={urlError ? "project-url-error" : undefined}
                 placeholder="example.com"
                 value={newProject.url}
                 onChange={(e) => {
@@ -64,9 +63,9 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClos
                   if (urlError) setUrlError("");
                 }}
               />
-              {urlError && <p id="project-url-error" className="text-xs text-destructive">{urlError}</p>}
-            </div>
-          </div>
+              <FieldError>{urlError}</FieldError>
+            </Field>
+          </FieldGroup>
 
           <DialogFooter className="mt-5">
             <Button type="button" variant="outline" onClick={onClose}>

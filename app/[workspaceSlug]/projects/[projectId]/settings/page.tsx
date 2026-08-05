@@ -16,7 +16,7 @@ import { AlertsSection } from '@/components/settings/AlertsSection';
 import { TrackingSection } from '@/components/settings/TrackingSection';
 import { DangerZoneSection } from '@/components/settings/DangerZoneSection';
 import { DataManagementSection } from '@/components/settings/DataManagementSection';
-import { Button } from '@/components/ui/button';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useProjectContext } from '../project-context';
 import ProjectPageShell from '@/components/project/ProjectPageShell';
 
@@ -42,43 +42,50 @@ export default function SettingsPage() {
       title="Project Settings"
       description="Configure site details, privacy exclusions, and data exports."
       className="overflow-hidden"
-      mainClassName="space-y-6"
+      mainClassName="flex flex-col gap-6"
     >
-        <div className="space-y-4">
+        <Tabs
+          value={activeTab}
+          onValueChange={(v) => typeof v === 'string' && setActiveTab(v as SettingsTabId)}
+          className="gap-4"
+        >
           <div className="max-w-full overflow-x-auto scrollbar-hide">
-            <div className="flex items-center gap-0.5 rounded-lg border border-border bg-muted p-0.5 w-max">
+            <TabsList className="w-max">
               {SETTINGS_TABS.map((tab) => {
                 const TabIcon = tab.icon;
-                const isActive = tab.id === activeTab;
                 return (
-                  <Button
+                  <TabsTrigger
                     key={tab.id}
-                    size="default"
-                    variant={isActive ? 'default' : 'ghost'}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`shrink-0 rounded-md font-medium ${tab.id === 'danger' && !isActive ? 'text-danger hover:text-danger' : ''}`}
+                    value={tab.id}
+                    className={tab.id === 'danger' ? 'text-danger data-active:text-danger' : ''}
                   >
-                    <TabIcon size={14} weight={isActive ? 'bold' : 'regular'} />
+                    <TabIcon size={14} weight={tab.id === activeTab ? 'bold' : 'regular'} />
                     <span>{tab.label}</span>
-                  </Button>
+                  </TabsTrigger>
                 );
               })}
-            </div>
+            </TabsList>
           </div>
 
-          <div key={activeTab} className="animate-fade-in">
-            {activeTab === 'general' && (
-              <GeneralSection project={project} onProjectUpdate={updateProject} showToast={showToast} />
-            )}
-            {activeTab === 'tracking' && (
-              <TrackingSection project={project} onProjectUpdate={updateProject} showToast={showToast} />
-            )}
-            {activeTab === 'goals' && <GoalsSection project={project} showToast={showToast} />}
-            {activeTab === 'alerts' && <AlertsSection project={project} showToast={showToast} />}
-            {activeTab === 'data' && <DataManagementSection project={project} showToast={showToast} />}
-            {activeTab === 'danger' && <DangerZoneSection project={project} showToast={showToast} />}
-          </div>
-        </div>
+          <TabsContent value="general" className="animate-fade-in">
+            <GeneralSection project={project} onProjectUpdate={updateProject} showToast={showToast} />
+          </TabsContent>
+          <TabsContent value="tracking" className="animate-fade-in">
+            <TrackingSection project={project} onProjectUpdate={updateProject} showToast={showToast} />
+          </TabsContent>
+          <TabsContent value="goals" className="animate-fade-in">
+            <GoalsSection project={project} showToast={showToast} />
+          </TabsContent>
+          <TabsContent value="alerts" className="animate-fade-in">
+            <AlertsSection project={project} showToast={showToast} />
+          </TabsContent>
+          <TabsContent value="data" className="animate-fade-in">
+            <DataManagementSection project={project} showToast={showToast} />
+          </TabsContent>
+          <TabsContent value="danger" className="animate-fade-in">
+            <DangerZoneSection project={project} showToast={showToast} />
+          </TabsContent>
+        </Tabs>
     </ProjectPageShell>
   );
 }

@@ -10,7 +10,9 @@ import { useProject } from "@/hooks/useProject";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { SidebarSimpleIcon } from "@phosphor-icons/react";
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty";
+import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
+import { WarningIcon } from "@phosphor-icons/react";
 import { normalizeProjectUrl } from "@/utils/url";
 import { ProjectProvider } from "./project-context";
 
@@ -46,7 +48,7 @@ const ProjectLoadingSkeleton = () => (
         </div>
       </div>
 
-      <div className="flex-1 px-2 py-3 space-y-1">
+      <div className="flex-1 px-2 py-3 flex flex-col gap-1">
         {[16, 14, 20, 12, 18].map((w, i) => (
           <div key={i} className="flex items-center gap-2.5 px-4 py-2.5">
             <Skeleton className="size-[18px] rounded-sm flex-shrink-0" />
@@ -55,7 +57,7 @@ const ProjectLoadingSkeleton = () => (
         ))}
       </div>
 
-      <div className="p-2.5 space-y-0.5 border-t border-border">
+      <div className="p-2.5 flex flex-col gap-0.5 border-t border-border">
         {[0, 1, 2].map((i) => (
           <div key={i} className="flex items-center gap-3 px-3 py-2.5">
             <Skeleton className="size-[18px] rounded-sm flex-shrink-0" />
@@ -72,7 +74,7 @@ const ProjectLoadingSkeleton = () => (
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        <div className="px-4 py-10 sm:px-6 sm:py-16 lg:px-8 space-y-4 max-w-6xl mx-auto w-full">
+        <div className="px-4 py-10 sm:px-6 sm:py-16 lg:px-8 flex flex-col gap-4 max-w-6xl mx-auto w-full">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {Array.from({ length: 4 }, (_, i) => (
               <Card key={i} className="p-4 flex flex-col justify-between gap-3">
@@ -90,7 +92,7 @@ const ProjectLoadingSkeleton = () => (
 
           <Card className="p-5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
-              <div className="space-y-2">
+              <div className="flex flex-col gap-2">
                 <Skeleton className="h-5 w-36 rounded-sm" />
                 <Skeleton className="h-3 w-48 rounded-sm" />
               </div>
@@ -112,15 +114,21 @@ const ProjectLoadingSkeleton = () => (
 
 const ErrorDisplay = ({ message, onRetry }: { message: string; onRetry?: () => void }) => (
   <div className="min-h-screen bg-background flex items-center justify-center p-4 text-foreground">
-    <Card className="text-center max-w-md p-6 bg-surface rounded-2xl">
-      <div className="text-danger text-4xl mb-3"><span role="img" aria-hidden="true">⚠️</span></div>
-      <h1 className="font-display text-xl font-semibold text-foreground mb-2">Unable to Load Project</h1>
-      <p className="text-muted-foreground text-sm mb-4">{message}</p>
-      {onRetry && (
-        <Button onClick={onRetry}>
-          Try Again
-        </Button>
-      )}
+    <Card className="max-w-md w-full bg-surface rounded-2xl">
+      <Empty>
+        <EmptyHeader>
+          <EmptyMedia variant="icon" className="bg-danger/10 text-danger">
+            <WarningIcon size={24} weight="fill" />
+          </EmptyMedia>
+          <EmptyTitle className="font-display text-xl font-semibold text-foreground">Unable to Load Project</EmptyTitle>
+          <EmptyDescription className="text-sm">{message}</EmptyDescription>
+        </EmptyHeader>
+        {onRetry && (
+          <EmptyContent>
+            <Button onClick={onRetry}>Try Again</Button>
+          </EmptyContent>
+        )}
+      </Empty>
     </Card>
   </div>
 );
@@ -128,7 +136,6 @@ const ErrorDisplay = ({ message, onRetry }: { message: string; onRetry?: () => v
 export default function ProjectLayoutClient({ children, workspaceId, workspaceSlug, projectId }: ProjectLayoutProps) {
   const pathname = usePathname();
 
-  const [isSidebarOpen, setSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   useEffect(() => {
@@ -136,12 +143,10 @@ export default function ProjectLayoutClient({ children, workspaceId, workspaceSl
     if (stored === "true") setSidebarCollapsed(true);
   }, []);
 
-  const toggleSidebarCollapsed = useCallback(() => {
-    setSidebarCollapsed((prev) => {
-      const next = !prev;
-      window.localStorage.setItem("sidebar-collapsed", String(next));
-      return next;
-    });
+  const handleSidebarOpenChange = useCallback((open: boolean) => {
+    const nextCollapsed = !open;
+    setSidebarCollapsed(nextCollapsed);
+    window.localStorage.setItem("sidebar-collapsed", String(nextCollapsed));
   }, []);
 
   const [activePageId, setActivePageId] = useState("analytics");
@@ -168,44 +173,10 @@ export default function ProjectLayoutClient({ children, workspaceId, workspaceSl
   const navigationItems = useMemo(() => getNavigationItems(projectBasePath), [projectBasePath]);
   const footerLinks = useMemo(() => getFooterLinks(workspaceSlug), [workspaceSlug]);
 
-  const handleNavClick = useCallback(() => {
-    if (typeof window !== "undefined" && window.innerWidth < 1024) {
-      setSidebarOpen(false);
-    }
-  }, []);
-
-  const closeSidebar = useCallback(() => setSidebarOpen(false), []);
-
   useEffect(() => {
     const pathParts = pathname.split("/").filter(Boolean);
     setActivePageId(pathParts[3] || "analytics");
   }, [pathname]);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setSidebarOpen(false);
-    };
-    const handleResize = () => {
-      if (window.innerWidth >= 1024) setSidebarOpen(false);
-    };
-    document.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("resize", handleResize);
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("resize", handleResize);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (isSidebarOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "unset";
-    }
-    return () => {
-      document.body.style.overflow = "unset";
-    };
-  }, [isSidebarOpen]);
 
   useEffect(() => {
     if (!projectData) return;
@@ -233,59 +204,33 @@ export default function ProjectLayoutClient({ children, workspaceId, workspaceSl
   return (
     <ProjectProvider value={{ project: projectData, updateProject }}>
       <ErrorBoundary>
-        <div className="h-screen w-full flex overflow-hidden bg-background text-foreground">
-        {isSidebarOpen && (
-          <div
-            className="fixed inset-0 bg-black/40 backdrop-blur-xs z-40 lg:hidden transition-opacity duration-300"
-            onClick={closeSidebar}
-            aria-hidden="true"
-          />
-        )}
-
-        <Sidebar
-          isOpen={isSidebarOpen}
-          onClose={closeSidebar}
-          isCollapsed={isSidebarCollapsed}
-          onToggleCollapsed={toggleSidebarCollapsed}
-          projectId={projectId}
-          projectName={projectName}
-          projectUrl={projectUrl}
-          workspaceId={workspaceId}
-          workspaceSlug={workspaceSlug}
-          navigationItems={navigationItems}
-          activePageId={activePageId}
-          setActivePageId={setActivePageId}
-          handleNavClick={handleNavClick}
-          footerLinks={footerLinks}
-        />
-
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-          {isSidebarCollapsed && (
-            <div className="hidden lg:flex items-center h-14 px-4 flex-shrink-0 border-b border-border bg-surface">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={toggleSidebarCollapsed}
-                className="relative h-8 w-8 text-muted-foreground hover:text-foreground active:scale-[0.96] transition-transform after:absolute after:-inset-1.5 after:content-['']"
-                aria-label="Expand sidebar"
-              >
-                <SidebarSimpleIcon size={18} weight="bold" />
-              </Button>
-            </div>
-          )}
-
-          <div className="lg:hidden">
-            <Header
-              onMenuToggle={() => setSidebarOpen(true)}
+        <SidebarProvider open={!isSidebarCollapsed} onOpenChange={handleSidebarOpenChange}>
+          <div className="h-screen w-full flex overflow-hidden bg-background text-foreground">
+            <Sidebar
+              projectId={projectId}
               projectName={projectName}
-              isLoading={isLoadingProject}
+              projectUrl={projectUrl}
+              workspaceId={workspaceId}
+              workspaceSlug={workspaceSlug}
+              navigationItems={navigationItems}
+              activePageId={activePageId}
+              setActivePageId={setActivePageId}
+              footerLinks={footerLinks}
             />
+
+            <SidebarInset className="flex-1 flex flex-col min-w-0 overflow-hidden">
+              <div className="lg:hidden">
+                <Header
+                  projectName={projectName}
+                  isLoading={isLoadingProject}
+                />
+              </div>
+              <div className="flex-1 overflow-y-auto scrollbar-thin">
+                <div className="w-full">{children}</div>
+              </div>
+            </SidebarInset>
           </div>
-          <div className="flex-1 overflow-y-auto scrollbar-thin">
-            <div className="w-full">{children}</div>
-          </div>
-        </div>
-        </div>
+        </SidebarProvider>
       </ErrorBoundary>
     </ProjectProvider>
   );

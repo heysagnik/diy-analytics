@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from "@/components/ui/empty";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/useToast";
 import { FunnelIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
 import ProjectPageShell from "@/components/project/ProjectPageShell";
@@ -251,7 +253,7 @@ export default function FunnelsPage({ params: promiseParams }: { params: Promise
       }
     >
         {showBuilder && (
-              <Card className="p-4 space-y-4">
+              <Card className="p-4 flex flex-col gap-4">
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -260,7 +262,7 @@ export default function FunnelsPage({ params: promiseParams }: { params: Promise
               aria-label="Funnel name"
             />
 
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               {steps.map((step, idx) => (
                 <div key={step.clientId} className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
                   <span className="text-xs text-muted-foreground w-14 shrink-0">Step {idx + 1}</span>
@@ -324,19 +326,25 @@ export default function FunnelsPage({ params: promiseParams }: { params: Promise
         )}
 
         {funnels.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-card py-16 text-center">
-            <FunnelIcon size={32} className="text-muted-foreground mb-3" />
-            <h3 className="text-sm font-medium text-foreground mb-1">No funnels yet</h3>
-            <p className="text-xs text-muted-foreground max-w-sm">
-              Create a funnel to see step-by-step conversion and drop-off.
-            </p>
-          </div>
+          <Empty className="rounded-xl border border-border bg-card py-16">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <FunnelIcon size={32} className="text-muted-foreground" />
+              </EmptyMedia>
+              <EmptyTitle className="text-sm font-medium text-foreground">No funnels yet</EmptyTitle>
+              <EmptyDescription className="text-xs max-w-sm">
+                Create a funnel to see step-by-step conversion and drop-off.
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         ) : (
-          <div className="space-y-4">
+          <div className="flex flex-col gap-4">
             {loadingAnalysis ? (
               <Skeleton className="h-64 w-full rounded-xl" />
             ) : error ? (
-              <div className="p-4 text-sm text-danger border border-danger/20 bg-danger/5 rounded-lg">{error}</div>
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
             ) : analysis ? (
               <Card className="p-5">
                 <FunnelChart steps={analysis.steps} />

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { WebVitalData } from '@/types/analytics';
 import { GaugeIcon } from '@phosphor-icons/react';
 
@@ -22,9 +23,9 @@ const METRIC_LABELS: Record<WebVitalData['metric'], string> = {
 
 function ratingFor(metric: WebVitalData['metric'], value: number): { label: string; className: string } {
   const t = THRESHOLDS[metric];
-  if (value <= t.good) return { label: 'Good', className: 'bg-success/10 text-success' };
-  if (value <= t.poor) return { label: 'Needs Improvement', className: 'bg-warning/10 text-warning' };
-  return { label: 'Poor', className: 'bg-danger/10 text-danger' };
+  if (value <= t.good) return { label: 'Good', className: 'bg-success/10 text-success hover:bg-success/10 border-none shadow-none' };
+  if (value <= t.poor) return { label: 'Needs Improvement', className: 'bg-warning/10 text-warning hover:bg-warning/10 border-none shadow-none' };
+  return { label: 'Poor', className: 'bg-danger/10 text-danger hover:bg-danger/10 border-none shadow-none' };
 }
 
 export const WebVitalsPanel: React.FC<WebVitalsPanelProps> = ({ webVitals }) => {
@@ -49,9 +50,9 @@ export const WebVitalsPanel: React.FC<WebVitalsPanelProps> = ({ webVitals }) => 
                 <span className="text-lg font-semibold text-foreground tabular-nums">
                   {THRESHOLDS[v.metric].format(v.p75)}
                 </span>
-                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${rating.className}`}>
+                <Badge className={`text-xs font-medium ${rating.className}`}>
                   {rating.label}
-                </span>
+                </Badge>
               </div>
               <p className="text-xs text-muted-foreground mt-1">p75 · {v.samples.toLocaleString()} samples</p>
             </div>

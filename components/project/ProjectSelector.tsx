@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -8,6 +8,13 @@ import { CaretDownIcon, PlusIcon } from "@phosphor-icons/react";
 import { Badge } from "@/components/ui/badge";
 import { normalizeProjectUrl } from "@/utils/url";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface ProjectSelectorProps {
   projectId: string;
@@ -15,6 +22,7 @@ interface ProjectSelectorProps {
   projectUrl: string;
   workspaceId: string;
   workspaceSlug: string;
+  collapsed?: boolean;
 }
 
 function ProjectAvatar({ name, url }: { name: string; url: string }) {
@@ -23,7 +31,7 @@ function ProjectAvatar({ name, url }: { name: string; url: string }) {
 
   if (showFavicon && hostname) {
     return (
-      <div className="w-5 h-5 rounded-full flex-shrink-0 relative overflow-hidden bg-surface-secondary outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10">
+      <div className="size-5 rounded-full flex-shrink-0 relative overflow-hidden bg-surface-secondary outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10">
         <Image
           src={`https://icons.duckduckgo.com/ip3/${encodeURIComponent(hostname)}.ico`}
           alt={`${name} favicon`}
@@ -38,20 +46,28 @@ function ProjectAvatar({ name, url }: { name: string; url: string }) {
   }
 
   return (
-    <div className="w-5 h-5 rounded-full bg-accent flex items-center justify-center text-accent-foreground text-xs font-bold flex-shrink-0">
-      {name ? name.charAt(0).toUpperCase() : '#'}
+    <div className="size-5 rounded-full bg-accent text-accent-foreground flex items-center justify-center text-xs font-bold flex-shrink-0">
+      {name.charAt(0).toUpperCase()}
     </div>
   );
 }
 
-export default function ProjectSelector({ projectId, projectName, projectUrl, workspaceId, workspaceSlug }: ProjectSelectorProps) {
+export default function ProjectSelector({
+  projectId,
+  projectName,
+  projectUrl,
+  workspaceId,
+  workspaceSlug,
+  collapsed = false,
+}: ProjectSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [projects, setProjects] = useState<Array<{_id: string, name: string, url: string}>>([]);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (!isOpen) return;
+
     const fetchProjects = async () => {
       setLoading(true);
       try {
@@ -70,20 +86,7 @@ export default function ProjectSelector({ projectId, projectName, projectUrl, wo
     };
 
     fetchProjects();
-  }, [workspaceId]);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
+  }, [isOpen, workspaceId]);
 
   const handleProjectSelect = (id: string) => {
     router.push(`/${workspaceSlug}/projects/${id}`);
@@ -91,76 +94,79 @@ export default function ProjectSelector({ projectId, projectName, projectUrl, wo
   };
 
   return (
-      <div className="px-3 py-2.5 relative" ref={dropdownRef}>
-        <Button
-          variant="outline"
-          size="lg"
-          type="button"
-          className="w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-md border border-border bg-surface text-foreground hover:bg-surface-secondary transition-colors text-left cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-          onClick={() => setIsOpen(!isOpen)}
-          aria-expanded={isOpen}
+    <div className="px-3 py-2.5">
+      <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
+        <DropdownMenuTrigger
+          render={
+            <Button
+              variant="outline"
+              size="lg"
+              type="button"
+              className={`w-full justify-start gap-2.5 text-left ${collapsed ? 'justify-center p-2' : 'px-2.5 py-2.5'}`}
+              aria-expanded={isOpen}
+            />
+          }
         >
           <ProjectAvatar name={projectName} url={projectUrl} />
-          <span className="font-medium text-sm flex-1 truncate text-foreground">{projectName}</span>
-          <CaretDownIcon aria-hidden="true"
-            size={16}
-             className={`flex-shrink-0 text-muted-foreground transition-transform duration-200 ease-out ${isOpen ? 'rotate-180' : ''}`}
-          />
-        </Button>
+          {!collapsed && (
+            <>
+              <span className="font-medium text-sm flex-1 truncate text-foreground">{projectName}</span>
+              <CaretDownIcon
+                aria-hidden="true"
+                size={16}
+                className={`flex-shrink-0 text-muted-foreground transition-transform duration-200 ease-out ${isOpen ? 'rotate-180' : ''}`}
+              />
+            </>
+          )}
+        </DropdownMenuTrigger>
 
-          {isOpen && (
-          <div className="absolute mt-2 left-3 right-3 origin-top rounded-xl border border-border bg-surface shadow-xl z-50 flex flex-col overflow-hidden transition-[opacity,transform] duration-200 ease-out starting:opacity-0 starting:scale-95">
-            <div className="max-h-56 overflow-y-auto scrollbar-thin p-1.5">
-              {loading ? (
-                <div className="p-4 text-center text-xs text-muted-foreground">
-                  Loading projects...
-                </div>
-              ) : projects.length === 0 ? (
-                <div className="p-4 text-center text-xs text-muted-foreground">
-                  No projects available
-                </div>
-              ) : (
-                <div className="space-y-1">
-                  {projects.map((project) => {
-                    const isActive = project._id === projectId;
-                    return (
-                      <button
-                        key={project._id}
-                        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-sm text-left text-xs transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-                          isActive
-                            ? 'bg-surface-tertiary text-foreground font-medium'
-                            : 'text-muted-foreground hover:bg-surface-secondary'
-                        }`}
-                        onClick={() => handleProjectSelect(project._id)}
-                      >
-                        <ProjectAvatar name={project.name} url={project.url} />
-                        <div className="flex-1 overflow-hidden">
-                          <span className="block truncate">{project.name || 'Unnamed Project'}</span>
-                        </div>
-                        {isActive && (
-                          <Badge className="bg-accent text-accent-foreground">
-                            Active
-                          </Badge>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            <div className="p-1.5 pt-1 border-t border-border shrink-0">
-              <Link
-                 href={`/${workspaceSlug}`}
-                className="flex items-center justify-center gap-1.5 w-full px-3 py-2 text-xs font-medium text-accent-foreground bg-accent hover:opacity-90 rounded-md transition-colors"
-                onClick={() => setIsOpen(false)}
-              >
-                <PlusIcon size={14} weight="bold" />
-                Create New Project
-              </Link>
-            </div>
+        <DropdownMenuContent align="start" className="w-72 p-1.5">
+          <div className="max-h-56 overflow-y-auto scrollbar-thin">
+            {loading ? (
+              <div className="p-4 text-center text-xs text-muted-foreground">
+                Loading projects...
+              </div>
+            ) : projects.length === 0 ? (
+              <div className="p-4 text-center text-xs text-muted-foreground">
+                No projects available
+              </div>
+            ) : (
+              projects.map((project) => {
+                const isActive = project._id === projectId;
+                return (
+                  <DropdownMenuItem
+                    key={project._id}
+                    className={`gap-2.5 px-3 py-2 text-xs ${
+                      isActive ? 'bg-surface-tertiary text-foreground font-medium' : 'text-muted-foreground'
+                    }`}
+                    onClick={() => handleProjectSelect(project._id)}
+                  >
+                    <ProjectAvatar name={project.name} url={project.url} />
+                    <div className="flex-1 overflow-hidden">
+                      <span className="block truncate">{project.name || 'Unnamed Project'}</span>
+                    </div>
+                    {isActive && (
+                      <Badge className="bg-accent text-accent-foreground">
+                        Active
+                      </Badge>
+                    )}
+                  </DropdownMenuItem>
+                );
+              })
+            )}
           </div>
-        )}
-      </div>
+
+          <DropdownMenuSeparator />
+
+          <DropdownMenuItem
+            render={<Link href={`/${workspaceSlug}`} />}
+            className="justify-center gap-1.5 px-3 py-2 text-xs font-medium text-accent-foreground bg-accent focus:bg-accent focus:text-accent-foreground hover:opacity-90"
+          >
+            <PlusIcon size={14} weight="bold" />
+            Create New Project
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
   );
 }

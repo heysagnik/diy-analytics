@@ -58,7 +58,7 @@ export const ProjectListHeader: React.FC<ProjectListHeaderProps> = ({
           <VisitorAvatar userId={userId} size={26} />
         </Link>
         <Button onClick={onNewSiteClick}>
-          <PlusIcon size={18} weight="bold" />
+          <PlusIcon data-icon="inline-start" weight="bold" />
           <span>New Site</span>
         </Button>
       </div>

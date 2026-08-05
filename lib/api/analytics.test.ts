@@ -26,7 +26,7 @@ const analyticsResponse: AnalyticsResponse = {
   sessions: metric,
   bounceRate: metric,
   avgSessionDuration: metric,
-  pages: [], sources: [], countries: [], browsers: [], devices: [], campaigns: [],
+  pages: [], sources: [], countries: [], browsers: [], devices: [], os: [], cities: [], campaigns: [], utmBreakdown: [],
   entryPages: [], exitPages: [], goals: [], webVitals: [], topEvents: [], recentEvents: [],
 };
 

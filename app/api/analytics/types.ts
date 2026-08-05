@@ -134,6 +134,30 @@ export interface BrowserData {
 export interface DeviceData {
   device: string;
   category: 'desktop' | 'mobile' | 'tablet';
+  detail?: string;
+  users: number;
+  sessions: number;
+}
+
+export interface OSData {
+  os: string;
+  version?: string;
+  users: number;
+  sessions: number;
+}
+
+export interface CityData {
+  city: string;
+  region: string;
+  country: string;
+  users: number;
+  sessions: number;
+}
+
+export interface UtmBreakdownData {
+  source: string;
+  medium: string;
+  campaign: string;
   users: number;
   sessions: number;
 }
@@ -147,6 +171,17 @@ export interface EventData {
 
 export type EventDataValue = string | number | boolean | null | undefined;
 export type EventDataRecord = Record<string, EventDataValue | EventDataValue[] | Record<string, EventDataValue>>;
+
+export interface EventPropertyKeyData {
+  key: string;
+  occurrences: number;
+}
+
+export interface EventPropertyValueData {
+  value: string;
+  count: number;
+  uniqueUsers: number;
+}
 
 export interface RecentEvent {
   _id: string;
@@ -176,7 +211,10 @@ export interface AnalyticsResponse {
   countries: CountryData[];
   browsers: BrowserData[];
   devices: DeviceData[];
+  os: OSData[];
+  cities: CityData[];
   campaigns: CampaignData[];
+  utmBreakdown: UtmBreakdownData[];
   entryPages: PageData[];
   exitPages: PageData[];
   goals: GoalConversionData[];
@@ -203,7 +241,22 @@ export interface QueryOptions {
     utmSource?: string[];
     utmMedium?: string[];
     utmCampaign?: string[];
+    os?: string[];
+    city?: string[];
   };
+}
+
+export interface EventPropertyQueryOptions {
+  projectId: string;
+  eventName: string;
+  // Present only for the value-breakdown request; absent when just
+  // listing which property keys exist for the event.
+  propertyKey?: string;
+  dateRange: string;
+  timezone?: string;
+  startDate?: string;
+  endDate?: string;
+  filters?: QueryOptions['filters'];
 }
 
 export interface RealtimeVisitor {

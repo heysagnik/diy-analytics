@@ -36,7 +36,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({ filters, onRemove, onClear
             className="text-muted-foreground hover:text-danger"
             aria-label={`Remove ${filterLabel(f.dimension)} filter`}
           >
-            <XIcon size={12} weight="bold" />
+            <XIcon weight="bold" />
           </Button>
         </Badge>
       ))}

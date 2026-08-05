@@ -4,6 +4,7 @@ import React, { useEffect, useState, use, useCallback } from "react";
 import { RetentionHeatmap, RetentionCohort } from "@/components/analytics/RetentionHeatmap";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import ProjectPageShell from "@/components/project/ProjectPageShell";
 
 const WEEK_OPTIONS = [4, 8, 12];
@@ -66,7 +67,9 @@ export default function RetentionPage({ params: promiseParams }: { params: Promi
         {loading ? (
           <Skeleton className="h-64 w-full rounded-xl" />
         ) : error ? (
-           <div className="p-4 text-sm text-danger border border-danger/20 bg-danger/5 rounded-lg">{RETENTION_LOAD_ERROR}</div>
+          <Alert variant="destructive">
+            <AlertDescription>{RETENTION_LOAD_ERROR}</AlertDescription>
+          </Alert>
         ) : (
           <RetentionHeatmap cohorts={cohorts} weeks={weeks} />
         )}

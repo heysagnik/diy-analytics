@@ -1,21 +1,22 @@
-"use client";
-
-import { CircleNotchIcon, SidebarSimpleIcon } from "@phosphor-icons/react";
+import { SidebarSimpleIcon } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
+import { useSidebar } from "@/components/ui/sidebar";
 
 interface HeaderProps {
-  onMenuToggle: () => void;
   projectName: string;
   isLoading?: boolean;
 }
 
-export default function Header({ onMenuToggle, projectName, isLoading = false }: HeaderProps) {
+export default function Header({ projectName, isLoading = false }: HeaderProps) {
+  const { toggleSidebar } = useSidebar();
+
   return (
     <header className="px-3 py-3 flex items-center gap-3 bg-surface-secondary/90 backdrop-blur-md sticky top-0 z-20">
       <Button
         size="icon-sm"
         variant="ghost"
-        onClick={onMenuToggle}
+        onClick={toggleSidebar}
         aria-label="Open sidebar"
       >
         <SidebarSimpleIcon size={20} weight="bold" />
@@ -25,9 +26,7 @@ export default function Header({ onMenuToggle, projectName, isLoading = false }:
         <h1 className="font-display font-medium text-lg text-foreground truncate max-w-[220px]">
           {projectName}
         </h1>
-        {isLoading && (
-          <CircleNotchIcon className="animate-spin text-muted-foreground flex-shrink-0" size={16} />
-        )}
+        {isLoading && <Spinner className="size-4 text-muted-foreground flex-shrink-0" />}
       </div>
     </header>
   );

@@ -75,7 +75,7 @@ export const ActivityHeatmap: React.FC<ActivityHeatmapProps> = ({
   }, [days]);
 
   return (
-    <div className="space-y-3 font-body">
+    <div className="flex flex-col gap-3 font-body">
       <Select value={String(selectedYear)} onValueChange={(v: unknown) => onYearChange?.(Number(v as string))}>
         <SelectTrigger className="h-7 min-w-[84px] bg-background px-2 text-xs tabular-nums" aria-label="Select year">
           <SelectValue>{(v: string) => v}</SelectValue>

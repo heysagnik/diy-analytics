@@ -1,7 +1,7 @@
 import React from 'react';
 import type { Icon } from '@phosphor-icons/react';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Field, FieldLabel } from '@/components/ui/field';
 
 interface AuthFieldProps extends React.ComponentProps<typeof Input> {
   label: string;
@@ -14,11 +14,11 @@ interface AuthFieldProps extends React.ComponentProps<typeof Input> {
  *  ring, and left-icon inset so fields read as one system. */
 export default function AuthField({ label, icon: IconComponent, endSlot, labelSlot, className, id, ...props }: AuthFieldProps) {
   return (
-    <div className="space-y-2">
+    <Field className="gap-2">
       <div className="flex items-center justify-between">
-        <Label htmlFor={id} className="label-eyebrow text-foreground/80">
+        <FieldLabel htmlFor={id} className="label-eyebrow text-foreground/80">
           {label}
-        </Label>
+        </FieldLabel>
         {labelSlot}
       </div>
       <div className="relative">
@@ -35,6 +35,6 @@ export default function AuthField({ label, icon: IconComponent, endSlot, labelSl
         />
         {endSlot}
       </div>
-    </div>
+    </Field>
   );
 }

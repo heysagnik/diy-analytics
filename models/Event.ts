@@ -20,8 +20,12 @@ const eventSchema = new mongoose.Schema(
     region: { type: String, maxlength: 128 },
     city: { type: String, maxlength: 128 },
     browser: { type: String, maxlength: 64 },
+    browserVersion: { type: String, maxlength: 32 },
     os: { type: String, maxlength: 64 },
+    osVersion: { type: String, maxlength: 32 },
     device: { type: String, maxlength: 32 },
+    deviceVendor: { type: String, maxlength: 64 },
+    deviceModel: { type: String, maxlength: 128 },
     // Mirrors PageView's source and UTM fields so event-based panels support
     // the same filtering and grouping dimensions.
     referrer: { type: String, maxlength: 2048 },

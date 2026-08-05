@@ -219,7 +219,7 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({
         }
       >
         {publicMode && publicDashboardUrl && (
-          <div className="space-y-2">
+          <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                 Shareable Dashboard Link

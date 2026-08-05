@@ -45,13 +45,33 @@ const pageViewSchema = new mongoose.Schema({
     type: String,
     maxlength: 64
   },
+  // Display detail alongside browser/os/device — not individually indexed
+  // (same rationale as path/source/browser/os/device above) and only
+  // populated for pageviews ingested after this field was added; older
+  // documents leave these unset rather than backfilled.
+  browserVersion: {
+    type: String,
+    maxlength: 32
+  },
   os: {
     type: String,
     maxlength: 64
   },
+  osVersion: {
+    type: String,
+    maxlength: 32
+  },
   device: {
     type: String,
     maxlength: 32
+  },
+  deviceVendor: {
+    type: String,
+    maxlength: 64
+  },
+  deviceModel: {
+    type: String,
+    maxlength: 128
   },
   country: {
     type: String,

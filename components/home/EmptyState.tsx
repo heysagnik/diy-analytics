@@ -1,6 +1,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { PlusIcon, FolderOpenIcon } from '@phosphor-icons/react';
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from '@/components/ui/empty';
 
 interface EmptyStateProps {
   searchQuery: string;
@@ -9,18 +10,22 @@ interface EmptyStateProps {
 
 export const EmptyState: React.FC<EmptyStateProps> = ({ searchQuery, onNewSiteClick }) => {
   return (
-    <div className="flex flex-col items-center justify-center py-16 px-4 text-center rounded-xl border border-border bg-surface my-4">
-      <div className="p-4 rounded-full bg-surface-secondary mb-4 text-muted-foreground">
-        <FolderOpenIcon size={48} weight="duotone" />
-      </div>
-      <p className="text-xl font-medium mb-2 text-foreground">No projects found</p>
-      <p className="mb-6 max-w-md text-sm text-muted-foreground">
-        {searchQuery ? "Try adjusting your search criteria." : "Create your first project to get started with analytics."}
-      </p>
-      <Button onClick={onNewSiteClick} className="px-6">
-        <PlusIcon size={18} weight="bold" />
-        <span>Create New Project</span>
-      </Button>
-    </div>
+    <Empty className="py-16 px-4 bg-surface my-4">
+      <EmptyHeader>
+        <EmptyMedia variant="icon" className="p-4 size-20 rounded-full bg-surface-secondary text-muted-foreground mb-4 flex items-center justify-center">
+          <FolderOpenIcon size={48} weight="duotone" />
+        </EmptyMedia>
+        <EmptyTitle className="text-xl font-medium text-foreground">No projects found</EmptyTitle>
+        <EmptyDescription className="text-muted-foreground text-sm max-w-md">
+          {searchQuery ? "Try adjusting your search criteria." : "Create your first project to get started with analytics."}
+        </EmptyDescription>
+      </EmptyHeader>
+      <EmptyContent>
+        <Button onClick={onNewSiteClick} className="px-6">
+          <PlusIcon data-icon="inline-start" weight="bold" />
+          <span>Create New Project</span>
+        </Button>
+      </EmptyContent>
+    </Empty>
   );
 };

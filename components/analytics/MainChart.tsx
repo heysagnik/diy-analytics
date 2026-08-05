@@ -6,6 +6,7 @@ import { ChartLineIcon } from '@phosphor-icons/react';
 import AreaChart from './AreaChart';
 import BarChart from './BarChart';
 import { useCompactChart } from './useCompactChart';
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from '@/components/ui/empty';
 
 interface MainChartProps {
   analyticsData: AnalyticsData;
@@ -29,74 +30,65 @@ export const MainChart: React.FC<MainChartProps> = ({ analyticsData, dateRange }
       color: 'var(--chart-1)'
     },
     {
-      name: 'Unique Users',
+      name: 'Unique Visitors',
       data: analyticsData.uniqueUsers.data || [],
       color: 'var(--chart-2)'
     }
   ];
 
+  const toDateValuePairs = (data: number[]) => labels.map((label, idx) => ({ date: label, value: data[idx] ?? 0 }));
+
   const barChartData = [
     {
       name: 'Page Views',
-      data: labels.map((label, idx) => ({
-        date: label,
-        value: analyticsData.pageViews.data?.[idx] ?? 0
-      })),
+      data: toDateValuePairs(analyticsData.pageViews.data || []),
       color: 'var(--chart-1)'
     },
     {
-      name: 'Unique Users',
-      data: labels.map((label, idx) => ({
-        date: label,
-        value: analyticsData.uniqueUsers.data?.[idx] ?? 0
-      })),
+      name: 'Unique Visitors',
+      data: toDateValuePairs(analyticsData.uniqueUsers.data || []),
       color: 'var(--chart-2)'
     }
   ];
 
   return (
-    <Card className="p-5">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
+    <Card className="p-4 sm:p-5 flex flex-col gap-4 font-body">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-balance font-display font-semibold text-xl text-foreground">Traffic Insights</h2>
           <p className="text-xs text-muted-foreground mt-1 font-body">Data overview for {dateRange}</p>
         </div>
 
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-0.5 bg-muted p-0.5 rounded-lg border border-border">
-            <Button
-              size="xs"
-              variant={chartType === 'area' ? 'default' : 'ghost'}
-              onClick={() => setChartType('area')}
-              className="rounded-md font-medium"
-            >
-              Area
-            </Button>
-            <Button
-              size="xs"
-              variant={chartType === 'bar' ? 'default' : 'ghost'}
-              onClick={() => setChartType('bar')}
-              className="rounded-md font-medium"
-            >
-              Bar
-            </Button>
-          </div>
-
-          <div className="hidden sm:flex items-center gap-4 text-xs text-muted-foreground font-medium">
-            <span className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-[var(--chart-1)]" />
-              Page Views
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-[var(--chart-2)]" />
-              Unique Users
-            </span>
-          </div>
+        <div className="flex items-center gap-1 bg-surface-secondary/50 p-0.5 rounded-lg border border-border w-fit">
+          <Button
+            variant={chartType === 'area' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setChartType('area')}
+            className={`rounded-md cursor-pointer ${
+              chartType === 'area'
+                ? 'shadow-xs border-border/10 dark:border-border/30'
+                : 'text-muted-foreground'
+            }`}
+          >
+            Area Chart
+          </Button>
+          <Button
+            variant={chartType === 'bar' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setChartType('bar')}
+            className={`rounded-md cursor-pointer ${
+              chartType === 'bar'
+                ? 'shadow-xs border-border/10 dark:border-border/30'
+                : 'text-muted-foreground'
+            }`}
+          >
+            Bar Chart
+          </Button>
         </div>
       </div>
 
       {hasData ? (
-        <div className="h-56 sm:h-64 w-full">
+        <div className="h-56 w-full sm:h-64">
           {chartType === 'area' ? (
             <AreaChart
               seriesData={areaChartData}
@@ -123,13 +115,15 @@ export const MainChart: React.FC<MainChartProps> = ({ analyticsData, dateRange }
           )}
         </div>
       ) : (
-        <div className="flex h-56 flex-col items-center justify-center gap-2 rounded-lg border border-border bg-surface text-center sm:h-64">
-          <ChartLineIcon size={32} className="text-muted-foreground" weight="duotone" />
-          <div className="space-y-1">
-            <p className="text-sm font-medium text-foreground">No data for this view</p>
-            <p className="text-xs text-muted-foreground">Try a different date range or clear active filters.</p>
-          </div>
-        </div>
+        <Empty className="h-56 bg-surface sm:h-64 border border-border rounded-lg">
+          <EmptyHeader>
+            <EmptyMedia variant="icon" className="mb-0 flex items-center justify-center text-muted-foreground">
+              <ChartLineIcon size={32} weight="duotone" />
+            </EmptyMedia>
+            <EmptyTitle className="text-sm font-medium text-foreground">No data for this view</EmptyTitle>
+            <EmptyDescription className="text-xs text-muted-foreground">Try a different date range or clear active filters.</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       )}
     </Card>
   );

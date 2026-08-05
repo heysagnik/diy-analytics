@@ -43,6 +43,9 @@ export const createEmptyAnalyticsData = (dateRange: DateRange): AnalyticsData =>
     countries: [],
     browsers: [],
     devices: [],
+    os: [],
+    cities: [],
+    utmBreakdown: [],
     topEvents: [],
     recentEvents: []
   };

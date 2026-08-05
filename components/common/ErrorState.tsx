@@ -1,6 +1,7 @@
 import React from 'react';
 import { WarningIcon } from '@phosphor-icons/react';
 import { Button } from '@/components/ui/button';
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from '@/components/ui/empty';
 
 interface ErrorStateProps {
   message: string;
@@ -9,17 +10,21 @@ interface ErrorStateProps {
 
 export default function ErrorState({ message, onRetry }: ErrorStateProps) {
   return (
-    <div className="flex flex-col items-center justify-center py-16 px-4">
-      <div className="flex items-center justify-center w-16 h-16 rounded-xl bg-danger/10 mb-4 text-danger">
-        <WarningIcon size={32} />
-      </div>
-      <h2 className="text-xl font-medium mb-2 text-center text-foreground">Something went wrong</h2>
-      <p className="text-muted-foreground mb-6 text-center max-w-md text-sm">{message}</p>
+    <Empty className="py-16">
+      <EmptyHeader>
+        <EmptyMedia variant="icon" className="flex size-16 items-center justify-center rounded-xl bg-danger/10 text-danger mb-4">
+          <WarningIcon size={32} />
+        </EmptyMedia>
+        <EmptyTitle className="text-xl font-medium text-foreground">Something went wrong</EmptyTitle>
+        <EmptyDescription className="text-muted-foreground max-w-md text-sm">{message}</EmptyDescription>
+      </EmptyHeader>
       {onRetry && (
-        <Button onClick={onRetry}>
-          Try Again
-        </Button>
+        <EmptyContent>
+          <Button onClick={onRetry}>
+            Try Again
+          </Button>
+        </EmptyContent>
       )}
-    </div>
+    </Empty>
   );
 }

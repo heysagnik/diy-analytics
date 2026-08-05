@@ -16,6 +16,8 @@ interface UseAnalyticsOptions {
     utmSource?: string[];
     utmMedium?: string[];
     utmCampaign?: string[];
+    os?: string[];
+    city?: string[];
   };
 }
 

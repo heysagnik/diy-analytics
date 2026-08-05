@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from '@/components/ui/empty';
 import type { Visitor, VisitorFiltersState, VisitorListViewState, VisitorPagination } from '@/types/visitors';
 import { getCountryName } from '@/utils/country';
 import { VisitorAvatar } from './VisitorAvatar';
@@ -39,7 +40,7 @@ interface VisitorFiltersProps {
 
 export function VisitorFilters({ filters, countries, loading, hasActiveFilters, onFilterChange, onClearFilters, onRefresh }: VisitorFiltersProps) {
   return (
-    <div className="space-y-3 py-1">
+    <div className="flex flex-col gap-3 py-1">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="relative w-full sm:max-w-sm">
           <MagnifyingGlassIcon aria-hidden="true" size={16} className="pointer-events-none absolute top-1/2 left-3.5 z-10 -translate-y-1/2 text-muted-foreground" />
@@ -206,7 +207,7 @@ export function VisitorList({
     <>
       <div className="flex-1 overflow-y-auto scrollbar-thin animate-fade-in">
         {viewState === 'loading' && (
-          <div className="space-y-3 p-5">
+          <div className="flex flex-col gap-3 p-5">
             {Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className="flex items-center justify-between gap-4 border-b border-border py-4 last:border-0">
                 <Skeleton className="h-6 w-32 rounded-lg" />
@@ -219,23 +220,37 @@ export function VisitorList({
         )}
 
         {viewState === 'error' && (
-          <div className="space-y-3 px-5 py-16 text-center">
-            <WarningCircleIcon size={36} className="mx-auto text-danger" weight="duotone" />
-            <p className="text-sm font-medium text-danger">{error}</p>
-            <Button onClick={onRetry}>Try Again</Button>
-          </div>
+          <Empty className="py-16 px-5 border-none">
+            <EmptyHeader>
+              <EmptyMedia variant="icon" className="mb-0 flex items-center justify-center text-danger bg-danger/10 size-10 rounded-lg">
+                <WarningCircleIcon size={24} weight="duotone" />
+              </EmptyMedia>
+              <EmptyTitle className="text-sm font-medium text-danger">Error Loading Visitors</EmptyTitle>
+              <EmptyDescription className="text-sm text-muted-foreground">{error}</EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <Button onClick={onRetry}>Try Again</Button>
+            </EmptyContent>
+          </Empty>
         )}
 
         {viewState === 'empty' && (
-          <div className="space-y-3 px-5 py-16 text-center">
-            <GlobeIcon size={36} className="mx-auto text-muted-foreground" weight="duotone" />
-            <p className="text-sm text-muted-foreground">No visitor telemetry matches your selected criteria.</p>
+          <Empty className="py-16 px-5 border-none">
+            <EmptyHeader>
+              <EmptyMedia variant="icon" className="mb-0 flex items-center justify-center text-muted-foreground">
+                <GlobeIcon size={24} weight="duotone" />
+              </EmptyMedia>
+              <EmptyTitle className="text-sm font-medium text-foreground">No visitors found</EmptyTitle>
+              <EmptyDescription className="text-sm text-muted-foreground">No visitor telemetry matches your selected criteria.</EmptyDescription>
+            </EmptyHeader>
             {hasActiveFilters && (
-              <Button variant="outline" onClick={onClearFilters}>
-                Clear Filters
-              </Button>
+              <EmptyContent>
+                <Button variant="outline" onClick={onClearFilters}>
+                  Clear Filters
+                </Button>
+              </EmptyContent>
             )}
-          </div>
+          </Empty>
         )}
 
         {viewState === 'ready' && (

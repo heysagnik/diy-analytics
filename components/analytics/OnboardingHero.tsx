@@ -35,7 +35,7 @@ export default function OnboardingHero({ project }: OnboardingHeroProps) {
   return (
     <Card className="p-8 sm:p-12 text-center bg-surface-secondary">
       <div className="max-w-xl mx-auto">
-        <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-surface text-foreground mb-6 border border-border">
+        <div className="inline-flex items-center justify-center size-14 rounded-full bg-surface text-foreground mb-6 border border-border">
           <CheckCircleIcon size={28} />
         </div>
 
@@ -52,13 +52,11 @@ export default function OnboardingHero({ project }: OnboardingHeroProps) {
             {snippet}
           </div>
           <Button onClick={handleCopy}>
-            <span className="inline-flex items-center gap-2">
-              <span className="icon-crossfade size-4">
-                <CopyIcon size={16} className={`size-4 ${copied ? 'icon-crossfade-hidden' : ''}`} />
-                <CheckIcon size={16} className={`size-4 ${copied ? '' : 'icon-crossfade-hidden'}`} />
-              </span>
-              {copied ? 'Copied!' : 'Copy snippet'}
+            <span className="icon-crossfade size-4" data-icon="inline-start">
+              <CopyIcon className={`size-4 ${copied ? 'icon-crossfade-hidden' : ''}`} />
+              <CheckIcon className={`size-4 ${copied ? '' : 'icon-crossfade-hidden'}`} />
             </span>
+            <span>{copied ? 'Copied!' : 'Copy snippet'}</span>
           </Button>
         </Card>
 
@@ -75,7 +73,7 @@ export default function OnboardingHero({ project }: OnboardingHeroProps) {
 function StepCard({ number, title, description }: { number: number; title: string; description: string }) {
   return (
     <Card className="p-5 text-left">
-      <div className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-accent text-accent-foreground text-xs font-bold mb-3">
+      <div className="inline-flex items-center justify-center size-6 rounded-full bg-accent text-accent-foreground text-xs font-bold mb-3">
         {number}
       </div>
       <h4 className="text-sm font-semibold text-foreground mb-1">{title}</h4>

@@ -1,7 +1,8 @@
-"use client";
+"use client"
 
 import React, { ErrorInfo } from 'react';
 import { Warning } from '@phosphor-icons/react';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 
 interface ErrorBoundaryProps {
   children: React.ReactNode; 
@@ -34,14 +35,14 @@ export default class ErrorBoundary extends React.Component<ErrorBoundaryProps, E
       }
       
       return (
-        <div className="m-4 rounded-xl border border-destructive/20 bg-destructive/5 p-4">
-          <div className="mb-2 flex items-center gap-2 text-destructive">
-            <Warning size={20} weight="bold" />
-            <h3 className="font-medium text-sm">Something went wrong</h3>
-          </div>
-          <p className="text-sm text-destructive/80">
-            This part of the page couldn&apos;t load. Please refresh and try again.
-          </p>
+        <div className="m-4">
+          <Alert variant="destructive">
+            <Warning />
+            <AlertTitle>Something went wrong</AlertTitle>
+            <AlertDescription>
+              This part of the page couldn&apos;t load. Please refresh and try again.
+            </AlertDescription>
+          </Alert>
         </div>
       );
     }

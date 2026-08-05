@@ -114,7 +114,7 @@ function RowList({
   const total = items.reduce((acc, i) => acc + i.value, 0) || 1;
 
   return (
-    <div className="space-y-1.5">
+    <div className="flex flex-col gap-1.5">
       {items.map((item) => {
         const pct = Math.max((item.value / maxVal) * 100, 2);
         const share = ((item.value / total) * 100).toFixed(1);
@@ -130,11 +130,18 @@ function RowList({
               style={{ width: `${pct}%` }}
             />
             <div className="relative flex items-center justify-between gap-3 px-2.5 py-1 text-xs">
-              <span
-                className={`truncate font-medium max-w-[65%] ${isActive ? 'text-accent' : 'text-foreground'}`}
-                title={label}
-              >
-                {label}
+              <span className="min-w-0 max-w-[65%]">
+                <span
+                  className={`block truncate font-medium ${isActive ? 'text-accent' : 'text-foreground'}`}
+                  title={label}
+                >
+                  {label}
+                </span>
+                {item.meta && (
+                  <span className="block truncate text-[11px] text-muted-foreground" title={item.meta}>
+                    {item.meta}
+                  </span>
+                )}
               </span>
               <span className="flex items-center gap-2 text-muted-foreground tabular-nums flex-shrink-0">
                 <span className="text-xs">{share}%</span>
@@ -191,7 +198,7 @@ export const BreakdownPanel: React.FC<BreakdownPanelProps> = ({
   const hasMore = sorted.length > shown.length;
 
   return (
-    <Card id={id} className={`relative p-3.5 space-y-3 font-body ${hasMore ? 'pb-12' : ''}`}>
+    <Card id={id} className={`relative p-3.5 flex flex-col gap-3 font-body ${hasMore ? 'pb-12' : ''}`}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 shrink-0">
           {ActiveIcon && (

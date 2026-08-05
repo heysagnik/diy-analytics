@@ -1,4 +1,5 @@
 import React from 'react';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
 const hashString = (value: string) => {
   let hash = 0;
@@ -41,29 +42,31 @@ export const VisitorAvatar: React.FC<VisitorAvatarProps> = ({ userId, size = 28,
   const cellSize = 100 / GRID;
 
   return (
-    <div
-      className={`overflow-hidden rounded-md ring-1 ring-inset ring-black/10 dark:ring-white/10 ${className}`}
+    <Avatar
+      className={`overflow-hidden rounded-md after:rounded-md ring-1 ring-inset ring-black/10 dark:ring-white/10 ${className}`}
       style={{ width: size, height: size, flexShrink: 0 }}
       aria-hidden="true"
     >
-      <svg viewBox="0 0 100 100" width="100%" height="100%" preserveAspectRatio="xMidYMid slice">
-        <rect width="100" height="100" fill={`hsl(${hue} var(--avatar-bg-s) var(--avatar-bg-l))`} />
-        {cells.map((row, y) =>
-          row.map((filled, x) => {
-            if (!filled) return null;
-            const mirroredX = GRID - 1 - x;
-            return (
-              <React.Fragment key={`${x}-${y}`}>
-                <rect x={x * cellSize} y={y * cellSize} width={cellSize} height={cellSize} fill={`hsl(${hue} var(--avatar-cell-s) var(--avatar-cell-l))`} />
-                {mirroredX !== x && (
-                  <rect x={mirroredX * cellSize} y={y * cellSize} width={cellSize} height={cellSize} fill={`hsl(${hue} var(--avatar-cell-s) var(--avatar-cell-l))`} />
-                )}
-              </React.Fragment>
-            );
-          })
-        )}
-      </svg>
-    </div>
+      <AvatarFallback className="rounded-md bg-transparent size-full p-0">
+        <svg viewBox="0 0 100 100" width="100%" height="100%" preserveAspectRatio="xMidYMid slice">
+          <rect width="100" height="100" fill={`hsl(${hue} var(--avatar-bg-s) var(--avatar-bg-l))`} />
+          {cells.map((row, y) =>
+            row.map((filled, x) => {
+              if (!filled) return null;
+              const mirroredX = GRID - 1 - x;
+              return (
+                <React.Fragment key={`${x}-${y}`}>
+                  <rect x={x * cellSize} y={y * cellSize} width={cellSize} height={cellSize} fill={`hsl(${hue} var(--avatar-cell-s) var(--avatar-cell-l))`} />
+                  {mirroredX !== x && (
+                    <rect x={mirroredX * cellSize} y={y * cellSize} width={cellSize} height={cellSize} fill={`hsl(${hue} var(--avatar-cell-s) var(--avatar-cell-l))`} />
+                  )}
+                </React.Fragment>
+              );
+            })
+          )}
+        </svg>
+      </AvatarFallback>
+    </Avatar>
   );
 };
 

@@ -1,7 +1,6 @@
-"use client";
-
 import React from 'react';
 import Link from 'next/link';
+import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from '@/components/ui/sidebar';
 
 export interface NavigationItem {
   id: string;
@@ -21,35 +20,41 @@ export default function Navigation({
   activePageId,
   onNavItemClick,
 }: NavigationProps) {
-  return (
-      <nav className="flex-1 px-2 space-y-1 overflow-y-auto scrollbar-thin">
-        {navigationItems.map((item) => {
-          const IconComponent = item.icon;
-          const isActive = item.id === activePageId;
 
-          return (
-            <Link
-              key={item.id}
-              href={item.href}
-              aria-current={isActive ? 'page' : undefined}
-              className={`relative flex items-center gap-2.5 px-4 py-2.5 rounded-md text-sm transition-colors before:absolute before:left-1 before:inset-y-2 before:w-[3px] before:rounded-full before:bg-accent before:transition-[opacity,transform] before:duration-200 before:ease-out ${
+  return (
+    <SidebarMenu className="gap-1">
+      {navigationItems.map((item) => {
+        const IconComponent = item.icon;
+        const isActive = item.id === activePageId;
+
+        return (
+          <SidebarMenuItem key={item.id}>
+            <SidebarMenuButton
+              isActive={isActive}
+              tooltip={item.label}
+              className={`relative flex items-center transition-all duration-150 active:scale-[0.96] rounded-md gap-2.5 px-4 py-2 ${
                 isActive
-                  ? 'bg-accent/10 text-accent font-semibold before:opacity-100 before:scale-y-100'
-                  : 'font-medium text-muted-foreground hover:text-foreground hover:bg-surface-tertiary/60 before:opacity-0 before:scale-y-50'
+                  ? 'bg-accent! text-accent-foreground! font-semibold shadow-xs'
+                  : 'font-medium text-muted-foreground hover:text-foreground hover:bg-surface-tertiary/60'
               }`}
-              onClick={() => onNavItemClick(item.id, item.href)}
-            >
-              <div className="icon-container flex items-center justify-center">
-                <IconComponent
-                  size={18}
-                  weight={isActive ? "bold" : "regular"}
-                  className={isActive ? 'text-accent' : ''}
+              render={
+                <Link
+                  href={item.href}
+                  onClick={() => onNavItemClick(item.id, item.href)}
+                  aria-current={isActive ? 'page' : undefined}
                 />
-              </div>
+              }
+            >
+              <IconComponent
+                size={18}
+                weight={isActive ? "fill" : "regular"}
+                className={isActive ? 'text-accent-foreground!' : ''}
+              />
               <span>{item.label}</span>
-            </Link>
-          );
-        })}
-      </nav>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        );
+      })}
+    </SidebarMenu>
   );
 }

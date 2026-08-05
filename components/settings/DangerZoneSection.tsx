@@ -109,7 +109,7 @@ export const DangerZoneSection: React.FC<DangerZoneSectionProps> = ({
             </DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-4 font-body">
+          <div className="flex flex-col gap-4 font-body">
             <p className="text-xs text-muted-foreground">
               All recorded page views, sessions, and path telemetry will be permanently wiped.
             </p>

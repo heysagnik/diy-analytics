@@ -1,5 +1,6 @@
 import React from 'react';
 import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { AnalyticsData } from '@/types/analytics';
 import {
   UsersIcon,
@@ -70,24 +71,21 @@ export const MetricsGrid: React.FC<MetricsGridProps> = ({ analyticsData }) => {
                 {metric.value}
               </span>
 
-              <span
-                className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full tabular-nums ${
-                  isNeutral
-                    ? 'bg-surface-secondary text-muted-foreground'
-                    : isPositive
-                    ? 'bg-success/10 text-success'
-                    : 'bg-danger/10 text-danger'
+              <Badge
+                variant={isNeutral ? "secondary" : isPositive ? "default" : "destructive"}
+                className={`gap-1 tabular-nums ${
+                  isPositive ? 'bg-success/10 text-success hover:bg-success/10 border-none shadow-none' : ''
                 }`}
               >
                 {isNeutral ? (
-                  <MinusIcon size={12} />
+                  <MinusIcon />
                 ) : isPositive ? (
-                  <ArrowUpRightIcon size={12} />
+                  <ArrowUpRightIcon />
                 ) : (
-                  <ArrowDownRightIcon size={12} />
+                  <ArrowDownRightIcon />
                 )}
-                {Math.abs(metric.change)}%
-              </span>
+                <span>{Math.abs(metric.change)}%</span>
+              </Badge>
             </div>
           </Card>
         );

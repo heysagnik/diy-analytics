@@ -2,7 +2,8 @@ import React, { useState, useRef, useEffect, useId } from 'react';
 import { DateRange } from '@/types/analytics';
 import { CalendarIcon, CaretDownIcon, CaretLeftIcon, CaretRightIcon, CheckIcon } from '@phosphor-icons/react';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
+import { Field, FieldLabel, FieldError } from '@/components/ui/field';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 export interface CustomDateRange {
   startDate: string;
@@ -86,23 +87,13 @@ function MiniCalendar({ value, onChange }: MiniCalendarProps) {
   return (
     <div className="w-64 rounded-xl bg-surface border border-border shadow-xl p-2.5 text-xs transition-[opacity,transform] duration-150 ease-out starting:opacity-0 starting:scale-95">
       <div className="flex items-center justify-between mb-2 px-0.5">
-        <button
-          type="button"
-          onClick={goPrev}
-          aria-label="Previous month"
-          className="relative flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 hover:bg-surface-secondary hover:text-foreground active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring before:absolute before:-inset-1.5 before:content-['']"
-        >
+        <Button type="button" variant="ghost" size="icon-xs" onClick={goPrev} aria-label="Previous month">
           <CaretLeftIcon size={12} weight="bold" />
-        </button>
+        </Button>
         <span className="text-xs font-semibold text-foreground">{monthLabel}</span>
-        <button
-          type="button"
-          onClick={goNext}
-          aria-label="Next month"
-          className="relative flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 hover:bg-surface-secondary hover:text-foreground active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring before:absolute before:-inset-1.5 before:content-['']"
-        >
+        <Button type="button" variant="ghost" size="icon-xs" onClick={goNext} aria-label="Next month">
           <CaretRightIcon size={12} weight="bold" />
-        </button>
+        </Button>
       </div>
 
       <div
@@ -161,17 +152,15 @@ interface DateFieldProps {
 function DateField({ label, value, isActive, onToggle, onChange, error, buttonRef }: DateFieldProps) {
   const id = useId();
   const buttonId = `${id}-button`;
-  const errorId = `${id}-error`;
   return (
-    <div className="relative flex flex-col gap-1">
-      <Label htmlFor={buttonId}>{label}</Label>
+    <Field className="relative gap-1" data-invalid={!!error}>
+      <FieldLabel htmlFor={buttonId}>{label}</FieldLabel>
       <button
         id={buttonId}
         type="button"
         ref={buttonRef}
         onClick={onToggle}
         aria-expanded={isActive}
-        aria-describedby={error ? errorId : undefined}
         className="h-8 w-full flex items-center justify-between rounded-lg border border-input bg-transparent px-2.5 text-sm text-foreground transition-colors outline-none hover:bg-surface-secondary/50 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
       >
         <span className={value ? 'text-foreground' : 'text-muted-foreground'}>{value || 'Select date'}</span>
@@ -182,12 +171,8 @@ function DateField({ label, value, isActive, onToggle, onChange, error, buttonRe
           <MiniCalendar value={value} onChange={onChange} />
         </div>
       )}
-      {error && (
-        <p id={errorId} className="text-xs text-destructive" role="alert">
-          {error}
-        </p>
-      )}
-    </div>
+      <FieldError>{error}</FieldError>
+    </Field>
   );
 }
 
@@ -198,18 +183,13 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
   onCustomRangeChange,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
-  const [isEntered, setIsEntered] = useState(false);
   const [showCustomPicker, setShowCustomPicker] = useState(false);
   const [startDate, setStartDate] = useState(customRange?.startDate || '');
   const [endDate, setEndDate] = useState(customRange?.endDate || '');
   const [activeField, setActiveField] = useState<'start' | 'end' | null>(null);
   const [errors, setErrors] = useState<{ start?: string; end?: string }>({});
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
   const startButtonRef = useRef<HTMLButtonElement>(null);
   const endButtonRef = useRef<HTMLButtonElement>(null);
-  const wasOpen = useRef(false);
 
   useEffect(() => {
     const raf = requestAnimationFrame(() => {
@@ -220,45 +200,13 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
     return () => cancelAnimationFrame(raf);
   }, [customRange?.startDate, customRange?.endDate]);
 
-  useEffect(() => {
-    if (isOpen) {
-      let enterRaf = 0;
-      const mountRaf = requestAnimationFrame(() => {
-        setIsMounted(true);
-        enterRaf = requestAnimationFrame(() => setIsEntered(true));
-      });
-      const focusRaf = requestAnimationFrame(() => {
-        if (showCustomPicker) startButtonRef.current?.focus();
-        else dropdownRef.current?.querySelector<HTMLButtonElement>('[data-date-range-option]')?.focus();
-      });
-      wasOpen.current = true;
-      return () => {
-        cancelAnimationFrame(mountRaf);
-        cancelAnimationFrame(enterRaf);
-        cancelAnimationFrame(focusRaf);
-      };
-    }
-    const closeRaf = requestAnimationFrame(() => {
-      setIsEntered(false);
+  const handleOpenChange = (open: boolean) => {
+    setIsOpen(open);
+    if (!open) {
+      setShowCustomPicker(false);
       setActiveField(null);
-      if (wasOpen.current) {
-        triggerRef.current?.focus();
-        wasOpen.current = false;
-      }
-    });
-    return () => cancelAnimationFrame(closeRaf);
-  }, [isOpen, showCustomPicker]);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-        setShowCustomPicker(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    }
+  };
 
   const handleSelectOption = (option: DateRange) => {
     onDateRangeChange(option);
@@ -298,117 +246,97 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
     ? `${customRange.startDate} - ${customRange.endDate}`
     : dateRange;
 
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      setIsOpen(false);
-      setShowCustomPicker(false);
-    }
-  };
-
   return (
-    <div className="relative font-body" ref={dropdownRef} onKeyDown={handleKeyDown}>
-      <Button
-        ref={triggerRef}
-        size="sm"
-        variant="outline"
-        onClick={() => setIsOpen((open) => !open)}
-        aria-expanded={isOpen}
-      >
+    <Popover open={isOpen} onOpenChange={handleOpenChange}>
+      <PopoverTrigger render={<Button size="sm" variant="outline" aria-expanded={isOpen} />}>
         <CalendarIcon size={14} />
         <span>{displayText}</span>
         <CaretDownIcon
           size={12}
           className={`transition-transform duration-150 ease-out ${isOpen ? 'rotate-180' : 'rotate-0'}`}
         />
-      </Button>
+      </PopoverTrigger>
 
-      {isMounted && (
-        <div
-          onTransitionEnd={() => { if (!isOpen) setIsMounted(false); }}
-          className={`absolute left-0 right-auto origin-top-left md:left-auto md:right-0 md:origin-top-right mt-2 w-64 max-w-[calc(100vw-2rem)] rounded-xl bg-surface border border-border shadow-xl z-50 p-2 text-xs transition-[opacity,transform] duration-150 ease-out ${
-            isEntered ? 'opacity-100 scale-100' : 'pointer-events-none opacity-0 scale-95'
-          }`}
-        >
-          {!showCustomPicker ? (
-            <>
-              {DATE_RANGE_OPTIONS.map((option) => (
-                <button
-                  key={option}
+      <PopoverContent align="end" className="w-64 max-w-[calc(100vw-2rem)] p-2 text-xs font-body">
+        {!showCustomPicker ? (
+          <>
+            {DATE_RANGE_OPTIONS.map((option) => (
+              <Button
+                key={option}
+                type="button"
+                variant="ghost"
+                onClick={() => handleSelectOption(option)}
+                className={`w-full justify-between px-3.5 py-2 text-left font-medium ${
+                  dateRange === option && !customRange
+                    ? 'bg-accent text-accent-foreground hover:bg-accent hover:text-accent-foreground'
+                    : 'text-foreground'
+                }`}
+              >
+                <span>{option}</span>
+                {dateRange === option && !customRange && <CheckIcon size={14} />}
+              </Button>
+            ))}
+            {onCustomRangeChange && (
+              <div className="border-t border-border pt-1.5 mt-1.5">
+                <Button
                   type="button"
-                  data-date-range-option
-                  onClick={() => handleSelectOption(option)}
-                  className={`w-full flex items-center justify-between px-3.5 py-2 rounded-xs text-left font-medium transition-colors duration-150 cursor-pointer active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                    dateRange === option && !customRange
-                      ? 'bg-accent text-accent-foreground'
-                      : 'hover:bg-surface-secondary text-foreground'
-                  }`}
+                  variant="ghost"
+                  onClick={() => setShowCustomPicker(true)}
+                  className="w-full justify-start px-3.5 py-2 text-foreground font-medium"
                 >
-                  <span>{option}</span>
-                  {dateRange === option && !customRange && <CheckIcon size={14} />}
-                </button>
-              ))}
-              {onCustomRangeChange && (
-                <div className="border-t border-border pt-1.5 mt-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setShowCustomPicker(true)}
-                    className="w-full text-left px-3.5 py-2 rounded-xs text-foreground font-medium hover:bg-surface-secondary transition-colors duration-150 cursor-pointer active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    Custom Range...
-                  </button>
-                </div>
-              )}
-            </>
-          ) : (
-            <form onSubmit={handleApplyCustomRange} className="p-2 space-y-3">
-              <div className="font-medium text-foreground border-b border-border pb-2 text-sm">
-                Select Custom Dates
-              </div>
-
-              <DateField
-                label="Start Date"
-                value={startDate}
-                isActive={activeField === 'start'}
-                onToggle={() => setActiveField((f) => (f === 'start' ? null : 'start'))}
-                buttonRef={startButtonRef}
-                error={errors.start}
-                onChange={(date) => {
-                  setStartDate(date);
-                  setErrors((current) => ({ ...current, start: undefined }));
-                  setActiveField(null);
-                  requestAnimationFrame(() => endButtonRef.current?.focus());
-                }}
-              />
-
-              <DateField
-                label="End Date"
-                value={endDate}
-                isActive={activeField === 'end'}
-                onToggle={() => setActiveField((f) => (f === 'end' ? null : 'end'))}
-                buttonRef={endButtonRef}
-                error={errors.end}
-                onChange={(date) => {
-                  setEndDate(date);
-                  setErrors((current) => ({ ...current, end: undefined }));
-                  setActiveField(null);
-                  requestAnimationFrame(() => endButtonRef.current?.focus());
-                }}
-              />
-
-              <div className="flex gap-2 pt-2">
-                <Button type="button" size="sm" variant="outline" onClick={() => setShowCustomPicker(false)} className="flex-1">
-                  Back
-                </Button>
-                <Button size="sm" type="submit" className="flex-1">
-                  Apply
+                  Custom Range...
                 </Button>
               </div>
-            </form>
-          )}
-        </div>
-      )}
-    </div>
+            )}
+          </>
+        ) : (
+          <form onSubmit={handleApplyCustomRange} className="p-2 flex flex-col gap-3">
+            <div className="font-medium text-foreground border-b border-border pb-2 text-sm">
+              Select Custom Dates
+            </div>
+
+            <DateField
+              label="Start Date"
+              value={startDate}
+              isActive={activeField === 'start'}
+              onToggle={() => setActiveField((f) => (f === 'start' ? null : 'start'))}
+              buttonRef={startButtonRef}
+              error={errors.start}
+              onChange={(date) => {
+                setStartDate(date);
+                setErrors((current) => ({ ...current, start: undefined }));
+                setActiveField(null);
+                requestAnimationFrame(() => endButtonRef.current?.focus());
+              }}
+            />
+
+            <DateField
+              label="End Date"
+              value={endDate}
+              isActive={activeField === 'end'}
+              onToggle={() => setActiveField((f) => (f === 'end' ? null : 'end'))}
+              buttonRef={endButtonRef}
+              error={errors.end}
+              onChange={(date) => {
+                setEndDate(date);
+                setErrors((current) => ({ ...current, end: undefined }));
+                setActiveField(null);
+                requestAnimationFrame(() => endButtonRef.current?.focus());
+              }}
+            />
+
+            <div className="flex gap-2 pt-2">
+              <Button type="button" size="sm" variant="outline" onClick={() => setShowCustomPicker(false)} className="flex-1">
+                Back
+              </Button>
+              <Button size="sm" type="submit" className="flex-1">
+                Apply
+              </Button>
+            </div>
+          </form>
+        )}
+      </PopoverContent>
+    </Popover>
   );
 };
 

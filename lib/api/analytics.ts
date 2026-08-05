@@ -1,4 +1,4 @@
-import type { AnalyticsResponse, DateRange } from '@/types/analytics';
+import type { AnalyticsResponse, DateRange, EventPropertyKeyData, EventPropertyValueData } from '@/types/analytics';
 import type { FilterDimension } from '@/types/filters';
 
 export type AnalyticsFilters = Partial<Record<FilterDimension, string[]>>;
@@ -53,7 +53,10 @@ export function isAnalyticsResponse(value: unknown): value is AnalyticsResponse 
     'countries',
     'browsers',
     'devices',
+    'os',
+    'cities',
     'campaigns',
+    'utmBreakdown',
     'entryPages',
     'exitPages',
     'goals',
@@ -123,6 +126,69 @@ export async function fetchAnalytics(
   const result: unknown = await response.json().catch(() => null);
 
   if (!response.ok || !isRecord(result) || result.success !== true || !isAnalyticsResponse(result.data)) {
+    throw new AnalyticsRequestError(response.status);
+  }
+
+  return result.data;
+}
+
+export interface EventPropertyQueryOptions {
+  projectId: string;
+  eventName: string;
+  dateRange: DateRange;
+  timezone?: string;
+  customRange?: {
+    startDate: string;
+    endDate: string;
+  } | null;
+  filters?: AnalyticsFilters;
+}
+
+function serializeEventPropertyQuery(
+  options: EventPropertyQueryOptions & { propertyKey?: string }
+): URLSearchParams {
+  const params = serializeAnalyticsQuery(options);
+  params.set('eventName', options.eventName);
+  if (options.propertyKey) params.set('propertyKey', options.propertyKey);
+  return params;
+}
+
+function isEventPropertyKeyData(value: unknown): value is EventPropertyKeyData {
+  return isRecord(value) && typeof value.key === 'string' && typeof value.occurrences === 'number';
+}
+
+function isEventPropertyValueData(value: unknown): value is EventPropertyValueData {
+  return isRecord(value) && typeof value.value === 'string' && typeof value.count === 'number' && typeof value.uniqueUsers === 'number';
+}
+
+export async function fetchEventPropertyKeys(
+  options: EventPropertyQueryOptions,
+  signal?: AbortSignal,
+): Promise<EventPropertyKeyData[]> {
+  const response = await fetch(`/api/analytics/events/properties?${serializeEventPropertyQuery(options).toString()}`, {
+    cache: 'no-store',
+    signal,
+  });
+  const result: unknown = await response.json().catch(() => null);
+
+  if (!response.ok || !isRecord(result) || result.success !== true || !Array.isArray(result.data) || !result.data.every(isEventPropertyKeyData)) {
+    throw new AnalyticsRequestError(response.status);
+  }
+
+  return result.data;
+}
+
+export async function fetchEventPropertyValues(
+  options: EventPropertyQueryOptions & { propertyKey: string },
+  signal?: AbortSignal,
+): Promise<EventPropertyValueData[]> {
+  const response = await fetch(`/api/analytics/events/properties?${serializeEventPropertyQuery(options).toString()}`, {
+    cache: 'no-store',
+    signal,
+  });
+  const result: unknown = await response.json().catch(() => null);
+
+  if (!response.ok || !isRecord(result) || result.success !== true || !Array.isArray(result.data) || !result.data.every(isEventPropertyValueData)) {
     throw new AnalyticsRequestError(response.status);
   }
 

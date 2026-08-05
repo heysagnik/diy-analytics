@@ -11,7 +11,7 @@ export function SettingsRow({ label, description, action, children }: SettingsRo
   return (
     <div className="p-4 sm:px-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-        <div className="min-w-0 space-y-0.5">
+        <div className="min-w-0 flex flex-col gap-0.5">
           <p className="text-sm font-medium text-foreground">{label}</p>
           {description && <div className="text-xs text-muted-foreground">{description}</div>}
         </div>

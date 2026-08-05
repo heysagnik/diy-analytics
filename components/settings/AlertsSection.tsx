@@ -140,7 +140,7 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({ project, showToast
         ) : undefined
       }
     >
-      <div className="space-y-4 p-4 sm:px-5">
+      <div className="flex flex-col gap-4 p-4 sm:px-5">
         <p className="text-xs text-muted-foreground">
           Get a webhook notification when traffic drops or falls below a threshold. No built-in scheduler ships with this app — point an external cron at the check endpoint, or use &apos;Check now&apos; manually.
         </p>

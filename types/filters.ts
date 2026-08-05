@@ -1,4 +1,4 @@
-export type FilterDimension = 'country' | 'browser' | 'device' | 'source' | 'page' | 'utmSource' | 'utmMedium' | 'utmCampaign';
+export type FilterDimension = 'country' | 'browser' | 'device' | 'source' | 'page' | 'utmSource' | 'utmMedium' | 'utmCampaign' | 'os' | 'city';
 
 export interface ActiveFilter {
   dimension: FilterDimension;
@@ -14,6 +14,8 @@ const DIMENSION_LABELS: Record<FilterDimension, string> = {
   utmSource: 'Campaign Source',
   utmMedium: 'Campaign Medium',
   utmCampaign: 'Campaign',
+  os: 'OS',
+  city: 'City',
 };
 
 export function filterLabel(dimension: FilterDimension): string {

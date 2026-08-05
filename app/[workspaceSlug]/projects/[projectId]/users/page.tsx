@@ -34,7 +34,7 @@ export default function UsersPage() {
       title="Visitors"
       description="Individual visitor profiles — sessions from the same person are grouped together."
     >
-        <div className="space-y-4">
+        <div className="flex flex-col gap-4">
           <VisitorFilters
             filters={filters}
             countries={countries}

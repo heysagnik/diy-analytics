@@ -10,6 +10,7 @@ import {
   validateAnalyticsData,
 } from "@/utils/analytics";
 import ErrorState from "@/components/common/ErrorState";
+import { Spinner } from "@/components/ui/spinner";
 import { AnalyticsHeader } from "@/components/analytics/AnalyticsHeader";
 import { MainChart } from "@/components/analytics/MainChart";
 import { MetricsGrid } from "@/components/analytics/MetricsGrid";
@@ -17,6 +18,7 @@ import { BreakdownPanel } from "@/components/analytics/BreakdownPanel";
 import { GoalsPanel } from "@/components/analytics/GoalsPanel";
 import { WebVitalsPanel } from "@/components/analytics/WebVitalsPanel";
 import { FilterBar } from "@/components/analytics/FilterBar";
+import { EventPropertyDrilldown } from "@/components/analytics/EventPropertyDrilldown";
 import OnboardingHero from "@/components/analytics/OnboardingHero";
 import type { CustomDateRange } from "@/components/analytics/DateRangePicker";
 import { ActiveFilter, filtersToQuery } from "@/types/filters";
@@ -28,10 +30,24 @@ import {
   DesktopIcon,
   BrowserIcon,
   LightningIcon,
+  MapPinIcon,
+  CpuIcon,
+  ChartBarIcon,
 } from "@phosphor-icons/react";
 
 const DEFAULT_DATE_RANGE: DateRange = "Last 30 days";
 const ANALYTICS_LOAD_ERROR = "We couldn't load analytics for this project. Please try again.";
+
+function formatPageMeta(bounceRate?: number, avgTimeOnPage?: number): string | undefined {
+  const parts: string[] = [];
+  if (typeof bounceRate === "number") parts.push(`${bounceRate}% bounce`);
+  if (typeof avgTimeOnPage === "number") {
+    const m = Math.floor(avgTimeOnPage / 60);
+    const s = Math.round(avgTimeOnPage % 60);
+    parts.push(`${m > 0 ? `${m}m ` : ""}${s}s avg`);
+  }
+  return parts.length ? parts.join(" · ") : undefined;
+}
 
 const ErrorDisplay = ({ message, onRetry }: { message: string; onRetry?: () => void }) => (
   <div className="w-full px-6 py-8">
@@ -40,8 +56,8 @@ const ErrorDisplay = ({ message, onRetry }: { message: string; onRetry?: () => v
 );
 
 const PageSpinner = () => (
-  <div className="w-full flex items-center justify-center py-16" role="status" aria-label="Loading analytics">
-    <div className="h-7 w-7 rounded-full border-2 border-border border-t-accent animate-spin" />
+  <div className="w-full flex items-center justify-center py-16">
+    <Spinner className="size-7 text-accent" aria-label="Loading analytics" />
   </div>
 );
 
@@ -109,7 +125,7 @@ export default function ProjectPage() {
 
   return (
     <ProjectPageShell>
-      <div className="space-y-4">
+      <div className="flex flex-col gap-4">
         <AnalyticsHeader
           project={project}
           dateRange={dateRange}
@@ -148,7 +164,11 @@ export default function ProjectPage() {
                     label: "Pages",
                     icon: FileTextIcon,
                     dimension: "page",
-                    items: analyticsData.pages.map((p) => ({ name: p.path, value: p.views })),
+                    items: analyticsData.pages.map((p) => ({
+                      name: p.path,
+                      value: p.views,
+                      meta: formatPageMeta(p.bounceRate, p.avgTimeOnPage),
+                    })),
                   },
                   {
                     id: "entry-pages",
@@ -162,6 +182,15 @@ export default function ProjectPage() {
                     icon: FileTextIcon,
                     items: analyticsData.exitPages.map((p) => ({ name: p.path, value: p.views })),
                   },
+                ]}
+              />
+
+              <BreakdownPanel
+                id="acquisition-list"
+                defaultTabId="sources"
+                onFilter={addFilter}
+                activeValues={activeValues}
+                tabs={[
                   {
                     id: "sources",
                     label: "Sources",
@@ -176,11 +205,20 @@ export default function ProjectPage() {
                     dimension: "utmCampaign",
                     items: analyticsData.campaigns.map((c) => ({ name: c.name, value: c.users })),
                   },
+                  {
+                    id: "utm",
+                    label: "UTM",
+                    icon: ChartBarIcon,
+                    items: analyticsData.utmBreakdown.map((u) => ({
+                      name: `${u.source} / ${u.medium} / ${u.campaign}`,
+                      value: u.users,
+                    })),
+                  },
                 ]}
               />
 
               <BreakdownPanel
-                id="sources-list"
+                id="geo-list"
                 defaultTabId="countries"
                 onFilter={addFilter}
                 activeValues={activeValues}
@@ -194,11 +232,31 @@ export default function ProjectPage() {
                     format: getCountryName,
                   },
                   {
+                    id: "cities",
+                    label: "Cities",
+                    icon: MapPinIcon,
+                    dimension: "city",
+                    items: analyticsData.cities.map((c) => ({
+                      name: c.region ? `${c.city}, ${c.region}` : c.city,
+                      value: c.users,
+                      meta: c.country,
+                    })),
+                  },
+                ]}
+              />
+
+              <BreakdownPanel
+                id="tech-list"
+                defaultTabId="devices"
+                onFilter={addFilter}
+                activeValues={activeValues}
+                tabs={[
+                  {
                     id: "devices",
                     label: "Devices",
                     icon: DesktopIcon,
                     dimension: "device",
-                    items: analyticsData.devices.map((d) => ({ name: d.device, value: d.users })),
+                    items: analyticsData.devices.map((d) => ({ name: d.device, value: d.users, meta: d.detail })),
                     format: (s) => s.charAt(0).toUpperCase() + s.slice(1),
                   },
                   {
@@ -206,26 +264,26 @@ export default function ProjectPage() {
                     label: "Browsers",
                     icon: BrowserIcon,
                     dimension: "browser",
-                    items: analyticsData.browsers.map((b) => ({ name: b.browser, value: b.users })),
+                    items: analyticsData.browsers.map((b) => ({ name: b.browser, value: b.users, meta: b.version })),
+                  },
+                  {
+                    id: "os",
+                    label: "OS",
+                    icon: CpuIcon,
+                    dimension: "os",
+                    items: analyticsData.os.map((o) => ({ name: o.os, value: o.users, meta: o.version })),
                   },
                 ]}
               />
             </div>
 
-            <BreakdownPanel
-              defaultTabId="events"
+            <EventPropertyDrilldown
+              events={analyticsData.topEvents}
+              projectId={projectId}
+              dateRange={dateRange}
+              customRange={customRange}
+              filters={filterQuery}
               rowsToShow={8}
-              tabs={[
-                {
-                  id: "events",
-                  label: "Top Events",
-                  icon: LightningIcon,
-                  items: analyticsData.topEvents.map((e) => ({
-                    name: e.name,
-                    value: e.count,
-                  })),
-                },
-              ]}
             />
           </div>
         )}

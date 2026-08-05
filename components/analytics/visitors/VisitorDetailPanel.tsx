@@ -7,6 +7,7 @@ import {
   FireIcon,
   MapPinIcon,
   XIcon,
+  WarningIcon,
 } from '@phosphor-icons/react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,6 +15,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Drawer, DrawerContent } from '@/components/ui/drawer';
 import { Dialog as DialogPrimitive } from '@base-ui/react/dialog';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from '@/components/ui/empty';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 import { useVisitorDetail, useVisitorHeatmap } from '@/hooks/useVisitorDetail';
 import { getCountryName } from '@/utils/country';
 import type { VisitorDetail, VisitorSession } from '@/types/visitors';
@@ -86,7 +90,7 @@ export const VisitorDetailPanel: React.FC<VisitorDetailPanelProps> = ({ projectI
 
       <div key={loading ? 'loading' : error ? 'error' : 'detail'} className="animate-fade-in">
         {loading ? (
-          <div className="p-5 space-y-4">
+          <div className="p-5 flex flex-col gap-4">
             <div className="grid grid-cols-2 gap-3">
               <Skeleton className="h-16 w-full rounded-lg" />
               <Skeleton className="h-16 w-full rounded-lg" />
@@ -95,9 +99,14 @@ export const VisitorDetailPanel: React.FC<VisitorDetailPanelProps> = ({ projectI
             <Skeleton className="h-32 w-full rounded-lg" />
           </div>
         ) : error ? (
-          <div className="p-4 text-xs text-danger font-medium bg-danger/5 border border-danger/20 rounded-lg m-4">{error}</div>
+          <div className="m-4">
+            <Alert variant="destructive">
+              <WarningIcon className="size-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          </div>
         ) : detail ? (
-          <div className="px-5 pb-5 space-y-6">
+          <div className="px-5 pb-5 flex flex-col gap-6">
             <div className="grid grid-cols-2 gap-3">
               <div className="surface-tile p-3.5">
                 <p className="label-eyebrow text-muted-foreground mb-1">Sessions</p>
@@ -176,7 +185,7 @@ export const VisitorDetailPanel: React.FC<VisitorDetailPanelProps> = ({ projectI
 
               <div className="surface-tile divide-y divide-border overflow-hidden">
                 {detail.sessions.map((s: VisitorSession, idx: number) => (
-                  <div key={s.sessionId || idx} className="p-2.5 text-xs hover:bg-surface-secondary/40 transition-colors duration-150 ease-out space-y-1">
+                  <div key={s.sessionId || idx} className="p-2.5 text-xs hover:bg-surface-secondary/40 transition-colors duration-150 ease-out flex flex-col gap-1">
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-semibold text-foreground tabular-nums text-xs">
                         {new Date(s.lastSeen).toLocaleString(undefined, {
@@ -186,9 +195,9 @@ export const VisitorDetailPanel: React.FC<VisitorDetailPanelProps> = ({ projectI
                           minute: '2-digit',
                         })}
                       </span>
-                      <span className="px-1.5 py-0.5 rounded bg-accent/10 text-accent font-semibold text-xs tabular-nums">
+                      <Badge variant="secondary" className="px-1.5 py-0.5 rounded bg-accent/10 text-accent hover:bg-accent/10 border-none font-semibold text-xs tabular-nums shadow-none">
                         {s.pageCount} {s.pageCount === 1 ? 'view' : 'views'}
-                      </span>
+                      </Badge>
                     </div>
 
                     <div className="flex items-center gap-2 text-xs text-muted-foreground truncate">
@@ -233,15 +242,17 @@ export const VisitorDetailPanel: React.FC<VisitorDetailPanelProps> = ({ projectI
 
   if (!userId) {
     return (
-      <Card className={emptyClasses}>
-        <div className="icon-chip size-10 mb-3.5">
-          <FingerprintIcon size={20} weight="bold" />
-        </div>
-        <h3 className="text-sm font-semibold text-foreground mb-1 tracking-tight">No visitor selected</h3>
-        <p className="text-pretty text-xs text-muted-foreground max-w-[220px] leading-relaxed">
-          Click any visitor in the list to inspect their profile, telemetry, and activity history.
-        </p>
-      </Card>
+      <Empty className={emptyClasses}>
+        <EmptyHeader>
+          <EmptyMedia variant="icon" className="mb-0 flex items-center justify-center text-muted-foreground bg-accent/10 text-accent size-10 rounded-lg">
+            <FingerprintIcon size={20} weight="bold" />
+          </EmptyMedia>
+          <EmptyTitle className="text-sm font-semibold text-foreground tracking-tight">No visitor selected</EmptyTitle>
+          <EmptyDescription className="text-pretty text-xs text-muted-foreground max-w-[220px] leading-relaxed">
+            Click any visitor in the list to inspect their profile, telemetry, and activity history.
+          </EmptyDescription>
+        </EmptyHeader>
+      </Empty>
     );
   }
 

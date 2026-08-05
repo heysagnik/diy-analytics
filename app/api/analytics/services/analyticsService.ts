@@ -13,7 +13,13 @@ import type {
   CountryData,
   BrowserData,
   DeviceData,
+  OSData,
+  CityData,
+  UtmBreakdownData,
   EventData,
+  EventPropertyKeyData,
+  EventPropertyValueData,
+  EventPropertyQueryOptions,
   RecentEvent,
   RealtimeResponse,
   TimeRange,
@@ -46,6 +52,11 @@ interface CoreMetricsFacetResult {
   currentPageViewCount: { count: number }[];
   previousPageViewCount: { count: number }[];
   currentPageViewTimestamps: { timestamp: Date }[];
+}
+
+interface PageSessionRollup {
+  _id: string;
+  pages: { path: string; timestamp: Date }[];
 }
 
 /**
@@ -216,14 +227,17 @@ export class AnalyticsService {
     // aggregation itself is skipped entirely when there are none.
     const projectGoals = await Goal.find({ projectId: projectObjectId }).lean();
 
-    const [core, pages, sources, countries, browsers, devices, campaigns, { entryPages, exitPages }, goals, webVitals, topEvents, recentEvents] = await Promise.all([
+    const [core, pages, sources, countries, browsers, devices, os, cities, campaigns, utmBreakdown, { entryPages, exitPages }, goals, webVitals, topEvents, recentEvents] = await Promise.all([
       this.getCoreMetricsBundle(baseMatch, timeRange, previousRange, config.granularity, config.dataPoints, tzResolved),
-      this.getTopPages({ ...baseMatch, timestamp: { $gte: timeRange.start, $lte: timeRange.end } }),
+      this.getTopPages(baseMatch, timeRange, previousRange),
       this.getTopSources({ ...baseMatch, timestamp: { $gte: timeRange.start, $lte: timeRange.end } }),
       this.getUsersByCountry({ ...baseMatch, timestamp: { $gte: timeRange.start, $lte: timeRange.end } }),
       this.getUsersByBrowser({ ...baseMatch, timestamp: { $gte: timeRange.start, $lte: timeRange.end } }),
       this.getUsersByDevice({ ...baseMatch, timestamp: { $gte: timeRange.start, $lte: timeRange.end } }),
+      this.getUsersByOS({ ...baseMatch, timestamp: { $gte: timeRange.start, $lte: timeRange.end } }),
+      this.getUsersByCity({ ...baseMatch, timestamp: { $gte: timeRange.start, $lte: timeRange.end } }),
       this.getTopCampaigns({ ...baseMatch, timestamp: { $gte: timeRange.start, $lte: timeRange.end } }),
+      this.getUtmBreakdown({ ...baseMatch, timestamp: { $gte: timeRange.start, $lte: timeRange.end } }),
       this.getEntryExitPages({ ...baseMatch, timestamp: { $gte: timeRange.start, $lte: timeRange.end } }),
       this.getGoalConversions(projectGoals, projectObjectId, dimensionMatch, timeRange),
       this.getWebVitals(projectObjectId, timeRange, dimensionMatch),
@@ -240,7 +254,10 @@ export class AnalyticsService {
       countries,
       browsers,
       devices,
+      os,
+      cities,
       campaigns,
+      utmBreakdown,
       entryPages,
       exitPages,
       goals,
@@ -308,6 +325,8 @@ export class AnalyticsService {
     if (filters.utmSource?.length) match.utmSource = { $in: filters.utmSource };
     if (filters.utmMedium?.length) match.utmMedium = { $in: filters.utmMedium };
     if (filters.utmCampaign?.length) match.utmCampaign = { $in: filters.utmCampaign };
+    if (filters.os?.length) match.os = { $in: filters.os };
+    if (filters.city?.length) match.city = { $in: filters.city };
 
     return match;
   }
@@ -319,7 +338,7 @@ export class AnalyticsService {
    * to pageview-based ones.
    */
   private buildEventDimensionMatch(dimensionMatch: Record<string, unknown>): Record<string, unknown> {
-    const eventCompatibleKeys = ['country', 'browser', 'device', 'path', 'source', 'utmSource', 'utmMedium', 'utmCampaign'];
+    const eventCompatibleKeys = ['country', 'browser', 'device', 'path', 'source', 'utmSource', 'utmMedium', 'utmCampaign', 'os', 'city'];
     const match: Record<string, unknown> = {};
     for (const key of eventCompatibleKeys) {
       if (key in dimensionMatch) match[key] = dimensionMatch[key];
@@ -498,34 +517,106 @@ export class AnalyticsService {
   }
 
   /**
-   * Get top pages data
+   * Get top pages data, including per-page bounce rate and avg time on
+   * page. No Session collection exists, so both are derived from ordered
+   * per-session pageview arrays computed in application code — the same
+   * division of labor getCoreMetricsBundle uses for its own bounce/duration
+   * numbers, just keyed by path instead of aggregated across the session.
+   *
+   * bounceRate for a path = of the sessions that *entered* on that path,
+   * the fraction that were single-pageview (bounce) sessions — matches the
+   * "entry page" definition already used by getEntryExitPages.
+   * avgTimeOnPage = mean gap to the *next* pageview in the same session for
+   * visits to that path; a page with no following pageview (last page of a
+   * session) contributes no data point, matching how GA/Plausible exclude
+   * exit-only visits from this average.
    */
-  private async getTopPages(match: Record<string, unknown>): Promise<PageData[]> {
-    const result = await PageView.aggregate([
-      { $match: match },
-      {
-        $group: {
-          _id: '$path',
-          views: { $sum: 1 },
-          users: { $addToSet: '$sessionId' }
-        }
-      },
-      {
-        $project: {
-          path: '$_id',
-          views: 1,
-          users: { $size: '$users' }
-        }
-      },
-      { $sort: { views: -1 } },
-      { $limit: 20 }
+  private async getTopPages(
+    baseMatch: Record<string, unknown>,
+    timeRange: TimeRange,
+    previousRange: TimeRange
+  ): Promise<PageData[]> {
+    const narrowMatch = { ...baseMatch, timestamp: { $gte: new Date(timeRange.start), $lte: new Date(timeRange.end) } };
+
+    const [result, sessionRows] = await Promise.all([
+      PageView.aggregate([
+        { $match: narrowMatch },
+        {
+          $group: {
+            _id: '$path',
+            views: { $sum: 1 },
+            users: { $addToSet: '$sessionId' }
+          }
+        },
+        {
+          $project: {
+            path: '$_id',
+            views: 1,
+            users: { $size: '$users' }
+          }
+        },
+        { $sort: { views: -1 } },
+        { $limit: 20 }
+      ]),
+      // Widened past the window's start (to `previousRange.start`) so a
+      // session that began before the window isn't misread as a bounce —
+      // same fix getCoreMetricsBundle applies to its own session rollups.
+      PageView.aggregate<PageSessionRollup>([
+        {
+          $match: {
+            ...baseMatch,
+            timestamp: { $gte: new Date(previousRange.start), $lte: new Date(timeRange.end) }
+          }
+        },
+        { $sort: { sessionId: 1, timestamp: 1 } },
+        { $group: { _id: '$sessionId', pages: { $push: { path: '$path', timestamp: '$timestamp' } } } }
+      ])
     ]);
 
-    return result.map(item => ({
-      path: item.path,
-      views: item.views,
-      users: item.users
-    }));
+    const windowStart = new Date(timeRange.start).getTime();
+    const windowEnd = new Date(timeRange.end).getTime();
+
+    const entryBounce = new Map<string, { entries: number; bounces: number }>();
+    const duration = new Map<string, { totalSec: number; count: number }>();
+
+    for (const session of sessionRows) {
+      const pages = session.pages;
+      if (pages.length === 0) continue;
+
+      const entryTs = new Date(pages[0].timestamp).getTime();
+      if (entryTs >= windowStart && entryTs <= windowEnd) {
+        const stat = entryBounce.get(pages[0].path) ?? { entries: 0, bounces: 0 };
+        stat.entries += 1;
+        if (pages.length === 1) stat.bounces += 1;
+        entryBounce.set(pages[0].path, stat);
+      }
+
+      for (let i = 0; i < pages.length - 1; i++) {
+        const curTs = new Date(pages[i].timestamp).getTime();
+        if (curTs < windowStart || curTs > windowEnd) continue;
+        const seconds = (new Date(pages[i + 1].timestamp).getTime() - curTs) / 1000;
+        const stat = duration.get(pages[i].path) ?? { totalSec: 0, count: 0 };
+        stat.totalSec += seconds;
+        stat.count += 1;
+        duration.set(pages[i].path, stat);
+      }
+    }
+
+    return result.map(item => {
+      const bounceStat = entryBounce.get(item.path);
+      const durationStat = duration.get(item.path);
+      return {
+        path: item.path,
+        views: item.views,
+        users: item.users,
+        bounceRate: bounceStat && bounceStat.entries > 0
+          ? Math.round((bounceStat.bounces / bounceStat.entries) * 10000) / 100
+          : undefined,
+        avgTimeOnPage: durationStat && durationStat.count > 0
+          ? Math.round(durationStat.totalSec / durationStat.count)
+          : undefined,
+      };
+    });
   }
 
   /**
@@ -756,31 +847,77 @@ export class AnalyticsService {
   }
 
   /**
+   * Builds a "top-3 sub-values" summary per top-level group (e.g. per
+   * browser, which versions; per OS, which versions) — a display-only
+   * detail string rather than a separate filterable dimension, so version
+   * fragmentation doesn't dilute the primary Browsers/OS tabs. Only
+   * documents ingested after browserVersion/osVersion started being
+   * persisted will have a sub-value; older rows are excluded rather than
+   * showing as a misleading "(none) (100%)" bucket.
+   */
+  private async getVersionSummaryMap(
+    match: Record<string, unknown>,
+    groupField: string,
+    subField: string
+  ): Promise<Map<string, string>> {
+    const rows = await PageView.aggregate<{ _id: { group: string | null; sub: string | null }; count: number }>([
+      { $match: { ...match, [subField]: { $exists: true, $nin: [null, ''] } } },
+      { $group: { _id: { group: `$${groupField}`, sub: `$${subField}` }, count: { $sum: 1 } } },
+      { $sort: { count: -1 } }
+    ]);
+
+    const byGroup = new Map<string, { sub: string; count: number }[]>();
+    for (const row of rows) {
+      const group = row._id.group || 'Unknown';
+      const sub = row._id.sub;
+      if (!sub) continue;
+      const arr = byGroup.get(group) ?? [];
+      arr.push({ sub, count: row.count });
+      byGroup.set(group, arr);
+    }
+
+    const summaries = new Map<string, string>();
+    for (const [group, subs] of byGroup) {
+      const total = subs.reduce((acc, s) => acc + s.count, 0);
+      const top = subs
+        .slice(0, 3)
+        .map((s) => `v${s.sub} (${Math.round((s.count / total) * 100)}%)`)
+        .join(', ');
+      summaries.set(group, top);
+    }
+    return summaries;
+  }
+
+  /**
    * Get users by browser
    */
   private async getUsersByBrowser(match: Record<string, unknown>): Promise<BrowserData[]> {
-    const result = await PageView.aggregate([
-      { $match: match },
-      {
-        $group: {
-          _id: '$browser',
-          users: { $addToSet: '$sessionId' },
-          sessions: { $addToSet: '$sessionId' }
-        }
-      },
-      {
-        $project: {
-          browser: '$_id',
-          users: { $size: '$users' },
-          sessions: { $size: '$sessions' }
-        }
-      },
-      { $sort: { users: -1 } },
-      { $limit: 10 }
+    const [result, versionSummary] = await Promise.all([
+      PageView.aggregate([
+        { $match: match },
+        {
+          $group: {
+            _id: '$browser',
+            users: { $addToSet: '$sessionId' },
+            sessions: { $addToSet: '$sessionId' }
+          }
+        },
+        {
+          $project: {
+            browser: '$_id',
+            users: { $size: '$users' },
+            sessions: { $size: '$sessions' }
+          }
+        },
+        { $sort: { users: -1 } },
+        { $limit: 10 }
+      ]),
+      this.getVersionSummaryMap(match, 'browser', 'browserVersion')
     ]);
 
     return result.map(item => ({
       browser: item.browser || 'Unknown',
+      version: versionSummary.get(item.browser || 'Unknown'),
       users: item.users,
       sessions: item.sessions
     }));
@@ -790,27 +927,138 @@ export class AnalyticsService {
    * Get users by device
    */
   private async getUsersByDevice(match: Record<string, unknown>): Promise<DeviceData[]> {
+    const [result, modelSummary] = await Promise.all([
+      PageView.aggregate([
+        { $match: match },
+        {
+          $group: {
+            _id: '$device',
+            users: { $addToSet: '$sessionId' },
+            sessions: { $addToSet: '$sessionId' }
+          }
+        },
+        {
+          $project: {
+            device: '$_id',
+            category: {
+              $switch: {
+                branches: [
+                  { case: { $eq: ['$_id', 'mobile'] }, then: 'mobile' },
+                  { case: { $eq: ['$_id', 'tablet'] }, then: 'tablet' }
+                ],
+                default: 'desktop'
+              }
+            },
+            users: { $size: '$users' },
+            sessions: { $size: '$sessions' }
+          }
+        },
+        { $sort: { users: -1 } },
+        { $limit: 10 }
+      ]),
+      this.getDeviceModelSummaryMap(match)
+    ]);
+
+    return result.map(item => ({
+      device: item.device || 'desktop',
+      category: item.category,
+      detail: modelSummary.get(item.device || 'desktop'),
+      users: item.users,
+      sessions: item.sessions
+    }));
+  }
+
+  /**
+   * Top-3 vendor+model combos per device category — same display-only
+   * detail idea as getVersionSummaryMap, but keyed on a concatenated
+   * vendor/model since neither field alone identifies a device.
+   */
+  private async getDeviceModelSummaryMap(match: Record<string, unknown>): Promise<Map<string, string>> {
+    const rows = await PageView.aggregate<{ _id: { device: string | null; vendor: string | null; model: string | null }; count: number }>([
+      { $match: { ...match, deviceModel: { $exists: true, $nin: [null, ''] } } },
+      { $group: { _id: { device: '$device', vendor: '$deviceVendor', model: '$deviceModel' }, count: { $sum: 1 } } },
+      { $sort: { count: -1 } }
+    ]);
+
+    const byDevice = new Map<string, { label: string; count: number }[]>();
+    for (const row of rows) {
+      const device = row._id.device || 'desktop';
+      const label = [row._id.vendor, row._id.model].filter(Boolean).join(' ');
+      if (!label) continue;
+      const arr = byDevice.get(device) ?? [];
+      arr.push({ label, count: row.count });
+      byDevice.set(device, arr);
+    }
+
+    const summaries = new Map<string, string>();
+    for (const [device, models] of byDevice) {
+      const total = models.reduce((acc, m) => acc + m.count, 0);
+      const top = models
+        .slice(0, 3)
+        .map((m) => `${m.label} (${Math.round((m.count / total) * 100)}%)`)
+        .join(', ');
+      summaries.set(device, top);
+    }
+    return summaries;
+  }
+
+  /**
+   * Get users by OS — mirrors getUsersByBrowser; `os` is stored/indexed the
+   * same way but had no aggregation wired up until now.
+   */
+  private async getUsersByOS(match: Record<string, unknown>): Promise<OSData[]> {
+    const [result, versionSummary] = await Promise.all([
+      PageView.aggregate([
+        { $match: match },
+        {
+          $group: {
+            _id: '$os',
+            users: { $addToSet: '$sessionId' },
+            sessions: { $addToSet: '$sessionId' }
+          }
+        },
+        {
+          $project: {
+            os: '$_id',
+            users: { $size: '$users' },
+            sessions: { $size: '$sessions' }
+          }
+        },
+        { $sort: { users: -1 } },
+        { $limit: 10 }
+      ]),
+      this.getVersionSummaryMap(match, 'os', 'osVersion')
+    ]);
+
+    return result.map(item => ({
+      os: item.os || 'Unknown',
+      version: versionSummary.get(item.os || 'Unknown'),
+      users: item.users,
+      sessions: item.sessions
+    }));
+  }
+
+  /**
+   * Get users by city — `city`/`region` are best-effort (only populated
+   * when the hosting edge/proxy supplies geo headers, see
+   * trackingService.extractGeoData), so docs without a city are excluded
+   * up front rather than surfacing as a noisy "Unknown" row.
+   */
+  private async getUsersByCity(match: Record<string, unknown>): Promise<CityData[]> {
     const result = await PageView.aggregate([
-      { $match: match },
+      { $match: { ...match, city: { $exists: true, $ne: null } } },
       {
         $group: {
-          _id: '$device',
+          _id: { city: '$city', region: '$region', country: '$country' },
           users: { $addToSet: '$sessionId' },
           sessions: { $addToSet: '$sessionId' }
         }
       },
       {
         $project: {
-          device: '$_id',
-          category: {
-            $switch: {
-              branches: [
-                { case: { $eq: ['$_id', 'mobile'] }, then: 'mobile' },
-                { case: { $eq: ['$_id', 'tablet'] }, then: 'tablet' }
-              ],
-              default: 'desktop'
-            }
-          },
+          city: '$_id.city',
+          region: '$_id.region',
+          country: '$_id.country',
           users: { $size: '$users' },
           sessions: { $size: '$sessions' }
         }
@@ -820,8 +1068,51 @@ export class AnalyticsService {
     ]);
 
     return result.map(item => ({
-      device: item.device || 'desktop',
-      category: item.category,
+      city: item.city,
+      region: item.region || '',
+      country: item.country || 'Unknown',
+      users: item.users,
+      sessions: item.sessions
+    }));
+  }
+
+  /**
+   * UTM source + medium + campaign combined breakdown — getTopCampaigns
+   * stays as its own (campaign-only) query since collapsing this combo
+   * data into a campaign-only rollup would double-count sessions that
+   * appear under more than one source/medium for the same campaign.
+   */
+  private async getUtmBreakdown(match: Record<string, unknown>): Promise<UtmBreakdownData[]> {
+    const result = await PageView.aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: {
+            source: { $ifNull: ['$utmSource', '(none)'] },
+            medium: { $ifNull: ['$utmMedium', '(none)'] },
+            campaign: { $ifNull: ['$utmCampaign', '(none)'] }
+          },
+          users: { $addToSet: '$sessionId' },
+          sessions: { $addToSet: '$sessionId' }
+        }
+      },
+      {
+        $project: {
+          source: '$_id.source',
+          medium: '$_id.medium',
+          campaign: '$_id.campaign',
+          users: { $size: '$users' },
+          sessions: { $size: '$sessions' }
+        }
+      },
+      { $sort: { users: -1 } },
+      { $limit: 20 }
+    ]);
+
+    return result.map(item => ({
+      source: item.source,
+      medium: item.medium,
+      campaign: item.campaign,
       users: item.users,
       sessions: item.sessions
     }));
@@ -914,6 +1205,115 @@ export class AnalyticsService {
       browser: e.browser,
       device: e.device,
     })) satisfies RecentEvent[];
+  }
+
+  /**
+   * Shared time-range/dimension-match resolution for the on-demand event
+   * property endpoints — same logic getAnalytics uses for the main bundle,
+   * factored out since these are separate on-demand requests rather than
+   * part of it.
+   */
+  private async resolveEventPropertyContext(
+    projectObjectId: Types.ObjectId,
+    dateRange: string,
+    timezone: string,
+    filters: EventPropertyQueryOptions['filters'],
+    startDate?: string,
+    endDate?: string
+  ): Promise<{ timeRange: TimeRange; dimensionMatch: Record<string, unknown> }> {
+    const { createdAt: projectCreatedAt, timezone: projectTimezone } = await this.resolveProjectTimeContext(projectObjectId);
+    const tzResolved = normalizeTimezone(projectTimezone || timezone);
+    const allTimeStart = dateRange === 'ALL_TIME' && !startDate && !endDate ? projectCreatedAt : undefined;
+    const { timeRange } = this.resolveTimeRange(dateRange, tzResolved, startDate, endDate, allTimeStart);
+    const dimensionMatch = this.buildDimensionMatch(filters);
+    return { timeRange, dimensionMatch };
+  }
+
+  /**
+   * Guards against Mongo field-path injection via a user-controlled query
+   * param: rejects operator-like keys ($-prefixed), dotted paths (which
+   * would traverse into nested structures unexpectedly), null bytes, and
+   * unreasonably long keys.
+   */
+  private isValidPropertyKey(key: string): boolean {
+    return typeof key === 'string'
+      && key.length > 0
+      && key.length <= 128
+      && !key.startsWith('$')
+      && !key.includes('.')
+      && !key.includes('\0');
+  }
+
+  /**
+   * Distinct property keys observed on a custom event's structured `data`,
+   * ranked by frequency — feeds the key-selector in the event property
+   * drill-down UI. Only scalar-valued keys are surfaced (array/object
+   * values are excluded) since "breakdown by property" only makes sense
+   * for primitive values.
+   */
+  async getEventPropertyKeys(options: EventPropertyQueryOptions): Promise<EventPropertyKeyData[]> {
+    const { projectId, eventName, dateRange, timezone = 'UTC', filters, startDate, endDate } = options;
+    if (!Types.ObjectId.isValid(projectId)) throw new Error('Invalid project ID');
+
+    const projectObjectId = new Types.ObjectId(projectId);
+    const { timeRange, dimensionMatch } = await this.resolveEventPropertyContext(
+      projectObjectId, dateRange, timezone, filters, startDate, endDate
+    );
+
+    const rows = await Event.aggregate<{ _id: string; count: number }>([
+      {
+        $match: {
+          projectId: projectObjectId,
+          ...this.buildEventDimensionMatch(dimensionMatch),
+          name: eventName,
+          timestamp: { $gte: new Date(timeRange.start), $lte: new Date(timeRange.end) },
+          data: { $exists: true, $ne: null }
+        }
+      },
+      { $project: { keys: { $objectToArray: '$data' } } },
+      { $unwind: '$keys' },
+      { $match: { $expr: { $not: [{ $in: [{ $type: '$keys.v' }, ['array', 'object']] }] } } },
+      { $group: { _id: '$keys.k', count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: 50 }
+    ]);
+
+    return rows.map((r) => ({ key: r._id, occurrences: r.count }));
+  }
+
+  /**
+   * Value distribution for one property key on a custom event.
+   * `propertyKey` is user-controlled (a query param) and gets interpolated
+   * into a Mongo field path, so it's validated first via isValidPropertyKey.
+   */
+  async getEventPropertyBreakdown(options: EventPropertyQueryOptions & { propertyKey: string }): Promise<EventPropertyValueData[]> {
+    const { projectId, eventName, propertyKey, dateRange, timezone = 'UTC', filters, startDate, endDate } = options;
+    if (!Types.ObjectId.isValid(projectId)) throw new Error('Invalid project ID');
+    if (!this.isValidPropertyKey(propertyKey)) throw new Error('Invalid property key');
+
+    const projectObjectId = new Types.ObjectId(projectId);
+    const { timeRange, dimensionMatch } = await this.resolveEventPropertyContext(
+      projectObjectId, dateRange, timezone, filters, startDate, endDate
+    );
+
+    const fieldPath = `$data.${propertyKey}`;
+    const rows = await Event.aggregate<{ _id: string | number | boolean; count: number; users: string[] }>([
+      {
+        $match: {
+          projectId: projectObjectId,
+          ...this.buildEventDimensionMatch(dimensionMatch),
+          name: eventName,
+          timestamp: { $gte: new Date(timeRange.start), $lte: new Date(timeRange.end) },
+          [`data.${propertyKey}`]: { $exists: true, $ne: null }
+        }
+      },
+      { $match: { $expr: { $not: [{ $in: [{ $type: fieldPath }, ['array', 'object']] }] } } },
+      { $group: { _id: fieldPath, count: { $sum: 1 }, users: { $addToSet: '$sessionId' } } },
+      { $sort: { count: -1 } },
+      { $limit: 20 }
+    ]);
+
+    return rows.map((r) => ({ value: String(r._id), count: r.count, uniqueUsers: r.users.length }));
   }
 
   /**

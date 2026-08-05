@@ -24,6 +24,9 @@ import {
   MegaphoneIcon,
   LinkBreakIcon,
   WarningCircleIcon,
+  MapPinIcon,
+  CpuIcon,
+  ChartBarIcon,
 } from "@phosphor-icons/react";
 
 function ProjectLogo({ name, url }: { name: string; url: string }) {
@@ -54,6 +57,17 @@ function ProjectLogo({ name, url }: { name: string; url: string }) {
 }
 
 const OBJECT_ID_REGEX = /^[a-fA-F0-9]{24}$/;
+
+function formatPageMeta(bounceRate?: number, avgTimeOnPage?: number): string | undefined {
+  const parts: string[] = [];
+  if (typeof bounceRate === "number") parts.push(`${bounceRate}% bounce`);
+  if (typeof avgTimeOnPage === "number") {
+    const m = Math.floor(avgTimeOnPage / 60);
+    const s = Math.round(avgTimeOnPage % 60);
+    parts.push(`${m > 0 ? `${m}m ` : ""}${s}s avg`);
+  }
+  return parts.length ? parts.join(" · ") : undefined;
+}
 
 interface PublicDashboardClientProps {
   projectId: string;
@@ -213,7 +227,11 @@ export default function PublicDashboardClient({
                     label: "Pages",
                     icon: FileTextIcon,
                     dimension: "page",
-                    items: analyticsData.pages.map((p) => ({ name: p.path, value: p.views })),
+                    items: analyticsData.pages.map((p) => ({
+                      name: p.path,
+                      value: p.views,
+                      meta: formatPageMeta(p.bounceRate, p.avgTimeOnPage),
+                    })),
                   },
                   {
                     id: "entry-pages",
@@ -227,6 +245,14 @@ export default function PublicDashboardClient({
                     icon: FileTextIcon,
                     items: analyticsData.exitPages.map((p) => ({ name: p.path, value: p.views })),
                   },
+                ]}
+              />
+
+              <BreakdownPanel
+                defaultTabId="sources"
+                onFilter={addFilter}
+                activeValues={filterQuery}
+                tabs={[
                   {
                     id: "sources",
                     label: "Sources",
@@ -240,6 +266,15 @@ export default function PublicDashboardClient({
                     icon: MegaphoneIcon,
                     dimension: "utmCampaign",
                     items: analyticsData.campaigns.map((c) => ({ name: c.name, value: c.users })),
+                  },
+                  {
+                    id: "utm",
+                    label: "UTM",
+                    icon: ChartBarIcon,
+                    items: analyticsData.utmBreakdown.map((u) => ({
+                      name: `${u.source} / ${u.medium} / ${u.campaign}`,
+                      value: u.users,
+                    })),
                   },
                 ]}
               />
@@ -258,11 +293,30 @@ export default function PublicDashboardClient({
                     format: getCountryName,
                   },
                   {
+                    id: "cities",
+                    label: "Cities",
+                    icon: MapPinIcon,
+                    dimension: "city",
+                    items: analyticsData.cities.map((c) => ({
+                      name: c.region ? `${c.city}, ${c.region}` : c.city,
+                      value: c.users,
+                      meta: c.country,
+                    })),
+                  },
+                ]}
+              />
+
+              <BreakdownPanel
+                defaultTabId="devices"
+                onFilter={addFilter}
+                activeValues={filterQuery}
+                tabs={[
+                  {
                     id: "devices",
                     label: "Devices",
                     icon: DesktopIcon,
                     dimension: "device",
-                    items: analyticsData.devices.map((d) => ({ name: d.device, value: d.users })),
+                    items: analyticsData.devices.map((d) => ({ name: d.device, value: d.users, meta: d.detail })),
                     format: (s) => s.charAt(0).toUpperCase() + s.slice(1),
                   },
                   {
@@ -270,7 +324,14 @@ export default function PublicDashboardClient({
                     label: "Browsers",
                     icon: BrowserIcon,
                     dimension: "browser",
-                    items: analyticsData.browsers.map((b) => ({ name: b.browser, value: b.users })),
+                    items: analyticsData.browsers.map((b) => ({ name: b.browser, value: b.users, meta: b.version })),
+                  },
+                  {
+                    id: "os",
+                    label: "OS",
+                    icon: CpuIcon,
+                    dimension: "os",
+                    items: analyticsData.os.map((o) => ({ name: o.os, value: o.users, meta: o.version })),
                   },
                 ]}
               />
