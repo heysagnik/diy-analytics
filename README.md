@@ -1,5 +1,8 @@
 <p align="center">
-  <img src="docs/images/logo.svg" height="40" alt="diy-analytics">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/logo-dark.svg">
+    <img src="docs/images/logo.svg" height="40" alt="diy-analytics">
+  </picture>
 </p>
 
 <p align="center">Self-hosted, privacy-friendly website analytics.</p>
