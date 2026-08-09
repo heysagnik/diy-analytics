@@ -1,6 +1,8 @@
-# DIY Analytics
+<p align="center">
+  <img src="docs/images/logo.svg" height="40" alt="diy-analytics">
+</p>
 
-Self-hosted, privacy-friendly website analytics.
+<p align="center">Self-hosted, privacy-friendly website analytics.</p>
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/heysagnik/diy-analytics)
