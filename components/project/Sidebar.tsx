@@ -5,6 +5,7 @@ import Navigation, { NavigationItem } from "../layout/Navigation";
 import ProjectSelector from "./ProjectSelector";
 import Footer, { FooterLink } from "./Footer";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { StarFourIcon } from "@phosphor-icons/react";
 import {
   Sidebar as ShadcnSidebar,
   SidebarContent,
@@ -50,10 +51,10 @@ export default function Sidebar({
       <SidebarHeader className="border-b border-border p-2">
         <div className="flex h-10 items-center justify-between px-2">
           {!isCollapsed && (
-            <div className="flex items-center min-w-0">
-              <span className="font-display font-semibold text-sm leading-none tracking-[-0.03em] truncate">
-                <span className="text-accent">DIY</span>
-                <span className="text-foreground"> Analytics</span>
+            <div className="flex items-center gap-2 min-w-0">
+              <StarFourIcon size={20} weight="fill" className="shrink-0 text-foreground" />
+              <span className="font-sans font-semibold text-base leading-none tracking-[-0.03em] truncate text-foreground">
+                diy-analytics
               </span>
             </div>
           )}

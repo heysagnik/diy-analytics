@@ -4,6 +4,12 @@ import { createEmptyAnalyticsData } from "../utils/analytics";
 import type { CustomDateRange } from "../components/analytics/DateRangePicker";
 import { fetchAnalytics as requestAnalytics, normalizeAnalyticsError } from "../lib/api/analytics";
 
+// Client-side SWR cache: switching between tabs/date ranges the user has
+// already visited in this session renders instantly from cache while a
+// fresh request revalidates in the background, instead of showing a loading
+// spinner on every toggle.
+const swrCache = new Map<string, AnalyticsData>();
+
 interface UseAnalyticsOptions {
   timezone?: string;
   customRange?: CustomDateRange | null;
@@ -32,8 +38,11 @@ export function useAnalytics(
   // "4am" bucket. No caller in this codebase passes `timezone` explicitly,
   // so this default is what every dashboard view actually uses.
   const { timezone = Intl.DateTimeFormat().resolvedOptions().timeZone, customRange, filters } = options;
-  const [analyticsData, setAnalyticsData] = useState<AnalyticsData>(createEmptyAnalyticsData(dateRange));
-  const [loading, setLoading] = useState(true);
+  const cacheKey = JSON.stringify({ projectId, dateRange, timezone, customRange, filters });
+  const [analyticsData, setAnalyticsData] = useState<AnalyticsData>(
+    () => swrCache.get(cacheKey) ?? createEmptyAnalyticsData(dateRange)
+  );
+  const [loading, setLoading] = useState(!swrCache.has(cacheKey));
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [error, setError] = useState<string | null>(null);
@@ -52,6 +61,7 @@ export function useAnalytics(
     try {
       setError(null);
       const data = await requestAnalytics('/api/analytics', { projectId, dateRange, timezone, customRange, filters }, controller.signal);
+      swrCache.set(cacheKey, data);
       setAnalyticsData(data);
       setLastUpdated(new Date());
     } catch (err) {
@@ -63,12 +73,18 @@ export function useAnalytics(
         setLoading(false);
       }
     }
-  }, [projectId, dateRange, timezone, customRange, filters]);
+  }, [projectId, dateRange, timezone, customRange, filters, cacheKey]);
 
   useEffect(() => {
-    setLoading(true);
+    const cached = swrCache.get(cacheKey);
+    if (cached) {
+      setAnalyticsData(cached);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     void fetchAnalytics();
-  }, [fetchAnalytics]);
+  }, [fetchAnalytics, cacheKey]);
 
   useEffect(() => () => requestController.current?.abort(), []);
 

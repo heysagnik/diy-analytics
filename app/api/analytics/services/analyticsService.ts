@@ -44,6 +44,7 @@ interface SessionRollup {
   firstTs: Date;
   lastTs: Date;
   pageCount: number;
+  timestamps: Date[];
 }
 
 interface CoreMetricsFacetResult {
@@ -57,6 +58,20 @@ interface CoreMetricsFacetResult {
 interface PageSessionRollup {
   _id: string;
   pages: { path: string; timestamp: Date }[];
+}
+
+// Process-local cache for getAnalytics results. Serverless instances stay
+// warm across nearby requests (tab switches, filter toggles on the same
+// dashboard view), so this avoids re-running ~15 aggregations against the
+// Atlas cluster for identical queries within the TTL. Not shared across
+// instances/regions — that's fine, it's a latency optimization, not a
+// correctness guarantee, and results are never more than TTL_MS stale.
+const analyticsCache = new Map<string, { expiresAt: number; data: AnalyticsResponse }>();
+const ANALYTICS_CACHE_TTL_MS = 60_000;
+
+function analyticsCacheKey(options: QueryOptions): string {
+  const { projectId, dateRange, timezone, filters, startDate, endDate } = options;
+  return JSON.stringify({ projectId, dateRange, timezone, filters, startDate, endDate });
 }
 
 /**
@@ -197,9 +212,23 @@ export class AnalyticsService {
   }
 
   /**
-   * Get comprehensive analytics data for a project
+   * Get comprehensive analytics data for a project. Cached in-process for
+   * ANALYTICS_CACHE_TTL_MS so repeated requests for the same query (tab
+   * switches, filter toggles) skip the ~15-query aggregation round-trip.
    */
   async getAnalytics(options: QueryOptions): Promise<AnalyticsResponse> {
+    const key = analyticsCacheKey(options);
+    const cached = analyticsCache.get(key);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.data;
+    }
+
+    const data = await this.fetchAnalytics(options);
+    analyticsCache.set(key, { expiresAt: Date.now() + ANALYTICS_CACHE_TTL_MS, data });
+    return data;
+  }
+
+  private async fetchAnalytics(options: QueryOptions): Promise<AnalyticsResponse> {
     const { projectId, dateRange, timezone = 'UTC', filters, startDate, endDate } = options;
 
     if (!Types.ObjectId.isValid(projectId)) {
@@ -375,11 +404,11 @@ export class AnalyticsService {
         $facet: {
           currentSessionRollup: [
             { $match: { timestamp: currentWindow } },
-            { $group: { _id: '$sessionId', userId: { $first: '$userId' }, firstTs: { $min: '$timestamp' }, lastTs: { $max: '$timestamp' }, pageCount: { $sum: 1 } } }
+            { $group: { _id: '$sessionId', userId: { $first: '$userId' }, firstTs: { $min: '$timestamp' }, lastTs: { $max: '$timestamp' }, pageCount: { $sum: 1 }, timestamps: { $push: '$timestamp' } } }
           ],
           previousSessionRollup: [
             { $match: { timestamp: previousWindow } },
-            { $group: { _id: '$sessionId', userId: { $first: '$userId' }, firstTs: { $min: '$timestamp' }, lastTs: { $max: '$timestamp' }, pageCount: { $sum: 1 } } }
+            { $group: { _id: '$sessionId', userId: { $first: '$userId' }, firstTs: { $min: '$timestamp' }, lastTs: { $max: '$timestamp' }, pageCount: { $sum: 1 }, timestamps: { $push: '$timestamp' } } }
           ],
           currentPageViewCount: [
             { $match: { timestamp: currentWindow } },
@@ -462,14 +491,24 @@ export class AnalyticsService {
       return (bounced / rollup.length) * 100;
     };
 
+    // Gaps between consecutive pageviews are clipped to this ceiling before
+    // being summed, so a tab left open in the background for hours doesn't
+    // get counted as active session time and blow out the average.
+    const MAX_GAP_SEC = 30 * 60;
+
     const durationOf = (rollup: SessionRollup[]) => {
-      const multiPage = rollup.filter((s) => s.pageCount > 1);
-      if (multiPage.length === 0) return 0;
-      const totalSec = multiPage.reduce(
-        (acc, s) => acc + (new Date(s.lastTs).getTime() - new Date(s.firstTs).getTime()) / 1000,
-        0
-      );
-      return totalSec / multiPage.length;
+      if (rollup.length === 0) return 0;
+      const totalSec = rollup.reduce((acc, s) => {
+        if (s.pageCount <= 1) return acc;
+        const sorted = [...s.timestamps].sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+        let sessionSec = 0;
+        for (let i = 1; i < sorted.length; i++) {
+          const gapSec = (new Date(sorted[i]).getTime() - new Date(sorted[i - 1]).getTime()) / 1000;
+          sessionSec += Math.min(gapSec, MAX_GAP_SEC);
+        }
+        return acc + sessionSec;
+      }, 0);
+      return totalSec / rollup.length;
     };
 
     const currentBounce = bounceOf(currentSessions);

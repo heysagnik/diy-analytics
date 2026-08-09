@@ -68,14 +68,14 @@ function TabSwitcher({
       </div>
 
       <div className="hidden sm:block max-w-full overflow-x-auto scrollbar-hide">
-        <div className="bg-muted p-0.5 rounded-lg flex items-center gap-0.5 border border-border w-max">
+        <div className="bg-muted/80 backdrop-blur-sm p-0.5 rounded-lg flex items-center gap-0.5 border border-border/40 w-max">
           {tabs.map((tab) => (
             <Button
               key={tab.id}
               size="xs"
               variant={tab.id === activeId ? 'default' : 'ghost'}
               onClick={() => onChange(tab.id)}
-              className="rounded-md font-medium shrink-0"
+              className="rounded-md font-medium shrink-0 active:scale-[0.96] transition-[color,background-color,border-color,box-shadow,transform] duration-150 ease-out"
             >
               {tab.label}
             </Button>
@@ -129,17 +129,21 @@ function RowList({
               }`}
               style={{ width: `${pct}%` }}
             />
-            <div className="relative flex items-center justify-between gap-3 px-2.5 py-1 text-xs">
-              <span className="min-w-0 max-w-[65%]">
+            <div className="relative flex items-center justify-between gap-3 px-2.5 py-1.5 text-xs h-full">
+              <span className="min-w-0 max-w-[65%] flex flex-col justify-center">
                 <span
                   className={`block truncate font-medium ${isActive ? 'text-accent' : 'text-foreground'}`}
                   title={label}
                 >
                   {label}
                 </span>
-                {item.meta && (
+                {item.meta ? (
                   <span className="block truncate text-[11px] text-muted-foreground" title={item.meta}>
                     {item.meta}
+                  </span>
+                ) : (
+                  <span className="block truncate text-[11px] opacity-0 select-none" aria-hidden="true">
+                    &nbsp;
                   </span>
                 )}
               </span>
@@ -158,7 +162,7 @@ function RowList({
             <button
               key={`${active.id}:${item.name}:${item.meta ?? ''}`}
               onClick={() => onFilter!(active.dimension!, item.name)}
-              className="relative w-full min-h-10 text-left rounded-md hover:bg-muted/60 transition-colors duration-150 cursor-pointer active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="relative w-full h-[44px] text-left rounded-md hover:bg-muted/60 transition-colors duration-150 cursor-pointer active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               aria-label={`Filter by ${label}`}
             >
               {row}
@@ -167,7 +171,7 @@ function RowList({
         }
 
         return (
-          <div key={`${active.id}:${item.name}:${item.meta ?? ''}`} className="relative">
+          <div key={`${active.id}:${item.name}:${item.meta ?? ''}`} className="relative h-[44px]">
             {row}
           </div>
         );
@@ -198,8 +202,8 @@ export const BreakdownPanel: React.FC<BreakdownPanelProps> = ({
   const hasMore = sorted.length > shown.length;
 
   return (
-    <Card id={id} className={`relative p-3.5 flex flex-col gap-3 font-body ${hasMore ? 'pb-12' : ''}`}>
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <Card id={id} className="relative p-3.5 flex flex-col gap-3 font-body h-[340px]">
+      <div className="flex flex-wrap items-center justify-between gap-3 h-8 shrink-0">
         <div className="flex items-center gap-2 shrink-0">
           {ActiveIcon && (
             <span className="icon-chip size-6 rounded-md">
@@ -214,7 +218,7 @@ export const BreakdownPanel: React.FC<BreakdownPanelProps> = ({
         </div>
       </div>
 
-      <div className="relative">
+      <div className="relative flex-1 flex flex-col justify-start pb-10">
         <RowList
           items={shown}
           active={active}

@@ -115,15 +115,11 @@ export const EventPropertyDrilldown: React.FC<EventPropertyDrilldownProps> = ({
   return (
     <Card className="p-3.5 flex flex-col gap-3 font-body">
       <div className="flex items-center gap-2">
-        <span className="icon-chip size-6 rounded-md">
-          <LightningIcon size={14} weight="bold" />
-        </span>
         <h3 className="font-display font-semibold text-sm text-foreground">Top Events</h3>
       </div>
 
       {shown.length === 0 ? (
         <div className="flex flex-col items-center gap-2 py-12 text-center">
-          <LightningIcon size={32} className="text-muted-foreground" weight="duotone" />
           <p className="text-sm text-muted-foreground">No events recorded yet.</p>
         </div>
       ) : (
@@ -161,9 +157,6 @@ export const EventPropertyDrilldown: React.FC<EventPropertyDrilldownProps> = ({
         <DialogContent className="sm:max-w-lg h-[min(32rem,80vh)] grid-rows-[auto_1fr] p-0 gap-0 overflow-hidden">
           <DialogHeader className="p-4 pb-3 border-b border-border gap-3">
             <DialogTitle className="flex items-center gap-2 font-display text-sm">
-              <span className="icon-chip size-6 rounded-md">
-                <TagIcon size={14} weight="bold" />
-              </span>
               {selectedEvent}
             </DialogTitle>
 

@@ -16,17 +16,8 @@ import { ActiveFilter, filtersToQuery } from "@/types/filters";
 import { getCountryName } from "@/utils/country";
 import { normalizeProjectUrl } from "@/utils/url";
 import {
-  FileTextIcon,
-  ArrowSquareOutIcon,
-  GlobeIcon,
-  DesktopIcon,
-  BrowserIcon,
-  MegaphoneIcon,
   LinkBreakIcon,
   WarningCircleIcon,
-  MapPinIcon,
-  CpuIcon,
-  ChartBarIcon,
 } from "@phosphor-icons/react";
 
 function ProjectLogo({ name, url }: { name: string; url: string }) {
@@ -225,7 +216,6 @@ export default function PublicDashboardClient({
                   {
                     id: "pages",
                     label: "Pages",
-                    icon: FileTextIcon,
                     dimension: "page",
                     items: analyticsData.pages.map((p) => ({
                       name: p.path,
@@ -236,13 +226,11 @@ export default function PublicDashboardClient({
                   {
                     id: "entry-pages",
                     label: "Entry Pages",
-                    icon: FileTextIcon,
                     items: analyticsData.entryPages.map((p) => ({ name: p.path, value: p.views })),
                   },
                   {
                     id: "exit-pages",
                     label: "Exit Pages",
-                    icon: FileTextIcon,
                     items: analyticsData.exitPages.map((p) => ({ name: p.path, value: p.views })),
                   },
                 ]}
@@ -256,21 +244,18 @@ export default function PublicDashboardClient({
                   {
                     id: "sources",
                     label: "Sources",
-                    icon: ArrowSquareOutIcon,
                     dimension: "source",
                     items: analyticsData.sources.map((s) => ({ name: s.name, value: s.users })),
                   },
                   {
                     id: "campaigns",
                     label: "Campaigns",
-                    icon: MegaphoneIcon,
                     dimension: "utmCampaign",
                     items: analyticsData.campaigns.map((c) => ({ name: c.name, value: c.users })),
                   },
                   {
                     id: "utm",
                     label: "UTM",
-                    icon: ChartBarIcon,
                     items: analyticsData.utmBreakdown.map((u) => ({
                       name: `${u.source} / ${u.medium} / ${u.campaign}`,
                       value: u.users,
@@ -287,7 +272,6 @@ export default function PublicDashboardClient({
                   {
                     id: "countries",
                     label: "Countries",
-                    icon: GlobeIcon,
                     dimension: "country",
                     items: analyticsData.countries.map((c) => ({ name: c.country, value: c.users })),
                     format: getCountryName,
@@ -295,7 +279,6 @@ export default function PublicDashboardClient({
                   {
                     id: "cities",
                     label: "Cities",
-                    icon: MapPinIcon,
                     dimension: "city",
                     items: analyticsData.cities.map((c) => ({
                       name: c.region ? `${c.city}, ${c.region}` : c.city,
@@ -314,7 +297,6 @@ export default function PublicDashboardClient({
                   {
                     id: "devices",
                     label: "Devices",
-                    icon: DesktopIcon,
                     dimension: "device",
                     items: analyticsData.devices.map((d) => ({ name: d.device, value: d.users, meta: d.detail })),
                     format: (s) => s.charAt(0).toUpperCase() + s.slice(1),
@@ -322,14 +304,12 @@ export default function PublicDashboardClient({
                   {
                     id: "browsers",
                     label: "Browsers",
-                    icon: BrowserIcon,
                     dimension: "browser",
                     items: analyticsData.browsers.map((b) => ({ name: b.browser, value: b.users, meta: b.version })),
                   },
                   {
                     id: "os",
                     label: "OS",
-                    icon: CpuIcon,
                     dimension: "os",
                     items: analyticsData.os.map((o) => ({ name: o.os, value: o.users, meta: o.version })),
                   },

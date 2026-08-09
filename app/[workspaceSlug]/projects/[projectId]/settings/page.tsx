@@ -57,7 +57,7 @@ export default function SettingsPage() {
                   <TabsTrigger
                     key={tab.id}
                     value={tab.id}
-                    className={tab.id === 'danger' ? 'text-danger data-active:text-danger' : ''}
+                    className={tab.id === 'danger' ? 'text-danger data-active:bg-danger data-active:text-white data-active:border-danger/20 data-active:shadow-xs' : ''}
                   >
                     <TabIcon size={14} weight={tab.id === activeTab ? 'bold' : 'regular'} />
                     <span>{tab.label}</span>

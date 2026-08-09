@@ -249,7 +249,6 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
   return (
     <Popover open={isOpen} onOpenChange={handleOpenChange}>
       <PopoverTrigger render={<Button size="sm" variant="outline" aria-expanded={isOpen} />}>
-        <CalendarIcon size={14} />
         <span>{displayText}</span>
         <CaretDownIcon
           size={12}

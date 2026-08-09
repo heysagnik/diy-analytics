@@ -1,7 +1,6 @@
 import React from 'react';
 import { Card } from '@/components/ui/card';
 import { GoalConversionData } from '@/types/analytics';
-import { TargetIcon } from '@phosphor-icons/react';
 
 interface GoalsPanelProps {
   goals: GoalConversionData[];
@@ -13,9 +12,6 @@ export const GoalsPanel: React.FC<GoalsPanelProps> = ({ goals }) => {
   return (
     <Card className="p-4">
       <div className="flex items-center gap-2 mb-3">
-        <span className="icon-chip size-6 rounded-md">
-          <TargetIcon size={14} weight="bold" />
-        </span>
         <h3 className="text-sm font-semibold text-foreground">Goals</h3>
       </div>
 
