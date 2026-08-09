@@ -10,8 +10,8 @@
  * custom classes — use their variants/props and these tokens instead.
  */
 @theme {
-  --font-display: var(--font-sans), "Inter", sans-serif;
-  --font-body: var(--font-sans), "Inter", sans-serif;
+  --font-display: var(--font-sans), sans-serif;
+  --font-body: var(--font-sans), sans-serif;
 
   /* Type ramp and 4px spacing base. */
   --text-xs: 0.75rem;
@@ -285,12 +285,12 @@ body {
 
 /* Display and body use one type family with tighter display tracking. */
 .font-display {
-  font-family: var(--font-display), "Inter", sans-serif;
+  font-family: var(--font-display), sans-serif;
   letter-spacing: -0.02em;
 }
 
 .font-body {
-  font-family: var(--font-body), "Inter", sans-serif;
+  font-family: var(--font-body), sans-serif;
 }
 
 /* Compact uppercase labels; color remains contextual. */

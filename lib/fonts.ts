@@ -5,10 +5,10 @@ import localFont from "next/font/local";
 // occupied before.
 export const family = localFont({
   src: [
-    { path: "../app/fonts/Family-Regular.woff2", weight: "400", style: "normal" },
-    { path: "../app/fonts/Family-Medium.woff2", weight: "500", style: "normal" },
+    { path: "../public/fonts/Family-Regular.woff2", weight: "400", style: "normal" },
+    { path: "../public/fonts/Family-Medium.woff2", weight: "500", style: "normal" },
     {
-      path: "../app/fonts/Family-SemiBold.woff2",
+      path: "../public/fonts/Family-SemiBold.woff2",
       weight: "600",
       style: "normal",
     },
