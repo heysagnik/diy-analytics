@@ -9,6 +9,7 @@ const PUBLIC_PATH_PATTERNS: Array<RegExp> = [
   /^\/api\/whoami(\/.*)?$/,
   /^\/api\/auth\/(login|register|logout|me)(\/.*)?$/,
   /^\/api\/public(\/.*)?$/,
+  /^\/api\/site-icon(\/.*)?$/,
   /^\/public(\/.*)?$/,
   /^\/login(\/.*)?$/,
   /^\/register(\/.*)?$/,
