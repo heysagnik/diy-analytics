@@ -2,7 +2,6 @@ import React from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { WebVitalData } from '@/types/analytics';
-import { GaugeIcon } from '@phosphor-icons/react';
 
 interface WebVitalsPanelProps {
   webVitals: WebVitalData[];
@@ -33,10 +32,7 @@ export const WebVitalsPanel: React.FC<WebVitalsPanelProps> = ({ webVitals }) => 
 
   return (
     <Card className="p-4">
-      <div className="flex items-center gap-2 mb-3">
-        <span className="icon-chip size-6 rounded-md">
-          <GaugeIcon size={14} weight="bold" />
-        </span>
+      <div className="mb-3">
         <h3 className="text-sm font-semibold text-foreground">Web Vitals</h3>
       </div>
 

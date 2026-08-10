@@ -57,7 +57,9 @@ function TabSwitcher({
       <div className="min-w-0 flex-1 sm:hidden">
         <Select value={activeId} onValueChange={(v: unknown) => onChange(v as string)}>
           <SelectTrigger aria-label="Select breakdown" className="w-full">
-            <SelectValue>{(v: string) => tabs.find((t) => t.id === v)?.label ?? v}</SelectValue>
+            <SelectValue placeholder={tabs.find((t) => t.id === activeId)?.label ?? activeId}>
+              {tabs.find((t) => t.id === activeId)?.label ?? activeId}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {tabs.map((tab) => (
@@ -203,7 +205,7 @@ export const BreakdownPanel: React.FC<BreakdownPanelProps> = ({
 
   return (
     <Card id={id} className="relative p-3.5 flex flex-col gap-3 font-body h-[340px]">
-      <div className="flex flex-wrap items-center justify-between gap-3 h-8 shrink-0">
+      <div className="flex flex-wrap items-center justify-between gap-3 min-h-8 sm:h-8 shrink-0">
         <div className="flex items-center gap-2 shrink-0">
           {ActiveIcon && (
             <span className="icon-chip size-6 rounded-md">

@@ -4,6 +4,7 @@ import * as React from "react";
 import { useTheme } from "next-themes";
 import { MoonIcon, SunIcon } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 type ButtonSize = "default" | "xs" | "sm" | "lg" | "icon" | "icon-xs" | "icon-sm" | "icon-lg";
 type ButtonVariant = "default" | "outline" | "secondary" | "ghost" | "destructive" | "link";
@@ -23,17 +24,26 @@ export function ThemeToggle({ className, size = "icon-xs", variant = "ghost" }: 
   const isDark = mounted && resolvedTheme === "dark";
 
   return (
-    <Button
-      variant={variant}
-      size={size}
-      onClick={() => setTheme(isDark ? "light" : "dark")}
-      className={className}
-      aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
-    >
-      <span className="icon-crossfade size-4">
-        <SunIcon size={16} weight="regular" className={isDark ? "icon-crossfade-hidden" : undefined} />
-        <MoonIcon size={16} weight="regular" className={isDark ? undefined : "icon-crossfade-hidden"} />
-      </span>
-    </Button>
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            variant={variant}
+            size={size}
+            onClick={() => setTheme(isDark ? "light" : "dark")}
+            className={`relative active:translate-y-0 active:scale-[0.96] before:absolute before:-inset-2 before:content-[''] ${className ?? ""}`}
+            aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
+          >
+            <span className="icon-crossfade size-4">
+              <SunIcon size={16} weight="regular" className={isDark ? "icon-crossfade-hidden" : undefined} />
+              <MoonIcon size={16} weight="regular" className={isDark ? undefined : "icon-crossfade-hidden"} />
+            </span>
+          </Button>
+        }
+      />
+      <TooltipContent side="right" className="whitespace-nowrap">
+        {isDark ? "Switch to light theme" : "Switch to dark theme"}
+      </TooltipContent>
+    </Tooltip>
   );
 }

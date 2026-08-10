@@ -52,7 +52,6 @@ interface CoreMetricsFacetResult {
   previousSessionRollup: SessionRollup[];
   currentPageViewCount: { count: number }[];
   previousPageViewCount: { count: number }[];
-  currentPageViewTimestamps: { timestamp: Date }[];
 }
 
 interface PageSessionRollup {
@@ -417,10 +416,6 @@ export class AnalyticsService {
           previousPageViewCount: [
             { $match: { timestamp: previousWindow } },
             { $count: 'count' }
-          ],
-          currentPageViewTimestamps: [
-            { $match: { timestamp: currentWindow } },
-            { $project: { timestamp: 1, _id: 0 } }
           ]
         }
       }
@@ -433,7 +428,9 @@ export class AnalyticsService {
     const previousSessions = result?.previousSessionRollup ?? [];
     const currentViews = result?.currentPageViewCount[0]?.count ?? 0;
     const previousViews = result?.previousPageViewCount[0]?.count ?? 0;
-    const pageViewTimestamps = result?.currentPageViewTimestamps ?? [];
+    // Already fetched per-session in currentSessionRollup — reusing it here
+    // avoids a redundant facet branch re-scanning the same documents.
+    const pageViewTimestamps = currentSessions.flatMap((s) => s.timestamps);
 
     // Identity for "unique users" is the persistent userId when present,
     // falling back to sessionId for anonymous rows so every session still
@@ -474,7 +471,7 @@ export class AnalyticsService {
 
     // Page views series — bucketed by each raw pageview's own timestamp.
     const viewBucketMap = new Map<number, number>();
-    for (const { timestamp } of pageViewTimestamps) {
+    for (const timestamp of pageViewTimestamps) {
       const idx = this.findBucketIndex(new Date(timestamp), buckets, granularity, timezone);
       if (idx !== -1) viewBucketMap.set(idx, (viewBucketMap.get(idx) || 0) + 1);
     }
