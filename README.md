@@ -33,6 +33,11 @@
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/heysagnik/diy-analytics)
 
+> **Note:** the dashboard and database can run anywhere, but the public
+> tracking endpoint (`/api/track`) depends on [Vercel Queues](https://vercel.com/docs/queues)
+> for durable ingestion, so it only works when the app is deployed on
+> Vercel. See [docs/database.md](docs/database.md#ingestion-path-requires-vercel).
+
 ### Run locally
 
 ```bash
@@ -46,11 +51,12 @@ npm run dev
 Set `DATABASE_URL` in `.env.local` to your PostgreSQL connection string
 (the "Deploy with Vercel" button above does not provision a database for
 you — bring your own Postgres, e.g. Vercel Postgres, Neon, Supabase, or a
-self-hosted instance), and `NEXT_PUBLIC_SITE_URL` to the URL the app will
-be served from (used when generating tracking snippets). `DATABASE_STORAGE_CAP_MB`
-is optional and defaults to 512MB — it sets the soft cap shown as "storage
-used" in the workspace/profile dashboards. Then apply the schema and start
-the app:
+self-hosted instance; see [docs/database.md](docs/database.md) for
+provider-specific connection string notes), and `NEXT_PUBLIC_SITE_URL` to
+the URL the app will be served from (used when generating tracking
+snippets). `DATABASE_STORAGE_CAP_MB` is optional and defaults to 512MB —
+it sets the soft cap shown as "storage used" in the workspace/profile
+dashboards. Then apply the schema and start the app:
 
 ```bash
 npm run db:migrate
@@ -58,6 +64,13 @@ npm run dev
 ```
 
 The app runs at `http://localhost:3000`.
+
+On Vercel, migrations run automatically on every **Production** deploy
+(gated on `VERCEL_ENV=production`, via a `postinstall` hook) — Preview
+deployments and local `npm install` are unaffected, so PRs won't apply
+schema changes against your production database before merge. Non-Vercel
+deployments still need to run `npm run db:migrate` manually before first
+traffic.
 
 > **Upgrading from a MongoDB-backed deployment?** This is a breaking
 > change — see [docs/migrating-from-mongodb.md](docs/migrating-from-mongodb.md).

@@ -4,5 +4,10 @@
       "path": "/api/cron/rollup",
       "schedule": "0 3 * * *"
     }
-  ]
+  ],
+  "functions": {
+    "app/api/queues/track-write/route.ts": {
+      "experimentalTriggers": [{ "type": "queue/v2beta", "topic": "tracking-events" }]
+    }
+  }
 }

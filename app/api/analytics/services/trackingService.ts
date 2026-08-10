@@ -77,16 +77,22 @@ interface SessionInfo {
   sessionId: string;
 }
 
+interface CachedProject {
+  project: ProjectDocument | null;
+  cachedAt: number;
+}
+
 export class TrackingService {
   private uaParser: UAParser;
   private sessionCache = new Map<string, SessionInfo>();
   private readonly SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes
   private lastCleanupAt = 0;
 
+  private projectCache = new Map<string, CachedProject>();
+  private readonly PROJECT_CACHE_TTL = 60 * 1000; // 1 minute
+
   constructor() {
     this.uaParser = new UAParser();
-    // NOTE: deliberately no setInterval — that pattern leaks in serverless.
-    // Stale sessions are pruned lazily on each write (see touchSessionCache).
   }
 
   /**
@@ -276,8 +282,15 @@ export class TrackingService {
    * Find project by tracking code
    */
   private async findProjectByTrackingCode(trackingCode: string): Promise<ProjectDocument | null> {
+    const cached = this.projectCache.get(trackingCode);
+    if (cached && Date.now() - cached.cachedAt < this.PROJECT_CACHE_TTL) {
+      return cached.project;
+    }
+
     const [project] = await db.select().from(projects).where(eq(projects.trackingCode, trackingCode)).limit(1);
-    return project ?? null;
+    const result = project ?? null;
+    this.projectCache.set(trackingCode, { project: result, cachedAt: Date.now() });
+    return result;
   }
 
   /**
@@ -290,12 +303,6 @@ export class TrackingService {
       return 'Project has no authorized domains configured';
     }
 
-    // Uses the same hostname-normalization as project creation/update
-    // (utils/url.ts) so a domain authorized in Settings and a domain
-    // reported by the tracker are compared the same way. Falls back to the
-    // simpler strip-only comparison for inputs that don't parse as a URL
-    // (e.g. bare "localhost" without a scheme in some edge deployments),
-    // preserving prior behavior rather than rejecting them outright.
     const normalizeDomain = (value: string) =>
       normalizeProjectUrl(value)?.hostname ?? value.replace(/^(?:https?:\/\/)?(?:www\.)?/i, '').split('/')[0];
 

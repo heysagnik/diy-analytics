@@ -1,7 +1,10 @@
-import { type NextRequest, NextResponse } from 'next/server';
+import { send } from '@vercel/queue';
+import type { NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
 import { PUBLIC_CORS_HEADERS as CORS_HEADERS } from '@/lib/corsHeaders';
 import { isRateLimited } from '@/lib/rateLimit';
-import { type TrackingContext, type TrackingPayload, trackingService } from '../analytics/services/trackingService';
+import type { TrackingContext, TrackingPayload } from '../analytics/services/trackingService';
+import { TRACKING_EVENTS_TOPIC } from '../queues/track-write/topic';
 
 // Public, unauthenticated ingestion endpoint — bound request size before
 // parsing (a hostile client could otherwise send an arbitrarily large body
@@ -134,30 +137,9 @@ async function trackHandler(req: NextRequest) {
       headers: Object.fromEntries(req.headers.entries()),
     };
 
-    const result = await trackingService.processTracking(payload, context);
+    await send(TRACKING_EVENTS_TOPIC, { payload, context });
 
-    if (result.success) {
-      return NextResponse.json(
-        {
-          success: true,
-          sessionId: result.sessionId,
-          details: result.details,
-        },
-        { headers: CORS_HEADERS },
-      );
-    } else {
-      return NextResponse.json(
-        {
-          success: false,
-          error: result.error,
-          details: result.details,
-        },
-        {
-          status: 400,
-          headers: CORS_HEADERS,
-        },
-      );
-    }
+    return NextResponse.json({ success: true }, { headers: CORS_HEADERS });
   } catch (error: unknown) {
     console.error('Tracking API Error:', error);
 
