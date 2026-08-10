@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card } from '@/components/ui/card';
-import { Loader2, LogOut } from 'lucide-react';
+import { CircleNotchIcon, SignOutIcon } from '@phosphor-icons/react';
 
 export default function LogoutPage() {
   const router = useRouter();
@@ -36,9 +36,9 @@ export default function LogoutPage() {
         <Card className="p-8 rounded-2xl bg-card/95 backdrop-blur-md shadow-[0_0_0_1px_rgba(8,9,10,0.08),0_8px_24px_-6px_rgba(8,9,10,0.08),0_20px_48px_-12px_rgba(8,9,10,0.06)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_8px_24px_-6px_rgba(0,0,0,0.5)] text-center animate-[fadeIn_0.4s_cubic-bezier(0.16,1,0.3,1)_both]">
           <div className="inline-flex items-center justify-center size-12 rounded-2xl bg-muted text-foreground mb-4 ring-1 ring-border shadow-sm">
             {status === 'clearing' ? (
-              <Loader2 className="size-5 animate-spin text-accent stroke-[2.25]" />
+              <CircleNotchIcon size={24} weight="bold" className="animate-spin text-accent" />
             ) : (
-              <LogOut className="size-5 text-accent stroke-[2.25]" />
+              <SignOutIcon size={24} weight="bold" className="text-accent" />
             )}
           </div>
 

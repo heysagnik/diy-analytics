@@ -1,4 +1,3 @@
-import React from 'react';
 import Image from 'next/image';
 
 interface AuthBrandPanelProps {
@@ -39,7 +38,7 @@ export default function AuthBrandPanel({ headline, subtext }: AuthBrandPanelProp
       />
 
       <div className="relative z-10">
-        <Image src="/brand/logo-dark.svg" alt="DIY Analytics" width={91} height={12} className="h-3 w-auto" />
+        <Image src="/brand/logo-dark.svg" alt="DIY Analytics" width={91} height={12} className="h-5 w-auto" />
       </div>
 
       <div className="relative z-10 max-w-sm">

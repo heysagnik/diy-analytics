@@ -48,19 +48,21 @@ export const ProjectListHeader: React.FC<ProjectListHeaderProps> = ({
           />
         </div>
 
-        <ThemeToggle variant="outline" size="icon" />
+        <div className="flex items-center gap-3">
+          <ThemeToggle variant="outline" size="icon" className="shrink-0" />
 
-        <Link
-          href={`/${workspaceSlug}/profile`}
-          aria-label="View profile"
-          className="inline-flex size-8 items-center justify-center rounded-lg outline-none transition-[box-shadow,transform] duration-150 focus-visible:ring-3 focus-visible:ring-ring/50 active:scale-[0.96]"
-        >
-          <VisitorAvatar userId={userId} size={26} />
-        </Link>
-        <Button onClick={onNewSiteClick}>
-          <PlusIcon data-icon="inline-start" weight="bold" />
-          <span>New Site</span>
-        </Button>
+          <Link
+            href={`/${workspaceSlug}/profile`}
+            aria-label="View profile"
+            className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg outline-none transition-[box-shadow,transform] duration-150 focus-visible:ring-3 focus-visible:ring-ring/50 active:scale-[0.96]"
+          >
+            <VisitorAvatar userId={userId} size={26} />
+          </Link>
+          <Button onClick={onNewSiteClick} className="flex-1 sm:flex-none">
+            <PlusIcon data-icon="inline-start" weight="bold" />
+            <span>New Site</span>
+          </Button>
+        </div>
       </div>
     </header>
   );
