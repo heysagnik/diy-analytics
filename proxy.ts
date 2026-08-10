@@ -16,6 +16,8 @@ const PUBLIC_PATH_PATTERNS: Array<RegExp> = [
   /^\/logout(\/.*)?$/,
   /^\/_next(\/.*)?$/,
   /^\/favicon\.ico$/,
+  /^\/brand(\/.*)?$/,
+  /^\/fonts(\/.*)?$/,
 ];
 
 async function verify(request: NextRequest): Promise<boolean> {
