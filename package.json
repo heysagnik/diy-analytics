@@ -1,6 +1,6 @@
 {
   "name": "diy-analytics",
-  "version": "0.1.0",
+  "version": "0.0.2",
   "description": "Self-hosted, privacy-friendly website analytics.",
   "license": "MIT",
   "private": true,

@@ -34,6 +34,11 @@ export default function Footer({ footerLinks, onLinkClick }: FooterProps) {
           </SidebarMenuButton>
         </SidebarMenuItem>
       ))}
+      <SidebarMenuItem>
+        <span className="block px-3 py-1.5 text-[11px] text-muted-foreground/70">
+          v{process.env.NEXT_PUBLIC_APP_VERSION}
+        </span>
+      </SidebarMenuItem>
     </SidebarMenu>
   );
 }
