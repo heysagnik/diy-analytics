@@ -1,4 +1,5 @@
 import React from 'react';
+import Image from 'next/image';
 
 interface AuthBrandPanelProps {
   headline: string;
@@ -37,8 +38,8 @@ export default function AuthBrandPanel({ headline, subtext }: AuthBrandPanelProp
         }}
       />
 
-      <div className="relative z-10 font-display text-sm font-semibold tracking-[-0.03em]">
-        <span className="text-accent">DIY</span> Analytics
+      <div className="relative z-10">
+        <Image src="/brand/logo-dark.svg" alt="DIY Analytics" width={91} height={12} className="h-3 w-auto" />
       </div>
 
       <div className="relative z-10 max-w-sm">
