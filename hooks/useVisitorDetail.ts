@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import type { VisitorDetail } from '@/types/visitors';
 import type { HeatmapDay } from '@/components/analytics/visitors/ActivityHeatmap';
+import type { VisitorDetail } from '@/types/visitors';
 
 export const useVisitorDetail = (projectId: string, userId: string | null) => {
   const [detail, setDetail] = useState<VisitorDetail | null>(null);
@@ -13,7 +13,10 @@ export const useVisitorDetail = (projectId: string, userId: string | null) => {
     const controller = new AbortController();
     setLoading(true);
     setError(null);
-    fetch(`/api/projects/${projectId}/users/${encodeURIComponent(userId)}`, { cache: 'no-store', signal: controller.signal })
+    fetch(`/api/projects/${projectId}/users/${encodeURIComponent(userId)}`, {
+      cache: 'no-store',
+      signal: controller.signal,
+    })
       .then(async (res) => {
         const result = await res.json().catch(() => null);
         if (!res.ok) throw new Error(result?.error || 'Failed to load visitor');
@@ -25,7 +28,8 @@ export const useVisitorDetail = (projectId: string, userId: string | null) => {
         setDetail(result.data);
       })
       .catch((e) => {
-        if (!cancelled && !controller.signal.aborted) setError(e instanceof Error ? e.message : 'Failed to load visitor');
+        if (!cancelled && !controller.signal.aborted)
+          setError(e instanceof Error ? e.message : 'Failed to load visitor');
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -50,7 +54,10 @@ export const useVisitorHeatmap = (projectId: string, userId: string | null, year
     const controller = new AbortController();
     setError(null);
     setLoading(true);
-    fetch(`/api/projects/${projectId}/activity-heatmap?userId=${encodeURIComponent(userId)}&year=${year}`, { cache: 'no-store', signal: controller.signal })
+    fetch(`/api/projects/${projectId}/activity-heatmap?userId=${encodeURIComponent(userId)}&year=${year}`, {
+      cache: 'no-store',
+      signal: controller.signal,
+    })
       .then(async (res) => {
         const result = await res.json().catch(() => null);
         if (!res.ok) throw new Error(result?.error || 'Failed to load activity');
@@ -61,7 +68,8 @@ export const useVisitorHeatmap = (projectId: string, userId: string | null, year
         else if (!cancelled) throw new Error('Failed to load activity');
       })
       .catch((e) => {
-        if (!cancelled && !controller.signal.aborted) setError(e instanceof Error ? e.message : 'Failed to load activity');
+        if (!cancelled && !controller.signal.aborted)
+          setError(e instanceof Error ? e.message : 'Failed to load activity');
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

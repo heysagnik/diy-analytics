@@ -3,8 +3,8 @@ import mongoose, { Schema } from 'mongoose';
 // Shared schema and route-validation values.
 export const ALERT_METRICS = ['pageViews', 'uniqueUsers', 'sessions'] as const;
 export const ALERT_THRESHOLD_TYPES = ['drop_pct', 'value_below'] as const;
-export type AlertMetric = typeof ALERT_METRICS[number];
-export type AlertThresholdType = typeof ALERT_THRESHOLD_TYPES[number];
+export type AlertMetric = (typeof ALERT_METRICS)[number];
+export type AlertThresholdType = (typeof ALERT_THRESHOLD_TYPES)[number];
 
 const AlertSchema = new Schema({
   projectId: { type: Schema.Types.ObjectId, required: true, ref: 'Project', index: true },

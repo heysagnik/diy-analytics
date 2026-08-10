@@ -1,19 +1,15 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import { TagIcon } from '@phosphor-icons/react';
+import type React from 'react';
+import { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
-import { LightningIcon, TagIcon } from '@phosphor-icons/react';
-import type { EventData, EventPropertyKeyData, EventPropertyValueData, DateRange } from '@/types/analytics';
+import { type AnalyticsFilters, fetchEventPropertyKeys, fetchEventPropertyValues } from '@/lib/api/analytics';
+import type { DateRange, EventData, EventPropertyKeyData, EventPropertyValueData } from '@/types/analytics';
 import type { CustomDateRange } from './DateRangePicker';
-import { fetchEventPropertyKeys, fetchEventPropertyValues, type AnalyticsFilters } from '@/lib/api/analytics';
 
 interface EventPropertyDrilldownProps {
   events: EventData[];
@@ -24,7 +20,15 @@ interface EventPropertyDrilldownProps {
   rowsToShow?: number;
 }
 
-function ValueRow({ item, maxCount, totalCount }: { item: EventPropertyValueData; maxCount: number; totalCount: number }) {
+function ValueRow({
+  item,
+  maxCount,
+  totalCount,
+}: {
+  item: EventPropertyValueData;
+  maxCount: number;
+  totalCount: number;
+}) {
   const pct = Math.max((item.count / maxCount) * 100, 2);
   const share = ((item.count / totalCount) * 100).toFixed(1);
 
@@ -84,7 +88,9 @@ export const EventPropertyDrilldown: React.FC<EventPropertyDrilldownProps> = ({
         if (!cancelled) setLoadingKeys(false);
       });
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [selectedEvent, projectId, dateRange, customRange, filters]);
 
   useEffect(() => {
@@ -92,7 +98,14 @@ export const EventPropertyDrilldown: React.FC<EventPropertyDrilldownProps> = ({
     let cancelled = false;
     setLoadingValues(true);
 
-    fetchEventPropertyValues({ projectId, eventName: selectedEvent, propertyKey: selectedKey, dateRange, customRange, filters })
+    fetchEventPropertyValues({
+      projectId,
+      eventName: selectedEvent,
+      propertyKey: selectedKey,
+      dateRange,
+      customRange,
+      filters,
+    })
       .then((data) => {
         if (!cancelled) setValues(data);
       })
@@ -101,7 +114,9 @@ export const EventPropertyDrilldown: React.FC<EventPropertyDrilldownProps> = ({
         if (!cancelled) setLoadingValues(false);
       });
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [selectedEvent, selectedKey, projectId, dateRange, customRange, filters]);
 
   const sorted = [...events].sort((a, b) => b.count - a.count);
@@ -129,6 +144,7 @@ export const EventPropertyDrilldown: React.FC<EventPropertyDrilldownProps> = ({
             const share = ((event.count / total) * 100).toFixed(1);
             return (
               <button
+                type="button"
                 key={event.name}
                 onClick={() => setSelectedEvent(event.name)}
                 className="relative w-full min-h-10 text-left rounded-md hover:bg-muted/60 transition-colors duration-150 cursor-pointer active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -153,12 +169,15 @@ export const EventPropertyDrilldown: React.FC<EventPropertyDrilldownProps> = ({
         </div>
       )}
 
-      <Dialog open={selectedEvent !== null} onOpenChange={(open: boolean) => { if (!open) setSelectedEvent(null); }}>
+      <Dialog
+        open={selectedEvent !== null}
+        onOpenChange={(open: boolean) => {
+          if (!open) setSelectedEvent(null);
+        }}
+      >
         <DialogContent className="sm:max-w-lg h-[min(32rem,80vh)] grid-rows-[auto_1fr] p-0 gap-0 overflow-hidden">
           <DialogHeader className="p-4 pb-3 border-b border-border gap-3">
-            <DialogTitle className="flex items-center gap-2 font-display text-sm">
-              {selectedEvent}
-            </DialogTitle>
+            <DialogTitle className="flex items-center gap-2 font-display text-sm">{selectedEvent}</DialogTitle>
 
             {keys.length > 0 && (
               <Select value={selectedKey ?? undefined} onValueChange={(v: unknown) => setSelectedKey(v as string)}>
@@ -167,7 +186,9 @@ export const EventPropertyDrilldown: React.FC<EventPropertyDrilldownProps> = ({
                 </SelectTrigger>
                 <SelectContent>
                   {keys.map((k) => (
-                    <SelectItem key={k.key} value={k.key}>{k.key}</SelectItem>
+                    <SelectItem key={k.key} value={k.key}>
+                      {k.key}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>

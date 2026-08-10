@@ -1,18 +1,25 @@
-"use client";
+'use client';
 
-import React, { useEffect, useState, use, useCallback } from "react";
-import { FunnelChart, FunnelStepResult } from "@/components/analytics/FunnelChart";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from "@/components/ui/empty";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useToast } from "@/hooks/useToast";
-import { FunnelIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
-import ProjectPageShell from "@/components/project/ProjectPageShell";
+import { FunnelIcon, PlusIcon, TrashIcon } from '@phosphor-icons/react';
+import { use, useCallback, useEffect, useState } from 'react';
+import { FunnelChart, type FunnelStepResult } from '@/components/analytics/FunnelChart';
+import ProjectPageShell from '@/components/project/ProjectPageShell';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/hooks/useToast';
 
 interface FunnelStep {
   type: 'page' | 'event';
@@ -31,12 +38,12 @@ interface FunnelSummary {
 }
 
 const DATE_RANGE_OPTIONS = [
-  { value: "LAST_7_DAYS", label: "Last 7 days" },
-  { value: "LAST_30_DAYS", label: "Last 30 days" },
-  { value: "LAST_6_MONTHS", label: "Last 6 months" },
+  { value: 'LAST_7_DAYS', label: 'Last 7 days' },
+  { value: 'LAST_30_DAYS', label: 'Last 30 days' },
+  { value: 'LAST_6_MONTHS', label: 'Last 6 months' },
 ] as const;
 
-type FunnelDateRange = (typeof DATE_RANGE_OPTIONS)[number]["value"];
+type FunnelDateRange = (typeof DATE_RANGE_OPTIONS)[number]['value'];
 const FUNNEL_LOAD_ERROR = "We couldn't load the funnel analysis. Please try again.";
 
 const emptyStep = (clientId = crypto.randomUUID()): EditableFunnelStep => ({
@@ -50,15 +57,19 @@ function isFunnelDateRange(value: unknown): value is FunnelDateRange {
   return typeof value === 'string' && DATE_RANGE_OPTIONS.some((option) => option.value === value);
 }
 
-export default function FunnelsPage({ params: promiseParams }: { params: Promise<{ workspaceSlug: string; projectId: string }> }) {
+export default function FunnelsPage({
+  params: promiseParams,
+}: {
+  params: Promise<{ workspaceSlug: string; projectId: string }>;
+}) {
   const params = use(promiseParams);
   const { projectId } = params;
   const { showToast } = useToast();
 
   const [funnels, setFunnels] = useState<FunnelSummary[]>([]);
   const [loadingFunnels, setLoadingFunnels] = useState(true);
-  const [selectedFunnelId, setSelectedFunnelId] = useState<string>("");
-  const [dateRange, setDateRange] = useState<FunnelDateRange>("LAST_30_DAYS");
+  const [selectedFunnelId, setSelectedFunnelId] = useState<string>('');
+  const [dateRange, setDateRange] = useState<FunnelDateRange>('LAST_30_DAYS');
   const [analysis, setAnalysis] = useState<{ name: string; steps: FunnelStepResult[] } | null>(null);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -78,9 +89,9 @@ export default function FunnelsPage({ params: promiseParams }: { params: Promise
       .then((data) => {
         const list = Array.isArray(data) ? data : [];
         setFunnels(list);
-        setSelectedFunnelId((prev) => (list.some((f) => f._id === prev) ? prev : list[0]?._id || ""));
+        setSelectedFunnelId((prev) => (list.some((f) => f._id === prev) ? prev : list[0]?._id || ''));
       })
-      .catch(() => setError("Failed to load funnels."))
+      .catch(() => setError('Failed to load funnels.'))
       .finally(() => setLoadingFunnels(false));
   }, [projectId]);
 
@@ -98,7 +109,7 @@ export default function FunnelsPage({ params: promiseParams }: { params: Promise
     try {
       const res = await fetch(
         `/api/projects/${projectId}/funnels/${selectedFunnelId}/analysis?dateRange=${dateRange}`,
-        { cache: "no-store" }
+        { cache: 'no-store' },
       );
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
@@ -107,7 +118,7 @@ export default function FunnelsPage({ params: promiseParams }: { params: Promise
       const result = await res.json();
       setAnalysis(result.data);
     } catch (e) {
-      console.error("Failed to load funnel analysis:", e);
+      console.error('Failed to load funnel analysis:', e);
       setError(FUNNEL_LOAD_ERROR);
     } finally {
       setLoadingAnalysis(false);
@@ -144,10 +155,12 @@ export default function FunnelsPage({ params: promiseParams }: { params: Promise
       label: label.trim(),
       matchValue: matchValue.trim(),
     }));
-    const duplicateStep = normalizedSteps.some((step, index) =>
-      normalizedSteps.findIndex((candidate) =>
-        candidate.type === step.type && candidate.matchValue.toLowerCase() === step.matchValue.toLowerCase()
-      ) !== index
+    const duplicateStep = normalizedSteps.some(
+      (step, index) =>
+        normalizedSteps.findIndex(
+          (candidate) =>
+            candidate.type === step.type && candidate.matchValue.toLowerCase() === step.matchValue.toLowerCase(),
+        ) !== index,
     );
     if (duplicateStep) {
       showToast('error', 'Each funnel step must use a unique page or event match.');
@@ -173,7 +186,7 @@ export default function FunnelsPage({ params: promiseParams }: { params: Promise
       setFunnels((prev) => [funnel, ...prev]);
       setSelectedFunnelId(funnel._id);
       setName('');
-       setSteps([emptyStep('step-1'), emptyStep('step-2')]);
+      setSteps([emptyStep('step-1'), emptyStep('step-2')]);
       setShowBuilder(false);
       showToast('success', 'Funnel created.');
     } catch (error: unknown) {
@@ -192,7 +205,7 @@ export default function FunnelsPage({ params: promiseParams }: { params: Promise
       const response = await fetch(`/api/projects/${projectId}/funnels/${funnelId}`, { method: 'DELETE' });
       if (!response.ok) throw new Error('Failed to delete funnel.');
       showToast('success', 'Funnel deleted.');
-      if (selectedFunnelId === funnelId) setSelectedFunnelId(prev.find((f) => f._id !== funnelId)?._id || "");
+      if (selectedFunnelId === funnelId) setSelectedFunnelId(prev.find((f) => f._id !== funnelId)?._id || '');
     } catch {
       setFunnels(prev);
       showToast('error', 'Failed to delete funnel.');
@@ -215,190 +228,208 @@ export default function FunnelsPage({ params: promiseParams }: { params: Promise
       description="Step-by-step conversion and drop-off across a sequence of pages or events."
       actions={
         <div className="flex gap-2">
-            {funnels.length > 0 && (
-              <>
-                <Select value={selectedFunnelId} onValueChange={(v: unknown) => {
-                  if (typeof v === "string" && funnels.some((funnel) => funnel._id === v)) setSelectedFunnelId(v);
-                }}>
-                  <SelectTrigger aria-label="Select funnel">
-                    <SelectValue>{(v: string) => funnels.find((f) => f._id === v)?.name || v}</SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {funnels.map((f) => (
-                      <SelectItem key={f._id} value={f._id}>{f.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={dateRange} onValueChange={(v: unknown) => {
+          {funnels.length > 0 && (
+            <>
+              <Select
+                value={selectedFunnelId}
+                onValueChange={(v: unknown) => {
+                  if (typeof v === 'string' && funnels.some((funnel) => funnel._id === v)) setSelectedFunnelId(v);
+                }}
+              >
+                <SelectTrigger aria-label="Select funnel">
+                  <SelectValue>{(v: string) => funnels.find((f) => f._id === v)?.name || v}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {funnels.map((f) => (
+                    <SelectItem key={f._id} value={f._id}>
+                      {f.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select
+                value={dateRange}
+                onValueChange={(v: unknown) => {
                   if (isFunnelDateRange(v)) setDateRange(v);
-                }}>
-                  <SelectTrigger aria-label="Date range">
-                    <SelectValue>
-                      {(v: string) => DATE_RANGE_OPTIONS.find((o) => o.value === v)?.label || v}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {DATE_RANGE_OPTIONS.map((o) => (
-                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </>
-            )}
-            <Button size="sm" onClick={() => setShowBuilder((v) => !v)}>
-              <PlusIcon size={14} />
-              <span>{showBuilder ? 'Close' : 'New Funnel'}</span>
-            </Button>
+                }}
+              >
+                <SelectTrigger aria-label="Date range">
+                  <SelectValue>{(v: string) => DATE_RANGE_OPTIONS.find((o) => o.value === v)?.label || v}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {DATE_RANGE_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </>
+          )}
+          <Button size="sm" onClick={() => setShowBuilder((v) => !v)}>
+            <PlusIcon size={14} />
+            <span>{showBuilder ? 'Close' : 'New Funnel'}</span>
+          </Button>
         </div>
       }
     >
-        {showBuilder && (
-              <Card className="p-4 flex flex-col gap-4">
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Funnel name (e.g. Checkout)"
-              disabled={isCreating}
-              aria-label="Funnel name"
-            />
+      {showBuilder && (
+        <Card className="p-4 flex flex-col gap-4">
+          <Input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Funnel name (e.g. Checkout)"
+            disabled={isCreating}
+            aria-label="Funnel name"
+          />
 
-            <div className="flex flex-col gap-2">
-              {steps.map((step, idx) => (
-                <div key={step.clientId} className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
-                  <span className="text-xs text-muted-foreground w-14 shrink-0">Step {idx + 1}</span>
-                  <Select
-                    value={step.type}
-                    onValueChange={(v: unknown) => {
-                      if (v === 'page' || v === 'event') updateStep(idx, { type: v });
-                    }}
-                    disabled={isCreating}
-                  >
-                    <SelectTrigger aria-label={`Step ${idx + 1} type`}>
-                      <SelectValue>{(v: 'page' | 'event') => (v === 'page' ? 'Page visit' : 'Custom event')}</SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="page">Page visit</SelectItem>
-                      <SelectItem value="event">Custom event</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Input
-                    value={step.label}
-                    onChange={(e) => updateStep(idx, { label: e.target.value })}
-                    placeholder="Step label"
-                    disabled={isCreating}
-                    aria-label={`Step ${idx + 1} label`}
-                    className="sm:flex-1"
-                  />
-                  <Input
-                    value={step.matchValue}
-                    onChange={(e) => updateStep(idx, { matchValue: e.target.value })}
-                    placeholder={step.type === 'page' ? '/checkout' : 'checkout_started'}
-                    disabled={isCreating}
-                    aria-label={`Step ${idx + 1} match value`}
-                    className="sm:flex-1"
-                  />
-                  {steps.length > 2 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeStep(idx)}
-                      disabled={isCreating}
-                      aria-label={`Remove step ${idx + 1}`}
-                    >
-                      <TrashIcon size={14} className="text-danger" />
-                    </Button>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            <div className="flex items-center justify-between">
-              <Button variant="outline" size="sm" onClick={addStep} disabled={isCreating || steps.length >= 10}>
-                <PlusIcon size={14} />
-                <span>Add step</span>
-              </Button>
-              <Button size="sm" onClick={handleCreate} disabled={isCreating}>
-                <PlusIcon size={14} />
-                <span>Create funnel</span>
-              </Button>
-            </div>
-          </Card>
-        )}
-
-        {funnels.length === 0 ? (
-          <Empty className="rounded-xl border border-border bg-card py-16">
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <FunnelIcon size={32} className="text-muted-foreground" />
-              </EmptyMedia>
-              <EmptyTitle className="text-sm font-medium text-foreground">No funnels yet</EmptyTitle>
-              <EmptyDescription className="text-xs max-w-sm">
-                Create a funnel to see step-by-step conversion and drop-off.
-              </EmptyDescription>
-            </EmptyHeader>
-          </Empty>
-        ) : (
-          <div className="flex flex-col gap-4">
-            {loadingAnalysis ? (
-              <Skeleton className="h-64 w-full rounded-xl" />
-            ) : error ? (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            ) : analysis ? (
-              <Card className="p-5">
-                <FunnelChart steps={analysis.steps} />
-              </Card>
-            ) : null}
-
-            <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
-              {funnels.map((funnel) => (
-                <li key={funnel._id} className="flex items-center justify-between gap-3 px-3 py-2.5">
-                  <button
-                    onClick={() => setSelectedFunnelId(funnel._id)}
-                    className={`min-w-0 text-left flex-1 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${funnel._id === selectedFunnelId ? '' : 'opacity-70'}`}
-                  >
-                    <p className="text-sm font-medium text-foreground truncate">{funnel.name}</p>
-                    <p className="text-xs text-muted-foreground truncate">
-                      {funnel.steps.map((s) => s.label).join(' → ')}
-                    </p>
-                  </button>
+          <div className="flex flex-col gap-2">
+            {steps.map((step, idx) => (
+              <div key={step.clientId} className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+                <span className="text-xs text-muted-foreground w-14 shrink-0">Step {idx + 1}</span>
+                <Select
+                  value={step.type}
+                  onValueChange={(v: unknown) => {
+                    if (v === 'page' || v === 'event') updateStep(idx, { type: v });
+                  }}
+                  disabled={isCreating}
+                >
+                  <SelectTrigger aria-label={`Step ${idx + 1} type`}>
+                    <SelectValue>{(v: 'page' | 'event') => (v === 'page' ? 'Page visit' : 'Custom event')}</SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="page">Page visit</SelectItem>
+                    <SelectItem value="event">Custom event</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Input
+                  value={step.label}
+                  onChange={(e) => updateStep(idx, { label: e.target.value })}
+                  placeholder="Step label"
+                  disabled={isCreating}
+                  aria-label={`Step ${idx + 1} label`}
+                  className="sm:flex-1"
+                />
+                <Input
+                  value={step.matchValue}
+                  onChange={(e) => updateStep(idx, { matchValue: e.target.value })}
+                  placeholder={step.type === 'page' ? '/checkout' : 'checkout_started'}
+                  disabled={isCreating}
+                  aria-label={`Step ${idx + 1} match value`}
+                  className="sm:flex-1"
+                />
+                {steps.length > 2 && (
                   <Button
                     variant="ghost"
                     size="sm"
-                     onClick={() => setFunnelToDelete(funnel)}
-                    aria-label={`Delete funnel ${funnel.name}`}
+                    onClick={() => removeStep(idx)}
+                    disabled={isCreating}
+                    aria-label={`Remove step ${idx + 1}`}
                   >
                     <TrashIcon size={14} className="text-danger" />
                   </Button>
-                </li>
-              ))}
-            </ul>
+                )}
+              </div>
+            ))}
           </div>
-         )}
-        <Dialog open={funnelToDelete !== null} onOpenChange={(open) => { if (!open) setFunnelToDelete(null); }}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Delete funnel?</DialogTitle>
-              <DialogDescription>
-                {funnelToDelete ? `“${funnelToDelete.name}” will be permanently deleted. This action cannot be undone.` : ''}
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setFunnelToDelete(null)}>Cancel</Button>
-              <Button
-                variant="destructive"
-                onClick={() => {
-                  if (!funnelToDelete) return;
-                  void handleDelete(funnelToDelete._id);
-                  setFunnelToDelete(null);
-                }}
-              >
-                Delete funnel
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+
+          <div className="flex items-center justify-between">
+            <Button variant="outline" size="sm" onClick={addStep} disabled={isCreating || steps.length >= 10}>
+              <PlusIcon size={14} />
+              <span>Add step</span>
+            </Button>
+            <Button size="sm" onClick={handleCreate} disabled={isCreating}>
+              <PlusIcon size={14} />
+              <span>Create funnel</span>
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {funnels.length === 0 ? (
+        <Empty className="rounded-xl border border-border bg-card py-16">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <FunnelIcon size={32} className="text-muted-foreground" />
+            </EmptyMedia>
+            <EmptyTitle className="text-sm font-medium text-foreground">No funnels yet</EmptyTitle>
+            <EmptyDescription className="text-xs max-w-sm">
+              Create a funnel to see step-by-step conversion and drop-off.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      ) : (
+        <div className="flex flex-col gap-4">
+          {loadingAnalysis ? (
+            <Skeleton className="h-64 w-full rounded-xl" />
+          ) : error ? (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          ) : analysis ? (
+            <Card className="p-5">
+              <FunnelChart steps={analysis.steps} />
+            </Card>
+          ) : null}
+
+          <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
+            {funnels.map((funnel) => (
+              <li key={funnel._id} className="flex items-center justify-between gap-3 px-3 py-2.5">
+                <button
+                  type="button"
+                  onClick={() => setSelectedFunnelId(funnel._id)}
+                  className={`min-w-0 text-left flex-1 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${funnel._id === selectedFunnelId ? '' : 'opacity-70'}`}
+                >
+                  <p className="text-sm font-medium text-foreground truncate">{funnel.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {funnel.steps.map((s) => s.label).join(' → ')}
+                  </p>
+                </button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setFunnelToDelete(funnel)}
+                  aria-label={`Delete funnel ${funnel.name}`}
+                >
+                  <TrashIcon size={14} className="text-danger" />
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <Dialog
+        open={funnelToDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setFunnelToDelete(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete funnel?</DialogTitle>
+            <DialogDescription>
+              {funnelToDelete
+                ? `“${funnelToDelete.name}” will be permanently deleted. This action cannot be undone.`
+                : ''}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setFunnelToDelete(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (!funnelToDelete) return;
+                void handleDelete(funnelToDelete._id);
+                setFunnelToDelete(null);
+              }}
+            >
+              Delete funnel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </ProjectPageShell>
   );
 }

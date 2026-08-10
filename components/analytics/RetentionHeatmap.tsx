@@ -1,5 +1,5 @@
-import React from 'react';
-import { Empty, EmptyHeader, EmptyTitle, EmptyDescription } from '@/components/ui/empty';
+import type React from 'react';
+import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
 
 export interface RetentionCohort {
   cohortWeek: string;
@@ -43,6 +43,7 @@ export const RetentionHeatmap: React.FC<RetentionHeatmapProps> = ({ cohorts, wee
             <th className="text-left font-medium text-muted-foreground px-3 py-2 sticky left-0 bg-surface">Cohort</th>
             <th className="text-right font-medium text-muted-foreground px-3 py-2">Size</th>
             {Array.from({ length: weeks }, (_, i) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: fixed week-offset header, position is the identity
               <th key={`week-${i}`} className="text-center font-medium text-muted-foreground px-2 py-2 min-w-[52px]">
                 W{i}
               </th>

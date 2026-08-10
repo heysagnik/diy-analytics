@@ -1,6 +1,6 @@
-import React from "react";
-import Link from "next/link";
-import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "@/components/ui/sidebar";
+import Link from 'next/link';
+import type React from 'react';
+import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 
 export interface FooterLink {
   icon: React.ReactNode;
@@ -21,24 +21,13 @@ export default function Footer({ footerLinks, onLinkClick }: FooterProps) {
           <SidebarMenuButton
             tooltip={link.label}
             className="flex items-center gap-3 px-3 py-2.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-surface-tertiary rounded-md transition-colors duration-150"
-            render={
-              <Link
-                href={link.href}
-                onClick={onLinkClick}
-                aria-label={link.label}
-              />
-            }
+            render={<Link href={link.href} onClick={onLinkClick} aria-label={link.label} />}
           >
             <span className="flex-shrink-0 text-muted-foreground">{link.icon}</span>
             <span>{link.label}</span>
           </SidebarMenuButton>
         </SidebarMenuItem>
       ))}
-      <SidebarMenuItem>
-        <span className="block px-3 py-1.5 text-[11px] text-muted-foreground/70">
-          v{process.env.NEXT_PUBLIC_APP_VERSION}
-        </span>
-      </SidebarMenuItem>
     </SidebarMenu>
   );
 }

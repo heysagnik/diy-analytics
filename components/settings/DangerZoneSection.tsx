@@ -1,28 +1,20 @@
-import React, { useState, useEffect } from 'react';
-import { Project } from '../../types/settings';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 import { TrashIcon, WarningCircleIcon } from '@phosphor-icons/react';
+import type React from 'react';
+import { useEffect, useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { deleteProject } from '@/lib/api/projects';
+import type { Project } from '../../types/settings';
 import { SettingsGroup } from './SettingsGroup';
 import { SettingsRow } from './SettingsRow';
-import { deleteProject } from '@/lib/api/projects';
 
 interface DangerZoneSectionProps {
   project: Project;
   showToast: (type: 'success' | 'error' | 'info', message: string) => void;
 }
 
-export const DangerZoneSection: React.FC<DangerZoneSectionProps> = ({
-  project,
-  showToast
-}) => {
+export const DangerZoneSection: React.FC<DangerZoneSectionProps> = ({ project, showToast }) => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [confirmText, setConfirmText] = useState('');
@@ -125,12 +117,7 @@ export const DangerZoneSection: React.FC<DangerZoneSectionProps> = ({
           </div>
 
           <DialogFooter className="flex flex-col sm:flex-row gap-3">
-            <Button
-              variant="outline"
-              onClick={closeModal}
-              disabled={isDeleting}
-              className="flex-1"
-            >
+            <Button variant="outline" onClick={closeModal} disabled={isDeleting} className="flex-1">
               Cancel
             </Button>
 
@@ -141,7 +128,9 @@ export const DangerZoneSection: React.FC<DangerZoneSectionProps> = ({
               className="flex-1"
             >
               <TrashIcon size={16} weight="bold" />
-              <span className="tabular-nums">{timerActive && countdown > 0 ? `Delete (${countdown})` : "Delete Project"}</span>
+              <span className="tabular-nums">
+                {timerActive && countdown > 0 ? `Delete (${countdown})` : 'Delete Project'}
+              </span>
             </Button>
           </DialogFooter>
         </DialogContent>

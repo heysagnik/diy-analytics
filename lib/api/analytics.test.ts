@@ -1,3 +1,5 @@
+import type { AnalyticsResponse } from '@/types/analytics';
+import type { AnalyticsQueryOptions } from './analytics';
 import {
   AnalyticsRequestError,
   DATE_RANGE_OPTIONS,
@@ -7,8 +9,6 @@ import {
   normalizeAnalyticsError,
   serializeAnalyticsQuery,
 } from './analytics';
-import type { AnalyticsResponse } from '@/types/analytics';
-import type { AnalyticsQueryOptions } from './analytics';
 
 const options: AnalyticsQueryOptions = {
   projectId: 'project 1',
@@ -26,8 +26,21 @@ const analyticsResponse: AnalyticsResponse = {
   sessions: metric,
   bounceRate: metric,
   avgSessionDuration: metric,
-  pages: [], sources: [], countries: [], browsers: [], devices: [], os: [], cities: [], campaigns: [], utmBreakdown: [],
-  entryPages: [], exitPages: [], goals: [], webVitals: [], topEvents: [], recentEvents: [],
+  pages: [],
+  sources: [],
+  countries: [],
+  browsers: [],
+  devices: [],
+  os: [],
+  cities: [],
+  campaigns: [],
+  utmBreakdown: [],
+  entryPages: [],
+  exitPages: [],
+  goals: [],
+  webVitals: [],
+  topEvents: [],
+  recentEvents: [],
 };
 
 const response = (body: unknown, init: { status?: number; statusText?: string } = {}) => ({
@@ -53,8 +66,12 @@ describe('analytics API utilities', () => {
     expect(serializeAnalyticsQuery(options).toString()).toBe(
       'projectId=project+1&dateRange=LAST_7_DAYS&timezone=America%2FNew_York&country=US%2CCA&page=%2Fhome',
     );
-    expect(serializeAnalyticsQuery({ ...options, customRange: { startDate: '2026-01-01', endDate: '2026-01-15' } }).toString())
-      .toContain('dateRange=CUSTOM');
+    expect(
+      serializeAnalyticsQuery({
+        ...options,
+        customRange: { startDate: '2026-01-01', endDate: '2026-01-15' },
+      }).toString(),
+    ).toContain('dateRange=CUSTOM');
   });
 
   it('accepts a structurally valid analytics response', () => {

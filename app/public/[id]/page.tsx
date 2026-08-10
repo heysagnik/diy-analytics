@@ -1,14 +1,15 @@
-import { notFound } from "next/navigation";
-import connectToDatabase from "@/lib/mongodb";
-import Project from "@/models/Project";
-import { AnalyticsService } from "@/app/api/analytics/services/analyticsService";
-import { createEmptyAnalyticsData } from "@/utils/analytics";
-import type { AnalyticsData, DateRange } from "@/types/analytics";
-import { Card } from "@/components/ui/card";
-import { LockSimpleIcon } from "@phosphor-icons/react/dist/ssr";
-import PublicDashboardClient from "./PublicDashboardClient";
+import { LockSimpleIcon } from '@phosphor-icons/react/dist/ssr';
+import { eq } from 'drizzle-orm';
+import { notFound } from 'next/navigation';
+import { AnalyticsService } from '@/app/api/analytics/services/analyticsService';
+import { Card } from '@/components/ui/card';
+import { projects } from '@/db/schema';
+import { db } from '@/lib/db';
+import type { AnalyticsData, DateRange } from '@/types/analytics';
+import { createEmptyAnalyticsData } from '@/utils/analytics';
+import PublicDashboardClient from './PublicDashboardClient';
 
-export const dynamic = "force-dynamic";
+export const dynamic = 'force-dynamic';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -17,15 +18,17 @@ interface PageProps {
 export default async function PublicDashboardPage({ params }: PageProps) {
   const { id } = await params;
 
-  await connectToDatabase();
-  const project = (await Project.findById(id).lean<{
-    _id: { toString(): string };
-    name: string;
-    url: string;
-    domain?: string;
-    trackingCode: string;
-    publicMode?: boolean;
-  }>());
+  const [project] = await db
+    .select({
+      name: projects.name,
+      url: projects.url,
+      domain: projects.domain,
+      trackingCode: projects.trackingCode,
+      publicMode: projects.publicMode,
+    })
+    .from(projects)
+    .where(eq(projects.id, id))
+    .limit(1);
 
   if (!project) {
     notFound();
@@ -42,22 +45,22 @@ export default async function PublicDashboardPage({ params }: PageProps) {
             Public dashboard is disabled
           </h1>
           <p className="text-sm text-muted-foreground text-pretty">
-            The owner of <strong className="text-foreground font-medium">{project.name}</strong> hasn&apos;t turned
-            on public access. Ask them to enable it in their dashboard settings.
+            The owner of <strong className="text-foreground font-medium">{project.name}</strong> hasn&apos;t turned on
+            public access. Ask them to enable it in their dashboard settings.
           </p>
         </Card>
       </div>
     );
   }
 
-  const DEFAULT_RANGE: DateRange = "Last 30 days";
+  const DEFAULT_RANGE: DateRange = 'Last 30 days';
   let initialData: AnalyticsData;
   try {
     const service = new AnalyticsService();
-    const data = await service.getAnalytics({ projectId: id, dateRange: "LAST_30_DAYS" });
+    const data = await service.getAnalytics({ projectId: id, dateRange: 'LAST_30_DAYS' });
     initialData = data;
   } catch (err) {
-    console.error("Public dashboard initial load failed:", err);
+    console.error('Public dashboard initial load failed:', err);
     initialData = createEmptyAnalyticsData(DEFAULT_RANGE);
   }
 
@@ -67,7 +70,7 @@ export default async function PublicDashboardPage({ params }: PageProps) {
       project={{
         name: project.name,
         url: project.url,
-        domain: project.domain,
+        domain: project.domain ?? undefined,
       }}
       initialData={initialData}
       initialRange={DEFAULT_RANGE}

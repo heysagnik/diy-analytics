@@ -1,4 +1,3 @@
-import React from 'react';
 import {
   ArrowClockwiseIcon,
   CaretLeftIcon,
@@ -8,12 +7,12 @@ import {
   WarningCircleIcon,
   XIcon,
 } from '@phosphor-icons/react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
-import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from '@/components/ui/empty';
 import type { Visitor, VisitorFiltersState, VisitorListViewState, VisitorPagination } from '@/types/visitors';
 import { getCountryName } from '@/utils/country';
 import { VisitorAvatar } from './VisitorAvatar';
@@ -38,12 +37,24 @@ interface VisitorFiltersProps {
   onRefresh: () => void;
 }
 
-export function VisitorFilters({ filters, countries, loading, hasActiveFilters, onFilterChange, onClearFilters, onRefresh }: VisitorFiltersProps) {
+export function VisitorFilters({
+  filters,
+  countries,
+  loading,
+  hasActiveFilters,
+  onFilterChange,
+  onClearFilters,
+  onRefresh,
+}: VisitorFiltersProps) {
   return (
     <div className="flex flex-col gap-3 py-1">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="relative w-full sm:max-w-sm">
-          <MagnifyingGlassIcon aria-hidden="true" size={16} className="pointer-events-none absolute top-1/2 left-3.5 z-10 -translate-y-1/2 text-muted-foreground" />
+          <MagnifyingGlassIcon
+            aria-hidden="true"
+            size={16}
+            className="pointer-events-none absolute top-1/2 left-3.5 z-10 -translate-y-1/2 text-muted-foreground"
+          />
           <Input
             aria-label="Search visitors"
             placeholder="Search visitor ID, country, browser, OS..."
@@ -52,15 +63,15 @@ export function VisitorFilters({ filters, countries, loading, hasActiveFilters, 
             className="w-full bg-background pr-9 pl-10"
           />
           {filters.search && (
-             <Button
-               variant="ghost"
-               size="icon-xs"
+            <Button
+              variant="ghost"
+              size="icon-xs"
               onClick={() => onFilterChange('search', '')}
-               className="absolute top-1/2 right-2 z-10 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              className="absolute top-1/2 right-2 z-10 -translate-y-1/2 text-muted-foreground hover:text-foreground"
               aria-label="Clear search"
             >
               <XIcon size={14} />
-             </Button>
+            </Button>
           )}
         </div>
 
@@ -92,7 +103,12 @@ export function VisitorFilters({ filters, countries, loading, hasActiveFilters, 
             </SelectContent>
           </Select>
 
-          <Button variant="outline" onClick={onRefresh} disabled={loading} className="col-span-2 sm:col-span-1 justify-center">
+          <Button
+            variant="outline"
+            onClick={onRefresh}
+            disabled={loading}
+            className="col-span-2 sm:col-span-1 justify-center"
+          >
             <ArrowClockwiseIcon size={14} className={loading ? 'animate-spin' : ''} />
             <span>Refresh</span>
           </Button>
@@ -106,42 +122,69 @@ export function VisitorFilters({ filters, countries, loading, hasActiveFilters, 
           {filters.country && (
             <Badge variant="secondary" className="gap-1.5">
               Country: {getCountryName(filters.country)}
-               <Button variant="ghost" size="icon-xs" onClick={() => onFilterChange('country', '')} className="hover:text-danger" aria-label="Remove country filter">
-                 <XIcon size={12} />
-               </Button>
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                onClick={() => onFilterChange('country', '')}
+                className="hover:text-danger"
+                aria-label="Remove country filter"
+              >
+                <XIcon size={12} />
+              </Button>
             </Badge>
           )}
 
           {filters.lastSeen && (
             <Badge variant="secondary" className="gap-1.5">
               Time: {LAST_SEEN_LABELS[filters.lastSeen] ?? filters.lastSeen}
-               <Button variant="ghost" size="icon-xs" onClick={() => onFilterChange('lastSeen', '')} className="hover:text-danger" aria-label="Remove time filter">
-                 <XIcon size={12} />
-               </Button>
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                onClick={() => onFilterChange('lastSeen', '')}
+                className="hover:text-danger"
+                aria-label="Remove time filter"
+              >
+                <XIcon size={12} />
+              </Button>
             </Badge>
           )}
 
           {filters.search && (
             <Badge variant="secondary" className="gap-1.5">
               Search: {filters.search}
-               <Button variant="ghost" size="icon-xs" onClick={() => onFilterChange('search', '')} className="hover:text-danger" aria-label="Remove search filter">
-                 <XIcon size={12} />
-               </Button>
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                onClick={() => onFilterChange('search', '')}
+                className="hover:text-danger"
+                aria-label="Remove search filter"
+              >
+                <XIcon size={12} />
+              </Button>
             </Badge>
           )}
 
-           <Button variant="link" size="xs" onClick={onClearFilters} className="ml-2 text-xs text-muted-foreground">
-             Clear all
-           </Button>
+          <Button variant="link" size="xs" onClick={onClearFilters} className="ml-2 text-xs text-muted-foreground">
+            Clear all
+          </Button>
         </div>
       )}
     </div>
   );
 }
 
-function VisitorRow({ user, isSelected, onSelect }: { user: Visitor; isSelected: boolean; onSelect: (userId: string) => void }) {
+function VisitorRow({
+  user,
+  isSelected,
+  onSelect,
+}: {
+  user: Visitor;
+  isSelected: boolean;
+  onSelect: (userId: string) => void;
+}) {
   return (
     <button
+      type="button"
       onClick={() => onSelect(user.userId)}
       className={`group/row relative w-full flex items-center gap-3 py-3.5 pr-9 pl-5 text-left transition-colors focus-visible:z-10 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring ${
         isSelected ? 'bg-accent/[0.07]' : 'hover:bg-surface-secondary/50'
@@ -209,7 +252,11 @@ export function VisitorList({
         {viewState === 'loading' && (
           <div className="flex flex-col gap-3 p-5">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="flex items-center justify-between gap-4 border-b border-border py-4 last:border-0">
+              <div
+                // biome-ignore lint/suspicious/noArrayIndexKey: fixed-count placeholder list, never reorders
+                key={i}
+                className="flex items-center justify-between gap-4 border-b border-border py-4 last:border-0"
+              >
                 <Skeleton className="h-6 w-32 rounded-lg" />
                 <Skeleton className="h-5 w-24 rounded-full" />
                 <Skeleton className="h-5 w-40 rounded-full" />
@@ -222,7 +269,10 @@ export function VisitorList({
         {viewState === 'error' && (
           <Empty className="py-16 px-5 border-none">
             <EmptyHeader>
-              <EmptyMedia variant="icon" className="mb-0 flex items-center justify-center text-danger bg-danger/10 size-10 rounded-lg">
+              <EmptyMedia
+                variant="icon"
+                className="mb-0 flex items-center justify-center text-danger bg-danger/10 size-10 rounded-lg"
+              >
                 <WarningCircleIcon size={24} weight="duotone" />
               </EmptyMedia>
               <EmptyTitle className="text-sm font-medium text-danger">Error Loading Visitors</EmptyTitle>
@@ -241,7 +291,9 @@ export function VisitorList({
                 <GlobeIcon size={24} weight="duotone" />
               </EmptyMedia>
               <EmptyTitle className="text-sm font-medium text-foreground">No visitors found</EmptyTitle>
-              <EmptyDescription className="text-sm text-muted-foreground">No visitor telemetry matches your selected criteria.</EmptyDescription>
+              <EmptyDescription className="text-sm text-muted-foreground">
+                No visitor telemetry matches your selected criteria.
+              </EmptyDescription>
             </EmptyHeader>
             {hasActiveFilters && (
               <EmptyContent>
@@ -256,7 +308,12 @@ export function VisitorList({
         {viewState === 'ready' && (
           <div className="divide-y divide-border">
             {users.map((user) => (
-              <VisitorRow key={user.userId} user={user} isSelected={selectedUserId === user.userId} onSelect={onSelect} />
+              <VisitorRow
+                key={user.userId}
+                user={user}
+                isSelected={selectedUserId === user.userId}
+                onSelect={onSelect}
+              />
             ))}
           </div>
         )}
@@ -264,8 +321,9 @@ export function VisitorList({
 
       {viewState === 'ready' && pagination.totalPages > 1 && (
         <div className="flex items-center justify-between gap-1 border-t border-border bg-surface-secondary/40 px-3 py-2.5 shrink-0 overflow-hidden text-xs">
-           <p className="text-xs text-muted-foreground truncate shrink-0">
-            <span className="tabular-nums">{users.length}</span>/<span className="tabular-nums">{pagination.total}</span>
+          <p className="text-xs text-muted-foreground truncate shrink-0">
+            <span className="tabular-nums">{users.length}</span>/
+            <span className="tabular-nums">{pagination.total}</span>
           </p>
 
           <div className="flex items-center gap-1 shrink-0">
@@ -274,13 +332,13 @@ export function VisitorList({
               size="sm"
               disabled={pagination.page === 1}
               onClick={() => onPageChange(pagination.page - 1)}
-               className="h-7 px-1.5 text-xs gap-1"
+              className="h-7 px-1.5 text-xs gap-1"
             >
               <CaretLeftIcon size={12} />
               <span className="hidden sm:inline">Prev</span>
             </Button>
 
-             <span className="px-1 font-mono text-xs tabular-nums text-foreground whitespace-nowrap">
+            <span className="px-1 font-mono text-xs tabular-nums text-foreground whitespace-nowrap">
               {pagination.page}/{pagination.totalPages}
             </span>
 
@@ -289,7 +347,7 @@ export function VisitorList({
               size="sm"
               disabled={pagination.page === pagination.totalPages}
               onClick={() => onPageChange(pagination.page + 1)}
-               className="h-7 px-1.5 text-xs gap-1"
+              className="h-7 px-1.5 text-xs gap-1"
             >
               <span className="hidden sm:inline">Next</span>
               <CaretRightIcon size={12} />

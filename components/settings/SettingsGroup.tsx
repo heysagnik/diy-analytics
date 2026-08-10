@@ -1,4 +1,4 @@
-import React from 'react';
+import type React from 'react';
 
 interface SettingsGroupProps {
   title: string;
@@ -15,11 +15,7 @@ export function SettingsGroup({ title, headerAction, tone = 'default', children 
       }`}
     >
       <div className="flex items-center justify-between gap-3 px-4 py-3 sm:px-5">
-        <h2
-          className={`text-xs font-medium tracking-kicker ${
-            tone === 'danger' ? 'text-danger' : 'text-accent'
-          }`}
-        >
+        <h2 className={`text-xs font-medium tracking-kicker ${tone === 'danger' ? 'text-danger' : 'text-accent'}`}>
           {title}
         </h2>
         {headerAction}

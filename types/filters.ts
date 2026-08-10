@@ -1,4 +1,14 @@
-export type FilterDimension = 'country' | 'browser' | 'device' | 'source' | 'page' | 'utmSource' | 'utmMedium' | 'utmCampaign' | 'os' | 'city';
+export type FilterDimension =
+  | 'country'
+  | 'browser'
+  | 'device'
+  | 'source'
+  | 'page'
+  | 'utmSource'
+  | 'utmMedium'
+  | 'utmCampaign'
+  | 'os'
+  | 'city';
 
 export interface ActiveFilter {
   dimension: FilterDimension;
@@ -29,7 +39,10 @@ export function filterLabel(dimension: FilterDimension): string {
 export function filtersToQuery(filters: ActiveFilter[]): Partial<Record<FilterDimension, string[]>> {
   const query: Partial<Record<FilterDimension, string[]>> = {};
   for (const f of filters) {
-    (query[f.dimension] ??= []).push(f.value);
+    if (!query[f.dimension]) {
+      query[f.dimension] = [];
+    }
+    query[f.dimension]?.push(f.value);
   }
   return query;
 }

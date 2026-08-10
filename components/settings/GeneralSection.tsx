@@ -1,23 +1,35 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Project } from '../../types/settings';
-import { Input } from '@/components/ui/input';
-import { Switch } from '@/components/ui/switch';
-import { Button } from '@/components/ui/button';
+import { CheckIcon, CopyIcon, FloppyDiskIcon, LinkIcon } from '@phosphor-icons/react';
+import type React from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
-import { LinkIcon, FloppyDiskIcon, CopyIcon, CheckIcon } from '@phosphor-icons/react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { updateProject } from '@/lib/api/projects';
+import type { Project } from '../../types/settings';
 import { SettingsGroup } from './SettingsGroup';
 import { SettingsRow } from './SettingsRow';
-import { updateProject } from '@/lib/api/projects';
 
 // Sentinel value for "no project timezone saved" — falls back to each
 // viewer's own browser timezone (see AnalyticsService.getAnalytics).
 const AUTO_TIMEZONE = 'auto';
 
 const FALLBACK_TIMEZONES = [
-  'UTC', 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
-  'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'Asia/Kolkata', 'Asia/Dubai',
-  'Asia/Shanghai', 'Asia/Singapore', 'Asia/Tokyo', 'Australia/Sydney',
+  'UTC',
+  'America/New_York',
+  'America/Chicago',
+  'America/Denver',
+  'America/Los_Angeles',
+  'Europe/London',
+  'Europe/Paris',
+  'Europe/Berlin',
+  'Asia/Kolkata',
+  'Asia/Dubai',
+  'Asia/Shanghai',
+  'Asia/Singapore',
+  'Asia/Tokyo',
+  'Australia/Sydney',
 ];
 
 function listTimezones(): string[] {
@@ -37,11 +49,7 @@ interface GeneralSectionProps {
   showToast: (type: 'success' | 'error' | 'info', message: string) => void;
 }
 
-export const GeneralSection: React.FC<GeneralSectionProps> = ({
-  project,
-  onProjectUpdate,
-  showToast,
-}) => {
+export const GeneralSection: React.FC<GeneralSectionProps> = ({ project, onProjectUpdate, showToast }) => {
   const [projectName, setProjectName] = useState(project?.name || '');
   const [isUpdating, setIsUpdating] = useState(false);
   const [publicMode, setPublicMode] = useState(project?.publicMode || false);
@@ -67,9 +75,7 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({
 
       showToast('success', 'Project details updated successfully!');
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error
-        ? error.message
-        : 'An error occurred while updating project details.';
+      const errorMessage = error instanceof Error ? error.message : 'An error occurred while updating project details.';
       showToast('error', errorMessage);
     } finally {
       setIsUpdating(false);
@@ -85,9 +91,7 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({
       onProjectUpdate({ publicMode: updatedProject.publicMode });
       showToast('success', `Public dashboard is now ${enabled ? 'enabled' : 'disabled'}`);
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error
-        ? error.message
-        : 'Failed to update public mode.';
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update public mode.';
       showToast('error', errorMessage);
       setPublicMode(!enabled);
     }
@@ -113,7 +117,7 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({
       const updatedProject = await updateProject(
         project._id,
         { timezone: timezone === AUTO_TIMEZONE ? null : timezone },
-        'Failed to update timezone.'
+        'Failed to update timezone.',
       );
       onProjectUpdate({ timezone: updatedProject.timezone });
       showToast('success', 'Timezone updated — this applies to everyone viewing this project.');
@@ -150,11 +154,7 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({
             placeholder="My Website Analytics"
             aria-label="Project name"
           />
-          <Button
-            size="sm"
-            onClick={handleUpdateProject}
-            disabled={isUpdating || projectName === project?.name}
-          >
+          <Button onClick={handleUpdateProject} disabled={isUpdating || projectName === project?.name}>
             <FloppyDiskIcon size={14} />
             <span>Save</span>
           </Button>
@@ -164,11 +164,7 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({
       <SettingsRow label="Project ID" description="A unique identifier assigned to your project.">
         <div className="flex flex-col sm:flex-row gap-2">
           <Input readOnly value={project?._id || ''} className="font-mono text-xs" aria-label="Project ID" />
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => copyToClipboard(project?._id || '', setCopiedId)}
-          >
+          <Button variant="outline" onClick={() => copyToClipboard(project?._id || '', setCopiedId)}>
             <span className="icon-crossfade size-3.5">
               <CopyIcon size={14} className={`size-3.5 ${copiedId ? 'icon-crossfade-hidden' : ''}`} />
               <CheckIcon size={14} className={`size-3.5 text-success ${copiedId ? '' : 'icon-crossfade-hidden'}`} />
@@ -183,21 +179,26 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({
         description="Charts and reports are bucketed and labeled in this timezone for everyone who views the project. Leave on Automatic to use each viewer's own browser timezone instead."
       >
         <div className="flex flex-col sm:flex-row gap-2">
-          <Select value={timezone} onValueChange={(v) => typeof v === 'string' && setTimezone(v)} disabled={isSavingTimezone}>
+          <Select
+            value={timezone}
+            onValueChange={(v) => typeof v === 'string' && setTimezone(v)}
+            disabled={isSavingTimezone}
+          >
             <SelectTrigger className="w-full sm:max-w-xs" aria-label="Timezone">
-              <SelectValue />
+              <SelectValue>
+                {(v: string) => (v === AUTO_TIMEZONE ? `Automatic${browserTimezone ? ` (${browserTimezone})` : ''}` : v)}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={AUTO_TIMEZONE}>
-                Automatic {browserTimezone && `(${browserTimezone})`}
-              </SelectItem>
+              <SelectItem value={AUTO_TIMEZONE}>Automatic {browserTimezone && `(${browserTimezone})`}</SelectItem>
               {timezoneOptions.map((tz) => (
-                <SelectItem key={tz} value={tz}>{tz}</SelectItem>
+                <SelectItem key={tz} value={tz}>
+                  {tz}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
           <Button
-            size="sm"
             onClick={handleSaveTimezone}
             disabled={isSavingTimezone || timezone === (project?.timezone || AUTO_TIMEZONE)}
           >
@@ -224,20 +225,22 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                 Shareable Dashboard Link
               </span>
-              <Badge className="bg-success/10 text-success">
-                Publicly Accessible
-              </Badge>
+              <Badge className="bg-success/10 text-success">Publicly Accessible</Badge>
             </div>
             <div className="flex flex-col sm:flex-row gap-2">
-              <Input readOnly value={fullShareUrl} className="font-mono text-xs" aria-label="Shareable dashboard link" />
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => copyToClipboard(fullShareUrl, setCopiedUrl)}
-              >
+              <Input
+                readOnly
+                value={fullShareUrl}
+                className="font-mono text-xs"
+                aria-label="Shareable dashboard link"
+              />
+              <Button variant="outline" onClick={() => copyToClipboard(fullShareUrl, setCopiedUrl)}>
                 <span className="icon-crossfade size-3.5">
                   <LinkIcon size={14} className={`size-3.5 ${copiedUrl ? 'icon-crossfade-hidden' : ''}`} />
-                  <CheckIcon size={14} className={`size-3.5 text-success ${copiedUrl ? '' : 'icon-crossfade-hidden'}`} />
+                  <CheckIcon
+                    size={14}
+                    className={`size-3.5 text-success ${copiedUrl ? '' : 'icon-crossfade-hidden'}`}
+                  />
                 </span>
                 <span>{copiedUrl ? 'Copied' : 'Copy Link'}</span>
               </Button>

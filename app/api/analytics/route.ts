@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 import { analyticsController } from './controllers/analyticsController';
 
 const CORS_HEADERS = {
@@ -6,7 +6,7 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
   'Access-Control-Max-Age': '86400',
-  'Vary': 'Origin'
+  Vary: 'Origin',
 } as const;
 
 // Project analytics requires authenticated project access. Keep responses
@@ -15,7 +15,7 @@ const CORS_HEADERS = {
 // projects with publicMode enabled.
 const CACHE_HEADERS = {
   'Cache-Control': 'private, no-store',
-  'Content-Type': 'application/json'
+  'Content-Type': 'application/json',
 } as const;
 
 class AnalyticsRouteHandler {
@@ -40,9 +40,7 @@ class AnalyticsRouteHandler {
     return this.addCorsHeaders(response);
   }
 
-  private async handleWithErrorBoundary(
-    handler: () => Promise<NextResponse>
-  ): Promise<NextResponse> {
+  private async handleWithErrorBoundary(handler: () => Promise<NextResponse>): Promise<NextResponse> {
     try {
       const response = await handler();
       return this.addCorsHeaders(this.addCacheHeaders(response));
@@ -52,9 +50,9 @@ class AnalyticsRouteHandler {
         {
           success: false,
           error: 'Internal server error',
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         },
-        { status: 500 }
+        { status: 500 },
       );
       return this.addCorsHeaders(errorResponse);
     }

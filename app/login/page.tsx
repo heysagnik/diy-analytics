@@ -1,17 +1,26 @@
-"use client";
+'use client';
 
-import { useState, FormEvent, useEffect, Suspense, KeyboardEvent } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import {
+  ArrowUpIcon,
+  CircleNotchIcon,
+  EnvelopeSimpleIcon,
+  EyeIcon,
+  EyeSlashIcon,
+  LockIcon,
+  WarningCircleIcon,
+} from '@phosphor-icons/react';
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
-import AuthLayout from '@/components/auth/AuthLayout';
-import AuthHeader from '@/components/auth/AuthHeader';
-import AuthField from '@/components/auth/AuthField';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { type FormEvent, type KeyboardEvent, Suspense, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { EyeIcon, EyeSlashIcon, CircleNotchIcon, LockIcon, EnvelopeSimpleIcon, ArrowUpIcon, WarningCircleIcon } from '@phosphor-icons/react';
+import AuthField from '@/components/auth/AuthField';
+import AuthHeader from '@/components/auth/AuthHeader';
+import AuthLayout from '@/components/auth/AuthLayout';
+import { Button } from '@/components/ui/button';
 
 const HEADLINE = 'Know exactly who’s on your site.';
-const SUBTEXT = 'Privacy-friendly, self-hosted analytics — no cookies, no data resale, deployed on your own infrastructure.';
+const SUBTEXT =
+  'Privacy-friendly, self-hosted analytics — no cookies, no data resale, deployed on your own infrastructure.';
 
 function LoginForm() {
   const router = useRouter();
@@ -138,7 +147,11 @@ function LoginForm() {
                 className="absolute right-1 top-1/2 -translate-y-1/2 text-muted-foreground hover:bg-muted/60 hover:text-foreground disabled:opacity-40"
               >
                 <span className="icon-crossfade size-4">
-                  <EyeSlashIcon size={16} weight="bold" className={showPassword ? undefined : 'icon-crossfade-hidden'} />
+                  <EyeSlashIcon
+                    size={16}
+                    weight="bold"
+                    className={showPassword ? undefined : 'icon-crossfade-hidden'}
+                  />
                   <EyeIcon size={16} weight="bold" className={showPassword ? 'icon-crossfade-hidden' : undefined} />
                 </span>
               </Button>
@@ -146,7 +159,11 @@ function LoginForm() {
           />
 
           {errorMessage && (
-            <p id="password-error" role="alert" className="-mt-2 flex items-center gap-1.5 text-xs font-medium text-destructive animate-fade-in">
+            <p
+              id="password-error"
+              role="alert"
+              className="-mt-2 flex items-center gap-1.5 text-xs font-medium text-destructive animate-fade-in"
+            >
               <WarningCircleIcon size={14} weight="bold" className="shrink-0" />
               {errorMessage}
             </p>
@@ -185,11 +202,7 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <AuthLayout headline={HEADLINE} subtext={SUBTEXT}>
-      <Suspense
-        fallback={
-          <div className="h-7 w-7 animate-spin rounded-full border-2 border-border border-t-accent" />
-        }
-      >
+      <Suspense fallback={<div className="h-7 w-7 animate-spin rounded-full border-2 border-border border-t-accent" />}>
         <LoginForm />
       </Suspense>
     </AuthLayout>

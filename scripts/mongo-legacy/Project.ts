@@ -1,4 +1,4 @@
-import mongoose, { Query, Schema } from 'mongoose';
+import mongoose, { type Query, Schema } from 'mongoose';
 import { normalizeProjectUrl } from '@/utils/url';
 
 export function extractDomain(url: string): string | undefined {
@@ -16,10 +16,7 @@ const ProjectSchema = new Schema(
       required: true,
       unique: true,
       index: true,
-      default: () =>
-        'site_' +
-        Math.random().toString(36).slice(2, 10) +
-        Math.random().toString(36).slice(2, 10),
+      default: () => `site_${Math.random().toString(36).slice(2, 10)}${Math.random().toString(36).slice(2, 10)}`,
     },
     publicMode: { type: Boolean, default: false },
     // Reporting timezone (IANA name, e.g. "Asia/Kolkata"). Unset (null)
@@ -30,7 +27,7 @@ const ProjectSchema = new Schema(
     excludedPaths: { type: [String], default: [] },
     createdAt: { type: Date, default: Date.now },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 interface DomainDocument {

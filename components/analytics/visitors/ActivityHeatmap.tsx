@@ -1,5 +1,6 @@
-import React, { useMemo } from 'react';
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import type React from 'react';
+import { useMemo } from 'react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export interface HeatmapDay {
   date: string; // YYYY-MM-DD (UTC)
@@ -38,12 +39,9 @@ export const ActivityHeatmap: React.FC<ActivityHeatmapProps> = ({
       return { weeks: [], monthMarkers: [], max: 1, totalActive: 0, filteredCount: 0 };
     }
 
-    const firstDate = new Date(days[0].date + 'T00:00:00Z');
+    const firstDate = new Date(`${days[0].date}T00:00:00Z`);
     const leadingEmpty = firstDate.getUTCDay();
-    const padded: (HeatmapDay | null)[] = [
-      ...Array.from({ length: leadingEmpty }, () => null),
-      ...days,
-    ];
+    const padded: (HeatmapDay | null)[] = [...Array.from({ length: leadingEmpty }, () => null), ...days];
 
     const weeksArr: (HeatmapDay | null)[][] = [];
     for (let i = 0; i < padded.length; i += 7) {
@@ -55,7 +53,7 @@ export const ActivityHeatmap: React.FC<ActivityHeatmapProps> = ({
     weeksArr.forEach((week, weekIdx) => {
       const firstRealDay = week.find((d) => d !== null);
       if (!firstRealDay) return;
-      const month = new Date(firstRealDay.date + 'T00:00:00Z').getUTCMonth();
+      const month = new Date(`${firstRealDay.date}T00:00:00Z`).getUTCMonth();
       if (month !== lastMonth) {
         markers.push({ weekIdx, label: MONTH_LABELS[month] });
         lastMonth = month;
@@ -90,9 +88,7 @@ export const ActivityHeatmap: React.FC<ActivityHeatmapProps> = ({
       </Select>
 
       {weeks.length === 0 ? (
-        <div className="py-4 text-center text-xs text-muted-foreground">
-          No activity recorded in {selectedYear}.
-        </div>
+        <div className="py-4 text-center text-xs text-muted-foreground">No activity recorded in {selectedYear}.</div>
       ) : (
         <div className="overflow-x-auto scrollbar-thin pb-1">
           <div className="inline-block min-w-full">
@@ -109,17 +105,20 @@ export const ActivityHeatmap: React.FC<ActivityHeatmapProps> = ({
             </div>
             <div className="flex gap-[3px]">
               {weeks.map((week, weekIdx) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: fixed calendar grid, position is the identity
                 <div key={weekIdx} className="flex flex-col gap-[3px]">
                   {week.map((day, dayIdx) =>
                     day ? (
                       <div
+                        // biome-ignore lint/suspicious/noArrayIndexKey: fixed calendar grid, position is the identity
                         key={dayIdx}
                         className={`w-[10px] h-[10px] rounded-[2px] ${intensityClass(day.count / max)} transition-colors`}
                         title={`${day.date}: ${day.count.toLocaleString()} views`}
                       />
                     ) : (
+                      // biome-ignore lint/suspicious/noArrayIndexKey: fixed calendar grid, position is the identity
                       <div key={dayIdx} className="w-[10px] h-[10px]" />
-                    )
+                    ),
                   )}
                 </div>
               ))}

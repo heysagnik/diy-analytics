@@ -1,12 +1,20 @@
-import React, { useState } from 'react';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { AnalyticsData, DateRange } from '@/types/analytics';
 import { ChartLineIcon } from '@phosphor-icons/react';
-import AreaChart from './AreaChart';
-import BarChart from './BarChart';
+import dynamic from 'next/dynamic';
+import type React from 'react';
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
+import { Skeleton } from '@/components/ui/skeleton';
+import type { AnalyticsData, DateRange } from '@/types/analytics';
 import { useCompactChart } from './useCompactChart';
-import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from '@/components/ui/empty';
+
+// recharts is a large dependency — only one of these two renders at a time
+// (via the toggle below), so code-split them instead of shipping both in
+// every project-dashboard page load.
+const ChartSkeleton = () => <Skeleton className="h-full w-full rounded-lg" />;
+const AreaChart = dynamic(() => import('./AreaChart'), { loading: ChartSkeleton });
+const BarChart = dynamic(() => import('./BarChart'), { loading: ChartSkeleton });
 
 interface MainChartProps {
   analyticsData: AnalyticsData;
@@ -27,13 +35,13 @@ export const MainChart: React.FC<MainChartProps> = ({ analyticsData, dateRange }
     {
       name: 'Page Views',
       data: analyticsData.pageViews.data || [],
-      color: 'var(--chart-1)'
+      color: 'var(--chart-1)',
     },
     {
       name: 'Unique Visitors',
       data: analyticsData.uniqueUsers.data || [],
-      color: 'var(--chart-2)'
-    }
+      color: 'var(--chart-2)',
+    },
   ];
 
   const toDateValuePairs = (data: number[]) => labels.map((label, idx) => ({ date: label, value: data[idx] ?? 0 }));
@@ -42,13 +50,13 @@ export const MainChart: React.FC<MainChartProps> = ({ analyticsData, dateRange }
     {
       name: 'Page Views',
       data: toDateValuePairs(analyticsData.pageViews.data || []),
-      color: 'var(--chart-1)'
+      color: 'var(--chart-1)',
     },
     {
       name: 'Unique Visitors',
       data: toDateValuePairs(analyticsData.uniqueUsers.data || []),
-      color: 'var(--chart-2)'
-    }
+      color: 'var(--chart-2)',
+    },
   ];
 
   return (
@@ -65,9 +73,7 @@ export const MainChart: React.FC<MainChartProps> = ({ analyticsData, dateRange }
             size="sm"
             onClick={() => setChartType('area')}
             className={`rounded-md cursor-pointer ${
-              chartType === 'area'
-                ? 'shadow-xs border-border/10 dark:border-border/30'
-                : 'text-muted-foreground'
+              chartType === 'area' ? 'shadow-xs border-border/10 dark:border-border/30' : 'text-muted-foreground'
             }`}
           >
             Area Chart
@@ -77,9 +83,7 @@ export const MainChart: React.FC<MainChartProps> = ({ analyticsData, dateRange }
             size="sm"
             onClick={() => setChartType('bar')}
             className={`rounded-md cursor-pointer ${
-              chartType === 'bar'
-                ? 'shadow-xs border-border/10 dark:border-border/30'
-                : 'text-muted-foreground'
+              chartType === 'bar' ? 'shadow-xs border-border/10 dark:border-border/30' : 'text-muted-foreground'
             }`}
           >
             Bar Chart
@@ -121,7 +125,9 @@ export const MainChart: React.FC<MainChartProps> = ({ analyticsData, dateRange }
               <ChartLineIcon size={32} weight="duotone" />
             </EmptyMedia>
             <EmptyTitle className="text-sm font-medium text-foreground">No data for this view</EmptyTitle>
-            <EmptyDescription className="text-xs text-muted-foreground">Try a different date range or clear active filters.</EmptyDescription>
+            <EmptyDescription className="text-xs text-muted-foreground">
+              Try a different date range or clear active filters.
+            </EmptyDescription>
           </EmptyHeader>
         </Empty>
       )}

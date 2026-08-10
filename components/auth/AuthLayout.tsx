@@ -1,6 +1,6 @@
-import React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import type React from 'react';
 import AuthBrandPanel from './AuthBrandPanel';
 
 interface AuthLayoutProps {
@@ -30,8 +30,20 @@ export default function AuthLayout({ children, headline, subtext }: AuthLayoutPr
           {/* Compact brand mark shown only when the dark panel is hidden (mobile/tablet). */}
           <div className="flex h-14 items-center px-6 lg:hidden">
             <Link href="/" aria-label="DIY Analytics">
-              <Image src="/brand/logo.svg" alt="DIY Analytics" width={91} height={12} className="h-5 w-auto dark:hidden" />
-              <Image src="/brand/logo-dark.svg" alt="DIY Analytics" width={91} height={12} className="hidden h-5 w-auto dark:block" />
+              <Image
+                src="/brand/logo.svg"
+                alt="DIY Analytics"
+                width={91}
+                height={12}
+                className="h-5 w-auto dark:hidden"
+              />
+              <Image
+                src="/brand/logo-dark.svg"
+                alt="DIY Analytics"
+                width={91}
+                height={12}
+                className="hidden h-5 w-auto dark:block"
+              />
             </Link>
           </div>
 

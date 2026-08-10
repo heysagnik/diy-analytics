@@ -1,12 +1,12 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import AuthLayout from '@/components/auth/AuthLayout';
-import AuthHeader from '@/components/auth/AuthHeader';
-import AuthField from '@/components/auth/AuthField';
 import { BuildingsIcon, CircleNotchIcon, WarningCircleIcon } from '@phosphor-icons/react';
+import { useRouter } from 'next/navigation';
+import { type FormEvent, useEffect, useState } from 'react';
+import AuthField from '@/components/auth/AuthField';
+import AuthHeader from '@/components/auth/AuthHeader';
+import AuthLayout from '@/components/auth/AuthLayout';
+import { Button } from '@/components/ui/button';
 
 const HEADLINE = 'One workspace, every project.';
 const SUBTEXT = 'Invite teammates, connect as many sites as you like, and see it all from a single dashboard.';
@@ -55,7 +55,7 @@ export default function OnboardingPage() {
         throw new Error(body.error || 'Failed to create workspace');
       }
       const body = await response.json();
-       router.replace(`/${body.workspaceSlug}`);
+      router.replace(`/${body.workspaceSlug}`);
       router.refresh();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to create workspace';
@@ -104,7 +104,10 @@ export default function OnboardingPage() {
             />
 
             {error && (
-              <p role="alert" className="flex items-center gap-1.5 text-xs font-medium text-destructive animate-fade-in">
+              <p
+                role="alert"
+                className="flex items-center gap-1.5 text-xs font-medium text-destructive animate-fade-in"
+              >
                 <WarningCircleIcon size={14} weight="bold" className="shrink-0" />
                 {error}
               </p>

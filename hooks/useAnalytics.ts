@@ -1,14 +1,8 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import { AnalyticsData, DateRange } from "../types/analytics";
-import { createEmptyAnalyticsData } from "../utils/analytics";
-import type { CustomDateRange } from "../components/analytics/DateRangePicker";
-import { fetchAnalytics as requestAnalytics, normalizeAnalyticsError } from "../lib/api/analytics";
-
-// Client-side SWR cache: switching between tabs/date ranges the user has
-// already visited in this session renders instantly from cache while a
-// fresh request revalidates in the background, instead of showing a loading
-// spinner on every toggle.
-const swrCache = new Map<string, AnalyticsData>();
+import { useQuery } from '@tanstack/react-query';
+import type { CustomDateRange } from '../components/analytics/DateRangePicker';
+import { normalizeAnalyticsError, fetchAnalytics as requestAnalytics } from '../lib/api/analytics';
+import type { AnalyticsData, DateRange } from '../types/analytics';
+import { createEmptyAnalyticsData } from '../utils/analytics';
 
 interface UseAnalyticsOptions {
   timezone?: string;
@@ -27,76 +21,30 @@ interface UseAnalyticsOptions {
   };
 }
 
-export function useAnalytics(
-  projectId: string,
-  dateRange: DateRange,
-  options: UseAnalyticsOptions = {}
-) {
+export function useAnalytics(projectId: string, dateRange: DateRange, options: UseAnalyticsOptions = {}) {
   // Falling back to a hardcoded 'UTC' here (instead of the browser's own
   // timezone) meant every chart bucket/label was computed in UTC regardless
   // of where the viewer actually is — a visit at 10am IST would land on the
   // "4am" bucket. No caller in this codebase passes `timezone` explicitly,
   // so this default is what every dashboard view actually uses.
   const { timezone = Intl.DateTimeFormat().resolvedOptions().timeZone, customRange, filters } = options;
-  const cacheKey = JSON.stringify({ projectId, dateRange, timezone, customRange, filters });
-  const [analyticsData, setAnalyticsData] = useState<AnalyticsData>(
-    () => swrCache.get(cacheKey) ?? createEmptyAnalyticsData(dateRange)
-  );
-  const [loading, setLoading] = useState(!swrCache.has(cacheKey));
-  const [refreshing, setRefreshing] = useState(false);
-  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
-  const [error, setError] = useState<string | null>(null);
-  const requestController = useRef<AbortController | null>(null);
 
-  const fetchAnalytics = useCallback(async (showLoadingState = true) => {
-    if (!projectId) {
-      setLoading(false);
-      return;
-    }
-    if (showLoadingState) setRefreshing(true);
-    requestController.current?.abort();
-    const controller = new AbortController();
-    requestController.current = controller;
-
-    try {
-      setError(null);
-      const data = await requestAnalytics('/api/analytics', { projectId, dateRange, timezone, customRange, filters }, controller.signal);
-      swrCache.set(cacheKey, data);
-      setAnalyticsData(data);
-      setLastUpdated(new Date());
-    } catch (err) {
-      const message = normalizeAnalyticsError(err);
-      if (message) setError(message);
-    } finally {
-      if (requestController.current === controller) {
-        setRefreshing(false);
-        setLoading(false);
-      }
-    }
-  }, [projectId, dateRange, timezone, customRange, filters, cacheKey]);
-
-  useEffect(() => {
-    const cached = swrCache.get(cacheKey);
-    if (cached) {
-      setAnalyticsData(cached);
-      setLoading(false);
-    } else {
-      setLoading(true);
-    }
-    void fetchAnalytics();
-  }, [fetchAnalytics, cacheKey]);
-
-  useEffect(() => () => requestController.current?.abort(), []);
+  const query = useQuery<AnalyticsData, Error>({
+    // react-query dedupes/caches by this key — switching between tabs/date
+    // ranges the user has already visited in this session renders instantly
+    // from cache while a fresh request revalidates in the background,
+    // instead of showing a loading spinner on every toggle.
+    queryKey: ['analytics', projectId, dateRange, timezone, customRange, filters],
+    queryFn: ({ signal }) =>
+      requestAnalytics('/api/analytics', { projectId, dateRange, timezone, customRange, filters }, signal),
+    enabled: Boolean(projectId),
+    staleTime: 60_000,
+  });
 
   return {
-    analyticsData,
-    loading,
-    refreshing,
-    lastUpdated,
-    error,
-    fetchAnalytics,
-    formatLastUpdated: () => lastUpdated.toLocaleTimeString(),
-    retry: () => fetchAnalytics(true),
-    hasData: analyticsData.uniqueUsers.total > 0 || analyticsData.pageViews.total > 0,
+    analyticsData: query.data ?? createEmptyAnalyticsData(dateRange),
+    loading: query.isLoading,
+    error: query.error ? normalizeAnalyticsError(query.error) || null : null,
+    retry: () => query.refetch(),
   };
 }

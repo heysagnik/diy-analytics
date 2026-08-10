@@ -1,8 +1,7 @@
+import { eq } from 'drizzle-orm';
 import { UAParser } from 'ua-parser-js';
-import { Types } from 'mongoose';
-import Project from '../../../../models/Project';
-import PageView from '../../../../models/PageView';
-import Event from '../../../../models/Event';
+import { events, pageViews, projects } from '../../../../db/schema';
+import { db } from '../../../../lib/db';
 import { normalizeProjectUrl } from '../../../../utils/url';
 
 export interface TrackingPayload {
@@ -65,9 +64,9 @@ interface UrlData {
 }
 
 interface ProjectDocument {
-  _id: Types.ObjectId;
-  domain?: string;
-  url?: string;
+  id: string;
+  domain?: string | null;
+  url?: string | null;
   trackingCode: string;
   excludedIPs?: string[];
   excludedPaths?: string[];
@@ -93,38 +92,33 @@ export class TrackingService {
   /**
    * Process incoming tracking request
    */
-  async processTracking(
-    payload: TrackingPayload,
-    context: TrackingContext
-  ): Promise<TrackingResult> {
+  async processTracking(payload: TrackingPayload, context: TrackingContext): Promise<TrackingResult> {
     try {
-      // Validate payload
       const validationError = this.validatePayload(payload);
       if (validationError) {
         return { success: false, error: validationError };
       }
 
-      // Find project by tracking code
       const project = await this.findProjectByTrackingCode(payload.siteId);
       if (!project) {
-        return { 
-          success: false, 
+        return {
+          success: false,
           error: 'Invalid site ID or project not found',
-          details: { siteId: payload.siteId }
+          details: { siteId: payload.siteId },
         };
       }
 
       // Validate domain authorization
       const domainValidationError = this.validateDomainAuthorization(project, payload.domain);
       if (domainValidationError) {
-        return { 
-          success: false, 
+        return {
+          success: false,
           error: domainValidationError,
-          details: { 
+          details: {
             siteId: payload.siteId,
             domain: payload.domain,
-            allowedDomains: [project.domain, project.url].filter(Boolean)
-          }
+            allowedDomains: [project.domain, project.url].filter(Boolean),
+          },
         };
       }
 
@@ -133,7 +127,13 @@ export class TrackingService {
       if (this.isExcludedIP(ip, project.excludedIPs)) {
         return { success: true, details: { reason: 'excluded-ip' } };
       }
-      const path = (() => { try { return new URL(payload.url).pathname; } catch { return ''; } })();
+      const path = (() => {
+        try {
+          return new URL(payload.url).pathname;
+        } catch {
+          return '';
+        }
+      })();
       if (this.isExcludedPath(path, project.excludedPaths)) {
         return { success: true, details: { reason: 'excluded-path' } };
       }
@@ -145,31 +145,33 @@ export class TrackingService {
       const urlData = this.parseUrl(payload.url);
 
       if (payload.type === 'pageview') {
-        await this.trackPageView(project._id, payload, context, deviceInfo, sessionId, geoData, urlData);
+        await this.trackPageView(project.id, payload, context, deviceInfo, sessionId, geoData, urlData);
       } else if (payload.type === 'event') {
-        await this.trackEvent(project._id, payload, deviceInfo, sessionId, geoData);
+        await this.trackEvent(project.id, payload, deviceInfo, sessionId, geoData);
       }
 
-      return { 
-        success: true, 
+      return {
+        success: true,
         sessionId,
         details: {
           type: payload.type,
-          projectId: project._id.toString(),
-          siteId: payload.siteId
-        }
+          projectId: project.id,
+          siteId: payload.siteId,
+        },
       };
-
     } catch (error) {
       console.error('Tracking Service Error:', error);
-      return { 
-        success: false, 
+      return {
+        success: false,
         error: 'Internal tracking error',
-        details: { message: error instanceof Error ? error.message : 'Unknown error' }
+        details: { message: error instanceof Error ? error.message : 'Unknown error' },
       };
     }
   }
 
+  // Used via `const { MAX_STRING_LENGTHS: LEN } = TrackingService` in
+  // validatePayload — Biome's usage analysis doesn't follow that pattern.
+  // biome-ignore lint/correctness/noUnusedPrivateClassMembers: false positive, see above
   private static readonly MAX_STRING_LENGTHS = {
     siteId: 100,
     domain: 255,
@@ -177,7 +179,7 @@ export class TrackingService {
     referrer: 2048,
     eventName: 128,
     sessionId: 100,
-    uid: 100
+    uid: 100,
   } as const;
 
   private isBoundedString(value: unknown, maxLength: number): value is string {
@@ -224,7 +226,11 @@ export class TrackingService {
       return 'URL must use http or https';
     }
 
-    if (payload.referrer !== undefined && payload.referrer !== null && !this.isBoundedString(payload.referrer, LEN.referrer)) {
+    if (
+      payload.referrer !== undefined &&
+      payload.referrer !== null &&
+      !this.isBoundedString(payload.referrer, LEN.referrer)
+    ) {
       return 'Referrer must be a string within length limits';
     }
 
@@ -270,7 +276,8 @@ export class TrackingService {
    * Find project by tracking code
    */
   private async findProjectByTrackingCode(trackingCode: string): Promise<ProjectDocument | null> {
-    return await Project.findOne({ trackingCode }).lean() as ProjectDocument | null;
+    const [project] = await db.select().from(projects).where(eq(projects.trackingCode, trackingCode)).limit(1);
+    return project ?? null;
   }
 
   /**
@@ -294,11 +301,10 @@ export class TrackingService {
 
     const normalizedRequestDomain = normalizeDomain(requestDomain);
 
-    const isAuthorized = allowedDomains.some(domain => {
+    const isAuthorized = allowedDomains.some((domain) => {
       if (!domain) return false;
       const normalizedDomain = normalizeDomain(domain);
-      return normalizedRequestDomain === normalizedDomain ||
-             normalizedRequestDomain.endsWith('.' + normalizedDomain);
+      return normalizedRequestDomain === normalizedDomain || normalizedRequestDomain.endsWith(`.${normalizedDomain}`);
     });
 
     if (!isAuthorized) {
@@ -324,7 +330,7 @@ export class TrackingService {
       osVersion: os.version || '',
       device: this.categorizeDevice(device.type),
       deviceVendor: device.vendor || '',
-      deviceModel: device.model || ''
+      deviceModel: device.model || '',
     };
   }
 
@@ -333,7 +339,7 @@ export class TrackingService {
    */
   private categorizeDevice(deviceType?: string): 'desktop' | 'mobile' | 'tablet' {
     if (!deviceType) return 'desktop';
-    
+
     const type = deviceType.toLowerCase();
     if (type.includes('mobile') || type.includes('smartphone')) return 'mobile';
     if (type.includes('tablet')) return 'tablet';
@@ -375,11 +381,10 @@ export class TrackingService {
       return existingSession.sessionId;
     }
 
-    // Generate new session ID
     const newSessionId = this.generateSessionId();
     this.sessionCache.set(cacheKey, {
       sessionId: newSessionId,
-      lastSeen: new Date()
+      lastSeen: new Date(),
     });
 
     return newSessionId;
@@ -444,17 +449,11 @@ export class TrackingService {
   /** Extract best-effort geo data from request context and supported edge headers. City and region remain unset when those headers are unavailable. */
   private extractGeoData(context: TrackingContext): GeoData {
     return {
-      country: context.country ||
-               context.headers['x-vercel-ip-country'] ||
-               context.headers['cf-ipcountry'] ||
-               'Unknown',
+      country:
+        context.country || context.headers['x-vercel-ip-country'] || context.headers['cf-ipcountry'] || 'Unknown',
       region: context.headers['x-vercel-ip-country-region'] || undefined,
-      city: context.headers['x-vercel-ip-city']
-        ? decodeURIComponent(context.headers['x-vercel-ip-city'])
-        : undefined,
-      language: context.language ||
-                context.headers['accept-language']?.split(',')[0]?.trim() ||
-                'en'
+      city: context.headers['x-vercel-ip-city'] ? decodeURIComponent(context.headers['x-vercel-ip-city']) : undefined,
+      language: context.language || context.headers['accept-language']?.split(',')[0]?.trim() || 'en',
     };
   }
 
@@ -478,7 +477,7 @@ export class TrackingService {
    */
   private parseUrl(urlString: string): UrlData {
     const url = new URL(urlString);
-    
+
     return {
       href: url.href,
       pathname: url.pathname,
@@ -489,8 +488,8 @@ export class TrackingService {
         medium: url.searchParams.get('utm_medium'),
         campaign: url.searchParams.get('utm_campaign'),
         term: url.searchParams.get('utm_term'),
-        content: url.searchParams.get('utm_content')
-      }
+        content: url.searchParams.get('utm_content'),
+      },
     };
   }
 
@@ -498,15 +497,15 @@ export class TrackingService {
    * Track page view
    */
   private async trackPageView(
-    projectId: Types.ObjectId,
+    projectId: string,
     payload: TrackingPayload,
     context: TrackingContext,
     deviceInfo: DeviceInfo,
     sessionId: string,
     geoData: GeoData,
-    urlData: UrlData
+    urlData: UrlData,
   ): Promise<void> {
-    const pageViewData = {
+    await db.insert(pageViews).values({
       projectId,
       url: urlData.href,
       path: urlData.pathname,
@@ -530,28 +529,31 @@ export class TrackingService {
       utmCampaign: urlData.utm.campaign,
       utmTerm: urlData.utm.term,
       utmContent: urlData.utm.content,
-      timestamp: this.parseTimestamp(payload.timestamp)
-    };
-
-    const pageView = new PageView(pageViewData);
-    await pageView.save();
+      timestamp: this.parseTimestamp(payload.timestamp),
+    });
   }
 
   /**
    * Track event
    */
   private async trackEvent(
-    projectId: Types.ObjectId,
+    projectId: string,
     payload: TrackingPayload,
     deviceInfo: DeviceInfo,
     sessionId: string,
-    geoData: GeoData
+    geoData: GeoData,
   ): Promise<void> {
+    // validatePayload already required eventName for type:'event' payloads
+    // (the only path that calls trackEvent) — this narrows that for TS
+    // rather than asserting past it.
+    if (!payload.eventName) {
+      throw new Error('trackEvent called without an eventName');
+    }
     const urlData = this.parseUrl(payload.url);
 
-    const eventData = {
+    await db.insert(events).values({
       projectId,
-      name: payload.eventName!,
+      name: payload.eventName,
       url: urlData.href,
       path: urlData.pathname,
       data: this.normalizeEventData(payload.eventData),
@@ -574,11 +576,8 @@ export class TrackingService {
       utmCampaign: urlData.utm.campaign,
       utmTerm: urlData.utm.term,
       utmContent: urlData.utm.content,
-      timestamp: this.parseTimestamp(payload.timestamp)
-    };
-
-    const event = new Event(eventData);
-    await event.save();
+      timestamp: this.parseTimestamp(payload.timestamp),
+    });
   }
 
   // Event.data is a Mixed field with no schema-level size limit — cap the
@@ -600,9 +599,10 @@ export class TrackingService {
     if (typeof data === 'string') {
       try {
         const parsed = JSON.parse(data);
-        normalized = parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-          ? (parsed as Record<string, unknown>)
-          : { value: parsed };
+        normalized =
+          parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+            ? (parsed as Record<string, unknown>)
+            : { value: parsed };
       } catch {
         normalized = { value: data };
       }
@@ -663,7 +663,7 @@ export class TrackingService {
       return now;
     }
 
-    if (isNaN(parsed.getTime())) return now;
+    if (Number.isNaN(parsed.getTime())) return now;
 
     const delta = parsed.getTime() - now.getTime();
     if (delta > TrackingService.MAX_FUTURE_SKEW_MS || delta < -TrackingService.MAX_PAST_SKEW_MS) {
@@ -672,8 +672,6 @@ export class TrackingService {
 
     return parsed;
   }
-
 }
 
-// Export singleton instance
 export const trackingService = new TrackingService();

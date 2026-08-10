@@ -1,14 +1,9 @@
-import React, { useState } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
+import type React from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { FieldGroup, Field, FieldLabel, FieldError } from '@/components/ui/field';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
 import { normalizeProjectUrl } from '@/utils/url';
 
 interface NewProjectModalProps {
@@ -19,20 +14,25 @@ interface NewProjectModalProps {
 
 export const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose, onCreateProject }) => {
   const [newProject, setNewProject] = useState({ name: '', url: '' });
-  const [urlError, setUrlError] = useState<string>("");
+  const [urlError, setUrlError] = useState<string>('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!normalizeProjectUrl(newProject.url)) {
-      setUrlError("Please enter a valid HTTP(S) web address (e.g. example.com)");
+      setUrlError('Please enter a valid HTTP(S) web address (e.g. example.com)');
       return;
     }
-    setUrlError("");
+    setUrlError('');
     onCreateProject(newProject);
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
       <DialogContent className="max-w-md w-full">
         <DialogHeader>
           <DialogTitle className="font-display font-semibold text-lg text-foreground">Add New Website</DialogTitle>
@@ -60,7 +60,7 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClos
                 value={newProject.url}
                 onChange={(e) => {
                   setNewProject({ ...newProject, url: e.target.value });
-                  if (urlError) setUrlError("");
+                  if (urlError) setUrlError('');
                 }}
               />
               <FieldError>{urlError}</FieldError>
@@ -71,9 +71,7 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClos
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit">
-              Create Project
-            </Button>
+            <Button type="submit">Create Project</Button>
           </DialogFooter>
         </form>
       </DialogContent>

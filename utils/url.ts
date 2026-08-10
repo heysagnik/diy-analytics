@@ -20,6 +20,7 @@ function isValidHostname(hostname: string): boolean {
 
 export function normalizeProjectUrl(value: string): NormalizedProjectUrl | null {
   const input = value.trim();
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: deliberately rejects raw control characters in URLs
   if (!input || /[\s\\]|[\u0000-\u001f\u007f]/.test(input)) return null;
 
   const schemeMatch = input.match(SCHEME_PATTERN);

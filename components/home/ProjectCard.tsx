@@ -1,16 +1,9 @@
-import React from 'react';
-import Link from 'next/link';
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardAction,
-  CardContent,
-} from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { ArrowRightIcon } from '@phosphor-icons/react';
-import { Project } from '@/lib/api/projects';
+import Link from 'next/link';
+import type React from 'react';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import type { Project } from '@/lib/api/projects';
 import { normalizeProjectUrl } from '@/utils/url';
 
 interface ProjectCardProps {
@@ -24,7 +17,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, workspaceSlug
   const hasData = (project.analytics?.views ?? 0) > 0;
 
   return (
-    <Card className="group relative hover:bg-surface-secondary hover:ring-foreground/20 transition-[background-color,box-shadow]">
+    <Card className="group relative hover:bg-surface-secondary hover:ring-foreground/20 transition-all duration-200 active:scale-[0.985]">
       <Link
         href={projectHref}
         aria-label={`View analytics for ${project.name}`}
@@ -47,16 +40,14 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, workspaceSlug
                 {project.url}
               </a>
             ) : (
-              <span className="text-xs text-muted-foreground truncate block font-body">
-                {project.url}
-              </span>
+              <span className="text-xs text-muted-foreground truncate block font-body">{project.url}</span>
             )}
           </CardDescription>
         </div>
         <CardAction className="relative z-10 flex-shrink-0 ml-4">
           <span
             aria-hidden
-            className="grid place-items-center size-8 rounded-full border border-border text-foreground group-hover:border-primary/40 group-hover:text-primary group-hover:translate-x-0.5 transition-[border-color,color,transform]"
+            className="grid place-items-center size-8 rounded-full border border-border text-foreground group-hover:border-primary/40 group-hover:text-primary group-hover:translate-x-0.5 transition-all duration-200"
           >
             <ArrowRightIcon size={14} weight="bold" />
           </span>
@@ -64,20 +55,16 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, workspaceSlug
       </CardHeader>
 
       <CardContent className="pointer-events-none relative z-10 flex items-center justify-between border-t border-border pt-4">
-        <div className="flex gap-6">
+        <div className="flex gap-4">
           <div>
-            <span className="text-xs font-semibold uppercase tracking-label text-muted-foreground block">
-              Views
-            </span>
-            <span className="font-display text-lg text-foreground mt-0.5 block tabular-nums">
+            <span className="text-xs font-semibold uppercase tracking-label text-muted-foreground block">Views</span>
+            <span className="font-mono text-lg text-foreground mt-0.5 block tabular-nums">
               {project.analytics?.views.toLocaleString() || '0'}
             </span>
           </div>
           <div>
-            <span className="text-xs font-semibold uppercase tracking-label text-muted-foreground block">
-              Users
-            </span>
-            <span className="font-display text-lg text-foreground mt-0.5 block tabular-nums">
+            <span className="text-xs font-semibold uppercase tracking-label text-muted-foreground block">Users</span>
+            <span className="font-mono text-lg text-foreground mt-0.5 block tabular-nums">
               {project.analytics?.users.toLocaleString() || '0'}
             </span>
           </div>
@@ -86,9 +73,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, workspaceSlug
         {hasData ? (
           <Badge
             className={
-              project.analytics?.growth.startsWith("+")
-                ? "bg-success/10 text-success"
-                : "bg-danger/10 text-danger"
+              project.analytics?.growth.startsWith('+') ? 'bg-success/10 text-success font-mono' : 'bg-danger/10 text-danger font-mono'
             }
           >
             <span className="tabular-nums">{project.analytics?.growth}</span>

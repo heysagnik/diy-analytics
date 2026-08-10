@@ -1,11 +1,19 @@
-import React, { useEffect, useState } from 'react';
-import { Project } from '../../types/settings';
-import { Input } from '@/components/ui/input';
+import { BellIcon, PlayIcon, PlusIcon, TrashIcon } from '@phosphor-icons/react';
+import type React from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
-import { PlusIcon, TrashIcon, BellIcon, PlayIcon } from '@phosphor-icons/react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import type { Project } from '../../types/settings';
 import { SettingsGroup } from './SettingsGroup';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 interface Alert {
   _id: string;
@@ -53,17 +61,24 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({ project, showToast
     let cancelled = false;
     fetch(`/api/projects/${project._id}/alerts`)
       .then((res) => res.json())
-      .then((data) => { if (!cancelled) setAlerts(Array.isArray(data) ? data : []); })
-      .catch(() => { if (!cancelled) showToast('error', 'Failed to load alerts.'); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [project?._id]);
+      .then((data) => {
+        if (!cancelled) setAlerts(Array.isArray(data) ? data : []);
+      })
+      .catch(() => {
+        if (!cancelled) showToast('error', 'Failed to load alerts.');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [project?._id, showToast]);
 
   const handleCreate = async () => {
     if (!project?._id) return;
     const value = Number(thresholdValue);
-    if (!name.trim() || !webhookUrl.trim() || !isFinite(value) || value < 0) {
+    if (!name.trim() || !webhookUrl.trim() || !Number.isFinite(value) || value < 0) {
       showToast('error', 'Name, webhook URL, and a valid threshold are required.');
       return;
     }
@@ -118,7 +133,7 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({ project, showToast
         triggered.length > 0 ? 'info' : 'success',
         triggered.length > 0
           ? `${triggered.length} alert(s) triggered and notified.`
-          : `Checked ${result.data.checked} alert(s) — all within thresholds.`
+          : `Checked ${result.data.checked} alert(s) — all within thresholds.`,
       );
     } catch (error: unknown) {
       console.error('Failed to run alert check:', error);
@@ -142,7 +157,8 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({ project, showToast
     >
       <div className="flex flex-col gap-4 p-4 sm:px-5">
         <p className="text-xs text-muted-foreground">
-          Get a webhook notification when traffic drops or falls below a threshold. No built-in scheduler ships with this app — point an external cron at the check endpoint, or use &apos;Check now&apos; manually.
+          Get a webhook notification when traffic drops or falls below a threshold. No built-in scheduler ships with
+          this app — point an external cron at the check endpoint, or use &apos;Check now&apos; manually.
         </p>
         <div className="flex flex-col sm:flex-row gap-2">
           <Input
@@ -153,27 +169,39 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({ project, showToast
             aria-label="Alert name"
             className="sm:flex-1"
           />
-          <Select value={metric} onValueChange={(v: unknown) => {
-            if (isAlertMetric(v)) setMetric(v);
-          }} disabled={isCreating}>
+          <Select
+            value={metric}
+            onValueChange={(v: unknown) => {
+              if (isAlertMetric(v)) setMetric(v);
+            }}
+            disabled={isCreating}
+          >
             <SelectTrigger aria-label="Metric">
               <SelectValue>{(v: Alert['metric']) => METRIC_LABELS[v]}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               {Object.entries(METRIC_LABELS).map(([value, label]) => (
-                <SelectItem key={value} value={value}>{label}</SelectItem>
+                <SelectItem key={value} value={value}>
+                  {label}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-2">
-          <Select value={thresholdType} onValueChange={(v: unknown) => {
-            if (isThresholdType(v)) setThresholdType(v);
-          }} disabled={isCreating}>
+          <Select
+            value={thresholdType}
+            onValueChange={(v: unknown) => {
+              if (isThresholdType(v)) setThresholdType(v);
+            }}
+            disabled={isCreating}
+          >
             <SelectTrigger aria-label="Threshold type">
               <SelectValue>
-                {(v: Alert['thresholdType']) => (v === 'drop_pct' ? 'Drops by (%) vs prior 24h' : 'Falls below (raw value)')}
+                {(v: Alert['thresholdType']) =>
+                  v === 'drop_pct' ? 'Drops by (%) vs prior 24h' : 'Falls below (raw value)'
+                }
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
@@ -218,7 +246,10 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({ project, showToast
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-foreground truncate">{alert.name}</p>
                   <p className="text-xs text-muted-foreground truncate">
-                    {METRIC_LABELS[alert.metric]} {alert.thresholdType === 'drop_pct' ? `drops ≥ ${alert.thresholdValue}%` : `< ${alert.thresholdValue}`}
+                    {METRIC_LABELS[alert.metric]}{' '}
+                    {alert.thresholdType === 'drop_pct'
+                      ? `drops ≥ ${alert.thresholdValue}%`
+                      : `< ${alert.thresholdValue}`}
                     {alert.lastTriggeredAt && ` · last triggered ${new Date(alert.lastTriggeredAt).toLocaleString()}`}
                   </p>
                 </div>
@@ -234,16 +265,25 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({ project, showToast
             ))}
           </ul>
         )}
-        <Dialog open={alertToDelete !== null} onOpenChange={(open) => { if (!open) setAlertToDelete(null); }}>
+        <Dialog
+          open={alertToDelete !== null}
+          onOpenChange={(open) => {
+            if (!open) setAlertToDelete(null);
+          }}
+        >
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Delete alert?</DialogTitle>
               <DialogDescription>
-                {alertToDelete ? `“${alertToDelete.name}” will be permanently deleted and will no longer send notifications.` : ''}
+                {alertToDelete
+                  ? `“${alertToDelete.name}” will be permanently deleted and will no longer send notifications.`
+                  : ''}
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setAlertToDelete(null)}>Cancel</Button>
+              <Button variant="outline" onClick={() => setAlertToDelete(null)}>
+                Cancel
+              </Button>
               <Button
                 variant="destructive"
                 onClick={() => {

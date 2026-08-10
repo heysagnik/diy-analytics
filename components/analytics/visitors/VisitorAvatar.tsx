@@ -10,7 +10,6 @@ const hashString = (value: string) => {
   return hash;
 };
 
-
 const mulberry32 = (seed: number) => {
   let s = seed;
   return () => {
@@ -35,9 +34,7 @@ export const VisitorAvatar: React.FC<VisitorAvatarProps> = ({ userId, size = 28,
   const rand = mulberry32(seed);
   const hue = Math.abs(seed) % 360;
 
-  const cells: boolean[][] = Array.from({ length: GRID }, () =>
-    Array.from({ length: HALF }, () => rand() > 0.45)
-  );
+  const cells: boolean[][] = Array.from({ length: GRID }, () => Array.from({ length: HALF }, () => rand() > 0.45));
 
   const cellSize = 100 / GRID;
 
@@ -48,21 +45,34 @@ export const VisitorAvatar: React.FC<VisitorAvatarProps> = ({ userId, size = 28,
       aria-hidden="true"
     >
       <AvatarFallback className="rounded-md bg-transparent size-full p-0">
-        <svg viewBox="0 0 100 100" width="100%" height="100%" preserveAspectRatio="xMidYMid slice">
+        <svg viewBox="0 0 100 100" width="100%" height="100%" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
           <rect width="100" height="100" fill={`hsl(${hue} var(--avatar-bg-s) var(--avatar-bg-l))`} />
           {cells.map((row, y) =>
             row.map((filled, x) => {
               if (!filled) return null;
               const mirroredX = GRID - 1 - x;
               return (
+                // biome-ignore lint/suspicious/noArrayIndexKey: fixed identicon grid, position is the identity
                 <React.Fragment key={`${x}-${y}`}>
-                  <rect x={x * cellSize} y={y * cellSize} width={cellSize} height={cellSize} fill={`hsl(${hue} var(--avatar-cell-s) var(--avatar-cell-l))`} />
+                  <rect
+                    x={x * cellSize}
+                    y={y * cellSize}
+                    width={cellSize}
+                    height={cellSize}
+                    fill={`hsl(${hue} var(--avatar-cell-s) var(--avatar-cell-l))`}
+                  />
                   {mirroredX !== x && (
-                    <rect x={mirroredX * cellSize} y={y * cellSize} width={cellSize} height={cellSize} fill={`hsl(${hue} var(--avatar-cell-s) var(--avatar-cell-l))`} />
+                    <rect
+                      x={mirroredX * cellSize}
+                      y={y * cellSize}
+                      width={cellSize}
+                      height={cellSize}
+                      fill={`hsl(${hue} var(--avatar-cell-s) var(--avatar-cell-l))`}
+                    />
                   )}
                 </React.Fragment>
               );
-            })
+            }),
           )}
         </svg>
       </AvatarFallback>

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 import { PUBLIC_CORS_HEADERS } from '@/lib/corsHeaders';
 
 const AUTH_COOKIE = 'diy_session';
@@ -10,6 +10,11 @@ const PUBLIC_PATH_PATTERNS: Array<RegExp> = [
   /^\/api\/auth\/(login|register|logout|me)(\/.*)?$/,
   /^\/api\/public(\/.*)?$/,
   /^\/api\/site-icon(\/.*)?$/,
+  // Vercel Cron authenticates via `Authorization: Bearer $CRON_SECRET`, not
+  // a session cookie — the route itself enforces that secret (see
+  // app/api/cron/rollup/route.ts), so this only needs to bypass the
+  // cookie check here, not skip auth entirely.
+  /^\/api\/cron(\/.*)?$/,
   /^\/public(\/.*)?$/,
   /^\/login(\/.*)?$/,
   /^\/register(\/.*)?$/,

@@ -1,24 +1,24 @@
-"use client";
+'use client';
 
-import React, { useState } from 'react';
 import {
-  SlidersHorizontalIcon,
-  EyeSlashIcon,
-  TargetIcon,
   BellIcon,
   DownloadSimpleIcon,
+  EyeSlashIcon,
+  SlidersHorizontalIcon,
+  TargetIcon,
   TrashIcon,
 } from '@phosphor-icons/react';
-import { useToast } from '@/hooks/useToast';
-import { GeneralSection } from '@/components/settings/GeneralSection';
-import { GoalsSection } from '@/components/settings/GoalsSection';
+import { useState } from 'react';
+import ProjectPageShell from '@/components/project/ProjectPageShell';
 import { AlertsSection } from '@/components/settings/AlertsSection';
-import { TrackingSection } from '@/components/settings/TrackingSection';
 import { DangerZoneSection } from '@/components/settings/DangerZoneSection';
 import { DataManagementSection } from '@/components/settings/DataManagementSection';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { GeneralSection } from '@/components/settings/GeneralSection';
+import { GoalsSection } from '@/components/settings/GoalsSection';
+import { TrackingSection } from '@/components/settings/TrackingSection';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useToast } from '@/hooks/useToast';
 import { useProjectContext } from '../project-context';
-import ProjectPageShell from '@/components/project/ProjectPageShell';
 
 const SETTINGS_TABS = [
   { id: 'general', label: 'General', icon: SlidersHorizontalIcon },
@@ -44,48 +44,52 @@ export default function SettingsPage() {
       className="overflow-hidden"
       mainClassName="flex flex-col gap-6"
     >
-        <Tabs
-          value={activeTab}
-          onValueChange={(v) => typeof v === 'string' && setActiveTab(v as SettingsTabId)}
-          className="gap-4"
-        >
-          <div className="max-w-full overflow-x-auto scrollbar-hide">
-            <TabsList className="w-max">
-              {SETTINGS_TABS.map((tab) => {
-                const TabIcon = tab.icon;
-                return (
-                  <TabsTrigger
-                    key={tab.id}
-                    value={tab.id}
-                    className={tab.id === 'danger' ? 'text-danger data-active:bg-danger data-active:text-white data-active:border-danger/20 data-active:shadow-xs' : ''}
-                  >
-                    <TabIcon size={14} weight={tab.id === activeTab ? 'bold' : 'regular'} />
-                    <span>{tab.label}</span>
-                  </TabsTrigger>
-                );
-              })}
-            </TabsList>
-          </div>
+      <Tabs
+        value={activeTab}
+        onValueChange={(v) => typeof v === 'string' && setActiveTab(v as SettingsTabId)}
+        className="gap-4"
+      >
+        <div className="max-w-full overflow-x-auto scrollbar-hide">
+          <TabsList className="w-max">
+            {SETTINGS_TABS.map((tab) => {
+              const TabIcon = tab.icon;
+              return (
+                <TabsTrigger
+                  key={tab.id}
+                  value={tab.id}
+                  className={
+                    tab.id === 'danger'
+                      ? 'text-danger data-active:bg-danger data-active:text-white data-active:border-danger/20 data-active:shadow-xs'
+                      : ''
+                  }
+                >
+                  <TabIcon size={14} weight={tab.id === activeTab ? 'bold' : 'regular'} />
+                  <span>{tab.label}</span>
+                </TabsTrigger>
+              );
+            })}
+          </TabsList>
+        </div>
 
-          <TabsContent value="general" className="animate-fade-in">
-            <GeneralSection project={project} onProjectUpdate={updateProject} showToast={showToast} />
-          </TabsContent>
-          <TabsContent value="tracking" className="animate-fade-in">
-            <TrackingSection project={project} onProjectUpdate={updateProject} showToast={showToast} />
-          </TabsContent>
-          <TabsContent value="goals" className="animate-fade-in">
-            <GoalsSection project={project} showToast={showToast} />
-          </TabsContent>
-          <TabsContent value="alerts" className="animate-fade-in">
-            <AlertsSection project={project} showToast={showToast} />
-          </TabsContent>
-          <TabsContent value="data" className="animate-fade-in">
-            <DataManagementSection project={project} showToast={showToast} />
-          </TabsContent>
-          <TabsContent value="danger" className="animate-fade-in">
-            <DangerZoneSection project={project} showToast={showToast} />
-          </TabsContent>
-        </Tabs>
+        <TabsContent value="general" className="animate-fade-in">
+          <GeneralSection project={project} onProjectUpdate={updateProject} showToast={showToast} />
+        </TabsContent>
+        <TabsContent value="tracking" className="animate-fade-in">
+          <TrackingSection project={project} onProjectUpdate={updateProject} showToast={showToast} />
+        </TabsContent>
+        <TabsContent value="goals" className="animate-fade-in">
+          <GoalsSection project={project} showToast={showToast} />
+        </TabsContent>
+        <TabsContent value="alerts" className="animate-fade-in">
+          <AlertsSection project={project} showToast={showToast} />
+        </TabsContent>
+        <TabsContent value="data" className="animate-fade-in">
+          <DataManagementSection project={project} showToast={showToast} />
+        </TabsContent>
+        <TabsContent value="danger" className="animate-fade-in">
+          <DangerZoneSection project={project} showToast={showToast} />
+        </TabsContent>
+      </Tabs>
     </ProjectPageShell>
   );
 }

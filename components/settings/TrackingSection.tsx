@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { Project } from '../../types/settings';
+import { CheckIcon, CopyIcon } from '@phosphor-icons/react';
+import type React from 'react';
+import { useEffect, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
-import { Button } from '@/components/ui/button';
-import { CopyIcon, CheckIcon } from '@phosphor-icons/react';
+import { updateProject } from '@/lib/api/projects';
+import type { Project } from '../../types/settings';
 import { SettingsGroup } from './SettingsGroup';
 import { SettingsRow } from './SettingsRow';
-import { updateProject } from '@/lib/api/projects';
 
 interface TrackingSectionProps {
   project: Project;
@@ -14,11 +15,7 @@ interface TrackingSectionProps {
   showToast: (type: 'success' | 'error' | 'info', message: string) => void;
 }
 
-export const TrackingSection: React.FC<TrackingSectionProps> = ({
-  project,
-  onProjectUpdate,
-  showToast,
-}) => {
+export const TrackingSection: React.FC<TrackingSectionProps> = ({ project, onProjectUpdate, showToast }) => {
   const [excludedPaths, setExcludedPaths] = useState(project?.excludedPaths?.join(', ') || '');
   const [isUpdating, setIsUpdating] = useState(false);
   const [excludeMyIP, setExcludeMyIP] = useState(false);
@@ -56,17 +53,19 @@ export const TrackingSection: React.FC<TrackingSectionProps> = ({
           newIPs.push(myIP);
         }
       } else {
-        newIPs = newIPs.filter(ip => ip !== myIP);
+        newIPs = newIPs.filter((ip) => ip !== myIP);
       }
 
-      const updatedProject = await updateProject(project._id, { excludedIPs: newIPs }, 'Failed to update tracking settings');
+      const updatedProject = await updateProject(
+        project._id,
+        { excludedIPs: newIPs },
+        'Failed to update tracking settings',
+      );
       onProjectUpdate({ excludedIPs: updatedProject.excludedIPs });
 
       showToast('success', `Your visits will ${checked ? 'no longer' : 'now'} be tracked`);
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error
-        ? error.message
-        : 'An error occurred';
+      const errorMessage = error instanceof Error ? error.message : 'An error occurred';
       showToast('error', errorMessage);
       setExcludeMyIP(!checked);
     } finally {
@@ -79,22 +78,24 @@ export const TrackingSection: React.FC<TrackingSectionProps> = ({
 
     const parsedPaths = excludedPaths
       .split(',')
-      .map(path => path.trim())
-      .filter(path => path);
+      .map((path) => path.trim())
+      .filter((path) => path);
 
     setIsUpdating(true);
 
     try {
-      const updatedProject = await updateProject(project._id, { excludedPaths: parsedPaths }, 'Failed to update tracking exclusions');
+      const updatedProject = await updateProject(
+        project._id,
+        { excludedPaths: parsedPaths },
+        'Failed to update tracking exclusions',
+      );
       onProjectUpdate({
-        excludedPaths: updatedProject.excludedPaths
+        excludedPaths: updatedProject.excludedPaths,
       });
 
       showToast('success', 'Exclusion settings saved');
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error
-        ? error.message
-        : 'An error occurred';
+      const errorMessage = error instanceof Error ? error.message : 'An error occurred';
       showToast('error', errorMessage);
     } finally {
       setIsUpdating(false);
@@ -102,7 +103,10 @@ export const TrackingSection: React.FC<TrackingSectionProps> = ({
   };
 
   const getTrackingScript = () => {
-    const baseUrl = typeof window !== 'undefined' ? window.location.origin : (process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000');
+    const baseUrl =
+      typeof window !== 'undefined'
+        ? window.location.origin
+        : process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
     return `<script async defer src="${baseUrl}/api/tracker.js?site-id=${project.trackingCode}"></script>`;
   };
 
@@ -150,11 +154,7 @@ export const TrackingSection: React.FC<TrackingSectionProps> = ({
             disabled={isUpdating}
             aria-label="Excluded paths"
           />
-          <Button
-            size="sm"
-            onClick={handleUpdateExclusions}
-            disabled={isUpdating}
-          >
+          <Button size="sm" onClick={handleUpdateExclusions} disabled={isUpdating}>
             Save
           </Button>
         </div>
@@ -164,11 +164,7 @@ export const TrackingSection: React.FC<TrackingSectionProps> = ({
         label="Tracking Snippet"
         description="Paste this into your site's HTML <head> tag to start collecting analytics."
         action={
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => copyToClipboard(getTrackingScript(), setCopiedScript)}
-          >
+          <Button variant="outline" size="sm" onClick={() => copyToClipboard(getTrackingScript(), setCopiedScript)}>
             <span className="icon-crossfade size-3.5">
               <CopyIcon size={14} className={`size-3.5 ${copiedScript ? 'icon-crossfade-hidden' : ''}`} />
               <CheckIcon size={14} className={`size-3.5 text-success ${copiedScript ? '' : 'icon-crossfade-hidden'}`} />

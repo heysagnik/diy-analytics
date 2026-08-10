@@ -1,8 +1,7 @@
-import type { DateRange, AnalyticsData, Granularity, MetricData } from "../types/analytics";
-import { generateLabels } from "../lib/utils/labelUtils";
+import { generateLabels } from '../lib/utils/labelUtils';
+import type { AnalyticsData, DateRange, Granularity, MetricData } from '../types/analytics';
 
-const generateDefaultNumericArray = (length: number): number[] =>
-  Array(length).fill(0);
+const generateDefaultNumericArray = (length: number): number[] => Array(length).fill(0);
 
 // Mirrors DATE_RANGES' granularity in app/api/analytics/types.ts.
 const DATE_RANGE_GRANULARITY: Record<DateRange, Granularity> = {
@@ -47,14 +46,13 @@ export const createEmptyAnalyticsData = (dateRange: DateRange): AnalyticsData =>
     cities: [],
     utmBreakdown: [],
     topEvents: [],
-    recentEvents: []
+    recentEvents: [],
   };
 };
 
 export const validateAnalyticsData = (data: AnalyticsData): boolean => {
   return !!(
-    data &&
-    data.uniqueUsers &&
+    data?.uniqueUsers &&
     data.pageViews &&
     Array.isArray(data.uniqueUsers.labels) &&
     Array.isArray(data.uniqueUsers.data) &&

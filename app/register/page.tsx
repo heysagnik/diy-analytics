@@ -1,12 +1,5 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import AuthLayout from '@/components/auth/AuthLayout';
-import AuthHeader from '@/components/auth/AuthHeader';
-import AuthField from '@/components/auth/AuthField';
 import {
   CircleNotchIcon,
   EnvelopeSimpleIcon,
@@ -16,10 +9,18 @@ import {
   UserIcon,
   WarningCircleIcon,
 } from '@phosphor-icons/react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { type FormEvent, useState } from 'react';
+import AuthField from '@/components/auth/AuthField';
+import AuthHeader from '@/components/auth/AuthHeader';
+import AuthLayout from '@/components/auth/AuthLayout';
+import { Button } from '@/components/ui/button';
 
 const MIN_PASSWORD_LENGTH = 10;
 const HEADLINE = 'Own your analytics, end to end.';
-const SUBTEXT = 'Deploy in three steps, keep every event on infrastructure you control, and skip the cookie banner entirely.';
+const SUBTEXT =
+  'Deploy in three steps, keep every event on infrastructure you control, and skip the cookie banner entirely.';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -72,7 +73,11 @@ export default function RegisterPage() {
   return (
     <AuthLayout headline={HEADLINE} subtext={SUBTEXT}>
       <div className="relative w-full">
-        <AuthHeader eyebrow="Create account" title="Create your account" subtitle="You'll set up your workspace right after this." />
+        <AuthHeader
+          eyebrow="Create account"
+          title="Create your account"
+          subtitle="You'll set up your workspace right after this."
+        />
 
         <div
           className={`animate-[fadeIn_0.4s_cubic-bezier(0.16,1,0.3,1)_both] ${isError ? 'animate-shake' : ''}`}
@@ -129,7 +134,11 @@ export default function RegisterPage() {
                   className="absolute right-1 top-1/2 -translate-y-1/2 text-muted-foreground hover:bg-muted/60 hover:text-foreground disabled:opacity-40"
                 >
                   <span className="icon-crossfade size-4">
-                    <EyeSlashIcon size={16} weight="bold" className={showPassword ? undefined : 'icon-crossfade-hidden'} />
+                    <EyeSlashIcon
+                      size={16}
+                      weight="bold"
+                      className={showPassword ? undefined : 'icon-crossfade-hidden'}
+                    />
                     <EyeIcon size={16} weight="bold" className={showPassword ? 'icon-crossfade-hidden' : undefined} />
                   </span>
                 </Button>
@@ -140,7 +149,10 @@ export default function RegisterPage() {
             </p>
 
             {error && (
-              <p role="alert" className="flex items-center gap-1.5 text-xs font-medium text-destructive animate-fade-in">
+              <p
+                role="alert"
+                className="flex items-center gap-1.5 text-xs font-medium text-destructive animate-fade-in"
+              >
                 <WarningCircleIcon size={14} weight="bold" className="shrink-0" />
                 {error}
               </p>

@@ -1,17 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
-import { ArrowsOutSimpleIcon } from '@phosphor-icons/react';
 import type { Icon } from '@phosphor-icons/react';
+import { ArrowsOutSimpleIcon } from '@phosphor-icons/react';
+import type React from 'react';
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { FilterDimension } from '@/types/filters';
 
 export interface BreakdownItem {
@@ -63,7 +59,9 @@ function TabSwitcher({
           </SelectTrigger>
           <SelectContent>
             {tabs.map((tab) => (
-              <SelectItem key={tab.id} value={tab.id}>{tab.label}</SelectItem>
+              <SelectItem key={tab.id} value={tab.id}>
+                {tab.label}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -151,19 +149,22 @@ function RowList({
               </span>
               <span className="flex items-center gap-2 text-muted-foreground tabular-nums flex-shrink-0">
                 <span className="text-xs">{share}%</span>
-                <span className="font-display text-sm text-foreground">
-                  {item.value.toLocaleString()}
-                </span>
+                <span className="font-display text-sm text-foreground">{item.value.toLocaleString()}</span>
               </span>
             </div>
           </>
         );
 
-        if (clickable) {
+        // `clickable` (Boolean(onFilter && active.dimension)) guarantees
+        // active.dimension is set here, but that's not narrowable through a
+        // separate prop — re-check it directly instead of asserting past it.
+        if (clickable && active.dimension) {
+          const dimension = active.dimension;
           return (
             <button
+              type="button"
               key={`${active.id}:${item.name}:${item.meta ?? ''}`}
-              onClick={() => onFilter!(active.dimension!, item.name)}
+              onClick={() => onFilter?.(dimension, item.name)}
               className="relative w-full h-[44px] text-left rounded-md hover:bg-muted/60 transition-colors duration-150 cursor-pointer active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               aria-label={`Filter by ${label}`}
             >
@@ -261,9 +262,7 @@ export const BreakdownPanel: React.FC<BreakdownPanelProps> = ({
                   </span>
                 )}
                 {active.label}
-                <span className="text-xs font-normal text-muted-foreground">
-                  ({sorted.length.toLocaleString()})
-                </span>
+                <span className="text-xs font-normal text-muted-foreground">({sorted.length.toLocaleString()})</span>
               </DialogTitle>
             </div>
             <TabSwitcher tabs={tabs} activeId={activeId} onChange={setActiveId} />

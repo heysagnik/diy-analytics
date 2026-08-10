@@ -1,12 +1,12 @@
-import { Types } from 'mongoose';
-import PageView from '../../../../models/PageView';
-import DailyRollup from '../../../../models/DailyRollup';
+import { and, count, eq, gte, lt, sql } from 'drizzle-orm';
+import { dailyRollups, pageViews } from '@/db/schema';
+import { db } from '@/lib/db';
 
 interface DailySessionRollup {
-  _id: string;
-  userId?: string;
+  sessionId: string;
+  userId: string | null;
   pageCount: number;
-  timestamps: Date[];
+  timestamps: string[];
 }
 
 // Gaps between consecutive pageviews are clipped to this ceiling before
@@ -21,33 +21,32 @@ const MAX_GAP_SEC = 30 * 60;
  * dateUtils.periodStartFor/addPeriods with granularity 'day') so the result
  * matches what a live single-day query would produce for that date.
  */
-export async function computeDailyRollup(
-  projectObjectId: Types.ObjectId,
-  dayStart: Date,
-  dayEnd: Date
-): Promise<void> {
-  const sessions = await PageView.aggregate<DailySessionRollup>([
-    { $match: { projectId: projectObjectId, timestamp: { $gte: dayStart, $lt: dayEnd } } },
-    {
-      $group: {
-        _id: '$sessionId',
-        userId: { $first: '$userId' },
-        pageCount: { $sum: 1 },
-        timestamps: { $push: '$timestamp' }
-      }
-    }
-  ]);
+export async function computeDailyRollup(projectId: string, dayStart: Date, dayEnd: Date): Promise<void> {
+  const rows: DailySessionRollup[] = await db
+    .select({
+      sessionId: pageViews.sessionId,
+      // Old Mongo pipeline used `$first: '$userId'` — only ever consumed
+      // downstream as "some non-null identity for that session", so any
+      // single-value aggregate is equivalent.
+      userId: sql<string | null>`max(${pageViews.userId})`,
+      pageCount: count(),
+      // jsonb_agg, not array_agg — see retentionService.ts for why.
+      timestamps: sql<string[]>`jsonb_agg(${pageViews.timestamp})`,
+    })
+    .from(pageViews)
+    .where(and(eq(pageViews.projectId, projectId), gte(pageViews.timestamp, dayStart), lt(pageViews.timestamp, dayEnd)))
+    .groupBy(pageViews.sessionId);
 
-  let pageViews = 0;
+  let pageViewCount = 0;
   let bounces = 0;
   let sessionDurationSec = 0;
   let durationSessionCount = 0;
   const userIds = new Set<string>();
 
-  for (const s of sessions) {
-    pageViews += s.pageCount;
+  for (const s of rows) {
+    pageViewCount += s.pageCount;
     if (s.pageCount === 1) bounces += 1;
-    userIds.add(s.userId || s._id);
+    userIds.add(s.userId || s.sessionId);
 
     if (s.pageCount > 1) {
       const sorted = [...s.timestamps].sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
@@ -61,18 +60,20 @@ export async function computeDailyRollup(
     }
   }
 
-  await DailyRollup.updateOne(
-    { projectId: projectObjectId, date: dayStart },
-    {
-      $set: {
-        pageViews,
-        sessions: sessions.length,
-        bounces,
-        sessionDurationSec,
-        durationSessionCount,
-        userIds: Array.from(userIds)
-      }
-    },
-    { upsert: true }
-  );
+  const values = {
+    pageViews: pageViewCount,
+    sessions: rows.length,
+    bounces,
+    sessionDurationSec: Math.round(sessionDurationSec),
+    durationSessionCount,
+    userIds: Array.from(userIds),
+  };
+
+  await db
+    .insert(dailyRollups)
+    .values({ projectId, date: dayStart, ...values })
+    .onConflictDoUpdate({
+      target: [dailyRollups.projectId, dailyRollups.date],
+      set: { ...values, updatedAt: new Date() },
+    });
 }

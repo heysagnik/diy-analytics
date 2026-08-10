@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
-import { Project } from '../../types/settings';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { DownloadSimpleIcon } from '@phosphor-icons/react';
+import type React from 'react';
+import { useState } from 'react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { isAnalyticsResponse } from '@/lib/api/analytics';
+import type { Project } from '../../types/settings';
 import { SettingsGroup } from './SettingsGroup';
 import { SettingsRow } from './SettingsRow';
-import { isAnalyticsResponse } from '@/lib/api/analytics';
 
 interface DataManagementSectionProps {
   project: Project;
@@ -23,10 +24,7 @@ function toCsvSection(title: string, headers: string[], rows: (string | number)[
   return lines.join('\n');
 }
 
-export const DataManagementSection: React.FC<DataManagementSectionProps> = ({
-  project,
-  showToast,
-}) => {
+export const DataManagementSection: React.FC<DataManagementSectionProps> = ({ project, showToast }) => {
   const [isExporting, setIsExporting] = useState(false);
 
   const handleExportData = async () => {
@@ -46,26 +44,56 @@ export const DataManagementSection: React.FC<DataManagementSectionProps> = ({
       const data = result.data;
 
       const sections = [
-        toCsvSection('Pages', ['Path', 'Views', 'Users'],
-          data.pages.map((p) => [p.path, p.views, p.users])),
-        toCsvSection('Entry Pages', ['Path', 'Views', 'Users'],
-          data.entryPages.map((p) => [p.path, p.views, p.users])),
-        toCsvSection('Exit Pages', ['Path', 'Views', 'Users'],
-          data.exitPages.map((p) => [p.path, p.views, p.users])),
-        toCsvSection('Sources', ['Source', 'Users', 'Sessions'],
-          data.sources.map((s) => [s.name, s.users, s.sessions])),
-        toCsvSection('Campaigns', ['Campaign', 'Users', 'Sessions'],
-          data.campaigns.map((c) => [c.name, c.users, c.sessions])),
-        toCsvSection('Countries', ['Country', 'Users', 'Sessions'],
-          data.countries.map((c) => [c.country, c.users, c.sessions])),
-        toCsvSection('Browsers', ['Browser', 'Users', 'Sessions'],
-          data.browsers.map((b) => [b.browser, b.users, b.sessions])),
-        toCsvSection('Devices', ['Device', 'Users', 'Sessions'],
-          data.devices.map((d) => [d.device, d.users, d.sessions])),
-        toCsvSection('Goals', ['Goal', 'Conversions', 'Total Sessions', 'Rate %'],
-          data.goals.map((g) => [g.name, g.conversions, g.totalSessions, g.rate])),
-        toCsvSection('Top Events', ['Event', 'Count', 'Unique Users'],
-          data.topEvents.map((e) => [e.name, e.count, e.uniqueUsers])),
+        toCsvSection(
+          'Pages',
+          ['Path', 'Views', 'Users'],
+          data.pages.map((p) => [p.path, p.views, p.users]),
+        ),
+        toCsvSection(
+          'Entry Pages',
+          ['Path', 'Views', 'Users'],
+          data.entryPages.map((p) => [p.path, p.views, p.users]),
+        ),
+        toCsvSection(
+          'Exit Pages',
+          ['Path', 'Views', 'Users'],
+          data.exitPages.map((p) => [p.path, p.views, p.users]),
+        ),
+        toCsvSection(
+          'Sources',
+          ['Source', 'Users', 'Sessions'],
+          data.sources.map((s) => [s.name, s.users, s.sessions]),
+        ),
+        toCsvSection(
+          'Campaigns',
+          ['Campaign', 'Users', 'Sessions'],
+          data.campaigns.map((c) => [c.name, c.users, c.sessions]),
+        ),
+        toCsvSection(
+          'Countries',
+          ['Country', 'Users', 'Sessions'],
+          data.countries.map((c) => [c.country, c.users, c.sessions]),
+        ),
+        toCsvSection(
+          'Browsers',
+          ['Browser', 'Users', 'Sessions'],
+          data.browsers.map((b) => [b.browser, b.users, b.sessions]),
+        ),
+        toCsvSection(
+          'Devices',
+          ['Device', 'Users', 'Sessions'],
+          data.devices.map((d) => [d.device, d.users, d.sessions]),
+        ),
+        toCsvSection(
+          'Goals',
+          ['Goal', 'Conversions', 'Total Sessions', 'Rate %'],
+          data.goals.map((g) => [g.name, g.conversions, g.totalSessions, g.rate]),
+        ),
+        toCsvSection(
+          'Top Events',
+          ['Event', 'Count', 'Unique Users'],
+          data.topEvents.map((e) => [e.name, e.count, e.uniqueUsers]),
+        ),
       ].filter(Boolean);
 
       const csv = sections.join('\n\n');
@@ -103,11 +131,7 @@ export const DataManagementSection: React.FC<DataManagementSectionProps> = ({
         label="Export Aggregate Analytics"
         description="Download an all-time CSV snapshot of aggregate pages, acquisition, audience, goals, and top-event metrics. Raw visitor and session telemetry is not included."
         action={
-          <Button
-            size="sm"
-            onClick={handleExportData}
-            disabled={isExporting}
-          >
+          <Button size="sm" onClick={handleExportData} disabled={isExporting}>
             <DownloadSimpleIcon size={14} />
             <span>{isExporting ? 'Preparing...' : 'Download CSV'}</span>
           </Button>

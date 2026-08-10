@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { createContext, useContext } from "react";
-import type { Project } from "@/types/analytics";
+import { createContext, useContext } from 'react';
+import type { Project } from '@/types/analytics';
 
 interface ProjectContextValue {
   project: Project;
@@ -16,7 +16,7 @@ export function useProjectContext(): ProjectContextValue {
   const context = useContext(ProjectContext);
 
   if (!context) {
-    throw new Error("useProjectContext must be used within a ProjectProvider");
+    throw new Error('useProjectContext must be used within a ProjectProvider');
   }
 
   return context;

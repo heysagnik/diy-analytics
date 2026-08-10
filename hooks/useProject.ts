@@ -1,10 +1,15 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { Project } from '@/types/analytics';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useMemo } from 'react';
+import type { Project } from '@/types/analytics';
 
 interface UseProjectProps {
   projectId: string;
   isValidProjectId: boolean;
   workspaceId: string;
+  // Fetched server-side by the layout that already confirmed this project
+  // exists (see layout.tsx) — seeds the cache so the client tree renders
+  // immediately instead of re-fetching the same row behind a skeleton.
+  initialProject?: Project;
 }
 
 interface UseProjectReturn {
@@ -15,129 +20,62 @@ interface UseProjectReturn {
   updateProject: (updatedFields: Partial<Project>) => void;
 }
 
-const MAX_RETRIES = 3;
-const TIMEOUT = 10000;
-
-export const useProject = ({ projectId, isValidProjectId, workspaceId }: UseProjectProps): UseProjectReturn => {
-  const [project, setProject] = useState<Project | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const requestControllerRef = useRef<AbortController | null>(null);
-
-  const fetchProject = useCallback(async (): Promise<void> => {
-    requestControllerRef.current?.abort();
-
-    if (!isValidProjectId) {
-      setError("Invalid or missing Project ID. Cannot fetch project details.");
-      setIsLoading(false);
-      return;
+async function fetchProject(projectId: string, workspaceId: string): Promise<Project> {
+  const response = await fetch(`/api/projects/${projectId}?workspaceId=${encodeURIComponent(workspaceId)}`);
+  if (!response.ok) {
+    let errorText = `HTTP error ${response.status}`;
+    try {
+      const errorJson = await response.json();
+      errorText = errorJson?.error || errorJson.message || errorText;
+    } catch {
+      errorText = await response.text().catch(() => errorText);
     }
+    throw new Error(`Failed to fetch project: ${errorText}`);
+  }
+  const project = await response.json();
+  if (!project) throw new Error('Project not found in API response.');
+  return project;
+}
 
-    const requestController = new AbortController();
-    requestControllerRef.current = requestController;
-    setIsLoading(true);
-    setError(null);
+export const useProject = ({
+  projectId,
+  isValidProjectId,
+  workspaceId,
+  initialProject,
+}: UseProjectProps): UseProjectReturn => {
+  const queryClient = useQueryClient();
+  const queryKey = useMemo(() => ['project', projectId, workspaceId], [projectId, workspaceId]);
 
-    for (let attempt = 1; attempt <= MAX_RETRIES; attempt += 1) {
-      const attemptController = new AbortController();
-      const abortAttempt = () => attemptController.abort();
-      requestController.signal.addEventListener('abort', abortAttempt, { once: true });
-      const timeoutId = setTimeout(() => attemptController.abort(), TIMEOUT);
+  const query = useQuery<Project>({
+    queryKey,
+    queryFn: () => fetchProject(projectId, workspaceId),
+    enabled: isValidProjectId,
+    initialData: initialProject,
+    // The layout's server-side row is already fresh at request time — avoid
+    // an immediate background re-fetch of data we just received.
+    staleTime: initialProject ? 30_000 : 0,
+  });
 
-      try {
-        const response = await fetch(`/api/projects/${projectId}?workspaceId=${encodeURIComponent(workspaceId)}`, {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-          signal: attemptController.signal,
-        });
-
-        if (!response.ok) {
-          let errorText = `HTTP error ${response.status}`;
-          try {
-            const errorJson = await response.json();
-            errorText = errorJson?.error || errorJson.message || errorText;
-          } catch {
-            errorText = await response.text().catch(() => errorText);
-          }
-          throw new Error(`Failed to fetch project: ${errorText}`);
-        }
-
-        const nextProject = await response.json();
-        if (!nextProject) {
-          throw new Error('Project not found in API response.');
-        }
-
-        if (!requestController.signal.aborted) {
-          setProject(nextProject);
-          setIsLoading(false);
-        }
-        if (requestControllerRef.current === requestController) {
-          requestControllerRef.current = null;
-        }
-        return;
-      } catch (caughtError: unknown) {
-        if (requestController.signal.aborted) return;
-
-        let errorMessage = 'An unknown error occurred while fetching project details.';
-        let canRetry = true;
-
-        if (caughtError instanceof Error) {
-          errorMessage = caughtError.name === 'AbortError'
-            ? 'The project request timed out. Please try again.'
-            : caughtError.message;
-          canRetry = caughtError.name !== 'AbortError' &&
-            !errorMessage.toLowerCase().includes('not found') &&
-            !errorMessage.toLowerCase().includes('invalid project id');
-        } else {
-          canRetry = false;
-        }
-
-        console.error(`Error fetching project (attempt ${attempt}):`, caughtError);
-
-        if (attempt >= MAX_RETRIES || !canRetry) {
-          setError(errorMessage);
-          setIsLoading(false);
-          if (requestControllerRef.current === requestController) {
-            requestControllerRef.current = null;
-          }
-          return;
-        }
-
-        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-        if (requestController.signal.aborted) return;
-      } finally {
-        clearTimeout(timeoutId);
-        requestController.signal.removeEventListener('abort', abortAttempt);
-      }
-    }
-
-  }, [projectId, isValidProjectId, workspaceId]);
-
-  useEffect(() => {
-    if (isValidProjectId) {
-      fetchProject();
-    } else {
-      if (projectId) {
-        setError("Invalid Project ID format. Please check the URL.");
-      }
-      setIsLoading(false);
-    }
-
-    return () => requestControllerRef.current?.abort();
-  }, [projectId, isValidProjectId, fetchProject]);
-
-  const updateProject = useCallback((updatedFields: Partial<Project>) => {
-    setProject((currentProject) => currentProject
-      ? { ...currentProject, ...updatedFields }
-      : null
-    );
-  }, []);
+  const updateProject = useCallback(
+    (updatedFields: Partial<Project>) => {
+      queryClient.setQueryData<Project>(queryKey, (current) => (current ? { ...current, ...updatedFields } : current));
+    },
+    [queryClient, queryKey],
+  );
 
   return {
-    project,
-    isLoading,
-    error,
-    refetch: () => { void fetchProject(); },
+    project: query.data ?? null,
+    isLoading: isValidProjectId && query.isLoading,
+    error: !isValidProjectId
+      ? projectId
+        ? 'Invalid Project ID format. Please check the URL.'
+        : null
+      : query.error
+        ? query.error.message
+        : null,
+    refetch: () => {
+      void query.refetch();
+    },
     updateProject,
   };
 };

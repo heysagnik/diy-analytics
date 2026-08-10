@@ -1,56 +1,44 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import type { Visitor, VisitorFiltersState, VisitorListResponse, VisitorPagination } from '@/types/visitors';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import type { VisitorFiltersState, VisitorListResponse, VisitorPagination } from '@/types/visitors';
 
-const DEFAULT_PAGINATION: VisitorPagination = { page: 1, limit: 12, total: 0, totalPages: 0 };
+const DEFAULT_PAGINATION_STATE = { page: 1, limit: 12 };
 const DEFAULT_FILTERS: VisitorFiltersState = { country: '', lastSeen: '', search: '' };
+const EMPTY_PAGINATION: VisitorPagination = { page: 1, limit: 12, total: 0, totalPages: 0 };
+
+async function fetchVisitors(
+  projectId: string,
+  page: number,
+  limit: number,
+  filters: VisitorFiltersState,
+  signal: AbortSignal,
+): Promise<VisitorListResponse> {
+  const searchParams = new URLSearchParams();
+  searchParams.append('page', page.toString());
+  searchParams.append('limit', limit.toString());
+  if (filters.country) searchParams.append('country', filters.country);
+  if (filters.lastSeen) searchParams.append('lastSeen', filters.lastSeen);
+  if (filters.search.trim()) searchParams.append('search', filters.search.trim());
+
+  const response = await fetch(`/api/projects/${projectId}/users?${searchParams.toString()}`, { signal });
+  if (!response.ok) {
+    throw new Error(`Error ${response.status}: ${response.statusText}`);
+  }
+  return response.json();
+}
 
 export const useVisitors = (projectId: string | undefined) => {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [users, setUsers] = useState<Visitor[]>([]);
-  const [pagination, setPagination] = useState<VisitorPagination>(DEFAULT_PAGINATION);
-  const [countries, setCountries] = useState<string[]>([]);
+  const [{ page, limit }, setPagination] = useState(DEFAULT_PAGINATION_STATE);
   const [filters, setFilters] = useState<VisitorFiltersState>(DEFAULT_FILTERS);
-  const requestControllerRef = useRef<AbortController | null>(null);
 
-  const fetchUsers = useCallback(async () => {
-    if (!projectId) return;
-    requestControllerRef.current?.abort();
-    const controller = new AbortController();
-    requestControllerRef.current = controller;
-    setLoading(true);
-    setError(null);
-    try {
-      const searchParams = new URLSearchParams();
-      searchParams.append('page', pagination.page.toString());
-      searchParams.append('limit', pagination.limit.toString());
-      if (filters.country) searchParams.append('country', filters.country);
-      if (filters.lastSeen) searchParams.append('lastSeen', filters.lastSeen);
-      if (filters.search.trim()) searchParams.append('search', filters.search.trim());
-
-      const response = await fetch(`/api/projects/${projectId}/users?${searchParams.toString()}`, { signal: controller.signal });
-      if (!response.ok) {
-        throw new Error(`Error ${response.status}: ${response.statusText}`);
-      }
-
-      const data: VisitorListResponse = await response.json();
-      setUsers(data.users);
-      setPagination(data.pagination);
-      setCountries(data.filters.countries || []);
-    } catch (err: unknown) {
-      if (controller.signal.aborted) return;
-      console.error('Error fetching users:', err);
-      setError('Failed to load visitor telemetry.');
-    } finally {
-      if (!controller.signal.aborted) setLoading(false);
-      if (requestControllerRef.current === controller) requestControllerRef.current = null;
-    }
-  }, [projectId, pagination.page, pagination.limit, filters.country, filters.lastSeen, filters.search]);
-
-  useEffect(() => {
-    if (projectId) void fetchUsers();
-    return () => requestControllerRef.current?.abort();
-  }, [projectId, fetchUsers]);
+  const query = useQuery<VisitorListResponse, Error>({
+    queryKey: ['visitors', projectId, page, limit, filters],
+    queryFn: ({ signal }) => fetchVisitors(projectId as string, page, limit, filters, signal),
+    enabled: Boolean(projectId),
+    // Keep the previous page's rows visible while the next page loads,
+    // instead of flashing back to a loading state on every pagination click.
+    placeholderData: keepPreviousData,
+  });
 
   const handlePageChange = (value: number) => {
     setPagination((prev) => ({ ...prev, page: value }));
@@ -61,19 +49,22 @@ export const useVisitors = (projectId: string | undefined) => {
     setPagination((prev) => ({ ...prev, page: 1 }));
   };
 
-  const handleClearFilters = () => setFilters(DEFAULT_FILTERS);
+  const handleClearFilters = () => {
+    setFilters(DEFAULT_FILTERS);
+    setPagination((prev) => ({ ...prev, page: 1 }));
+  };
 
   const hasActiveFilters = Boolean(filters.country || filters.lastSeen || filters.search);
 
   return {
-    loading,
-    error,
-    pagination,
-    countries,
+    loading: query.isLoading,
+    error: query.isError ? 'Failed to load visitor telemetry.' : null,
+    pagination: query.data?.pagination ?? EMPTY_PAGINATION,
+    countries: query.data?.filters.countries ?? [],
     filters,
-    filteredUsers: users,
+    filteredUsers: query.data?.users ?? [],
     hasActiveFilters,
-    fetchUsers,
+    fetchUsers: () => query.refetch(),
     handlePageChange,
     handleFilterChange,
     handleClearFilters,

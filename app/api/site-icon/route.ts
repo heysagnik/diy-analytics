@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 import { assertSafeWebhookUrl } from '@/lib/ssrfGuard';
 
 const MAX_HTML_BYTES = 300_000;
@@ -50,7 +50,7 @@ async function fetchWithTimeout(url: string, init: RequestInit): Promise<Respons
       ...init,
       signal: controller.signal,
       redirect: 'manual',
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; DIYAnalyticsIconBot/1.0)', ...init.headers }
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; DIYAnalyticsIconBot/1.0)', ...init.headers },
     });
   } catch {
     return null;
@@ -61,7 +61,7 @@ async function fetchWithTimeout(url: string, init: RequestInit): Promise<Respons
 
 async function fetchHtmlHead(pageUrl: URL): Promise<string> {
   const res = await fetchWithTimeout(pageUrl.toString(), {});
-  if (!res || !res.ok || !res.body) return '';
+  if (!res?.ok || !res.body) return '';
 
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
@@ -102,7 +102,7 @@ async function resolveIcon(domain: string): Promise<string | null> {
   candidates.push(
     { url: `${pageUrl.origin}/apple-touch-icon.png`, score: 500 },
     { url: `${pageUrl.origin}/apple-touch-icon-precomposed.png`, score: 490 },
-    { url: `${pageUrl.origin}/favicon.ico`, score: 1 }
+    { url: `${pageUrl.origin}/favicon.ico`, score: 1 },
   );
   candidates.sort((a, b) => b.score - a.score);
 

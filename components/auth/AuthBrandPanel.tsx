@@ -5,7 +5,8 @@ interface AuthBrandPanelProps {
   subtext: string;
 }
 
-const SPARKLINE_POINTS = '0,38 14,34 28,36 42,24 56,27 70,14 84,18 100,4';
+const SPARKLINE_CURVE = 'M 0,36 C 10,36 15,33 25,34 C 35,35 40,24 50,25 C 60,26 65,14 75,16 C 85,18 90,6 100,4';
+const SPARKLINE_AREA = `${SPARKLINE_CURVE} L 100,40 L 0,40 Z`;
 
 /**
  * Left-hand brand panel for the split auth layout. Deliberately dark
@@ -48,33 +49,42 @@ export default function AuthBrandPanel({ headline, subtext }: AuthBrandPanelProp
         <p className="mt-3 text-pretty text-sm leading-relaxed text-muted-foreground">{subtext}</p>
 
         <div
-          className="mt-8 rounded-xl border border-border p-4 shadow-[var(--overlay-shadow)]"
+          className="mt-8 rounded-xl border border-border/80 p-4 shadow-[var(--overlay-shadow)]"
           style={{ backgroundColor: 'var(--surface-2)' }}
         >
-          <div className="flex items-baseline justify-between">
-            <p className="text-xs font-medium text-muted-foreground">Pageviews this week</p>
-            <p className="flex items-center gap-1 text-xs font-medium text-success">
-              <span aria-hidden="true">▲</span> 18%
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-medium tracking-wide text-muted-foreground">Pageviews this week</p>
+            <p className="flex items-center gap-1 text-xs font-medium text-emerald-400">
+              <span aria-hidden="true" className="text-[10px]">▲</span> 18%
             </p>
           </div>
-          <p className="mt-1 font-mono text-2xl font-semibold tabular-nums">12,406</p>
-          <svg viewBox="0 0 100 40" className="mt-3 h-10 w-full overflow-visible" preserveAspectRatio="none">
-            <defs>
-              <linearGradient id="auth-sparkline-fill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="var(--chart-1)" stopOpacity="0.35" />
-                <stop offset="100%" stopColor="var(--chart-1)" stopOpacity="0" />
-              </linearGradient>
-            </defs>
-            <polyline points={`${SPARKLINE_POINTS} 100,40 0,40`} fill="url(#auth-sparkline-fill)" stroke="none" />
-            <polyline
-              points={SPARKLINE_POINTS}
-              fill="none"
-              stroke="var(--chart-1)"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+          <p className="mt-1 font-mono text-2xl font-semibold tracking-tight tabular-nums text-foreground">
+            12,406
+          </p>
+          <div className="relative mt-3 h-10 w-full">
+            <svg
+              viewBox="0 0 100 40"
+              className="h-full w-full"
+              preserveAspectRatio="none"
+              aria-hidden="true"
+            >
+              <defs>
+                <linearGradient id="auth-sparkline-fill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="var(--chart-1)" stopOpacity="0.2" />
+                  <stop offset="100%" stopColor="var(--chart-1)" stopOpacity="0" />
+                </linearGradient>
+              </defs>
+              <path d={SPARKLINE_AREA} fill="url(#auth-sparkline-fill)" stroke="none" />
+              <path
+                d={SPARKLINE_CURVE}
+                fill="none"
+                stroke="var(--chart-1)"
+                strokeWidth="1.75"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </div>
         </div>
       </div>
 

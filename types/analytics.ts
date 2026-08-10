@@ -10,9 +10,7 @@
 // value that's actually a string at runtime.
 // ====================================================================
 
-import type {
-  AnalyticsResponse as ServerAnalyticsResponse,
-} from '../app/api/analytics/types';
+import type { AnalyticsResponse as ServerAnalyticsResponse } from '../app/api/analytics/types';
 
 export interface TimeRange {
   start: string;
@@ -24,34 +22,33 @@ export type AnalyticsResponse = Omit<ServerAnalyticsResponse, 'timeRange'> & {
 };
 
 export type DateRange =
-  | "Last Hour"
-  | "Last 24 hours"
-  | "Last 7 days"
-  | "Last 30 days"
-  | "Last 6 months"
-  | "Last 12 months"
-  | "All Time";
+  | 'Last Hour'
+  | 'Last 24 hours'
+  | 'Last 7 days'
+  | 'Last 30 days'
+  | 'Last 6 months'
+  | 'Last 12 months'
+  | 'All Time';
 
 export type {
   BrowserData,
   CampaignData,
+  CityData,
   CountryData,
   DeviceData,
-  OSData,
-  CityData,
-  UtmBreakdownData,
   EventData,
   EventPropertyKeyData,
   EventPropertyValueData,
   GoalConversionData,
+  GranularityType as Granularity,
   MetricData,
+  OSData,
   PageData,
   RecentEvent,
   SourceData,
+  UtmBreakdownData,
   WebVitalData,
 } from '../app/api/analytics/types';
-
-export type { GranularityType as Granularity } from '../app/api/analytics/types';
 
 export type AnalyticsData = Omit<AnalyticsResponse, 'timeRange'>;
 

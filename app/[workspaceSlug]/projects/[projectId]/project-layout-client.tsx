@@ -1,22 +1,24 @@
-"use client";
+'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { usePathname } from "next/navigation";
-import ErrorBoundary from "@/components/layout/ErrorBoundary";
-import Header from "@/components/project/Header";
-import Sidebar from "@/components/project/Sidebar";
-import { getNavigationItems, getFooterLinks } from "@/utils/navigation";
-import { useProject } from "@/hooks/useProject";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty";
-import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
-import { WarningIcon } from "@phosphor-icons/react";
-import { normalizeProjectUrl } from "@/utils/url";
-import { ProjectProvider } from "./project-context";
+import { WarningIcon } from '@phosphor-icons/react';
+import { usePathname } from 'next/navigation';
+import type React from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import ErrorBoundary from '@/components/layout/ErrorBoundary';
+import Header from '@/components/project/Header';
+import Sidebar from '@/components/project/Sidebar';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
+import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useProject } from '@/hooks/useProject';
+import { isValidUuid } from '@/lib/uuid';
+import type { Project } from '@/types/analytics';
+import { getFooterLinks, getNavigationItems } from '@/utils/navigation';
+import { normalizeProjectUrl } from '@/utils/url';
+import { ProjectProvider } from './project-context';
 
-const OBJECT_ID_REGEX = /^[a-fA-F0-9]{24}$/;
 const PROJECT_LOAD_ERROR = "We couldn't load this project. Please try again.";
 
 interface ProjectLayoutProps {
@@ -24,6 +26,7 @@ interface ProjectLayoutProps {
   workspaceId: string;
   workspaceSlug: string;
   projectId: string;
+  initialProject: Project;
 }
 
 // Mirrors the real Sidebar/Header/MetricsGrid/MainChart shapes (not just
@@ -50,6 +53,7 @@ const ProjectLoadingSkeleton = () => (
 
       <div className="flex-1 px-2 py-3 flex flex-col gap-1">
         {[16, 14, 20, 12, 18].map((w, i) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: fixed placeholder list, never reorders
           <div key={i} className="flex items-center gap-2.5 px-4 py-2.5">
             <Skeleton className="size-[18px] rounded-sm flex-shrink-0" />
             <Skeleton className="h-3.5 rounded-sm" style={{ width: `${w * 0.25}rem` }} />
@@ -74,9 +78,10 @@ const ProjectLoadingSkeleton = () => (
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        <div className="px-4 py-10 sm:px-6 sm:py-16 lg:px-8 flex flex-col gap-4 max-w-6xl mx-auto w-full">
+        <div className="px-4 py-6 sm:px-6 sm:py-8 lg:px-8 flex flex-col gap-5 max-w-6xl mx-auto w-full">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {Array.from({ length: 4 }, (_, i) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: fixed-count placeholder list, never reorders
               <Card key={i} className="p-4 flex flex-col justify-between gap-3">
                 <div className="flex items-center justify-between">
                   <Skeleton className="h-3 w-16 rounded-sm" />
@@ -133,28 +138,31 @@ const ErrorDisplay = ({ message, onRetry }: { message: string; onRetry?: () => v
   </div>
 );
 
-export default function ProjectLayoutClient({ children, workspaceId, workspaceSlug, projectId }: ProjectLayoutProps) {
+export default function ProjectLayoutClient({
+  children,
+  workspaceId,
+  workspaceSlug,
+  projectId,
+  initialProject,
+}: ProjectLayoutProps) {
   const pathname = usePathname();
 
   const [isSidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   useEffect(() => {
-    const stored = window.localStorage.getItem("sidebar-collapsed");
-    if (stored === "true") setSidebarCollapsed(true);
+    const stored = window.localStorage.getItem('sidebar-collapsed');
+    if (stored === 'true') setSidebarCollapsed(true);
   }, []);
 
   const handleSidebarOpenChange = useCallback((open: boolean) => {
     const nextCollapsed = !open;
     setSidebarCollapsed(nextCollapsed);
-    window.localStorage.setItem("sidebar-collapsed", String(nextCollapsed));
+    window.localStorage.setItem('sidebar-collapsed', String(nextCollapsed));
   }, []);
 
-  const [activePageId, setActivePageId] = useState("analytics");
+  const [activePageId, setActivePageId] = useState('analytics');
 
-  const isValidProjectId = useMemo(
-    () => (projectId ? OBJECT_ID_REGEX.test(projectId) : false),
-    [projectId]
-  );
+  const isValidProjectId = useMemo(() => (projectId ? isValidUuid(projectId) : false), [projectId]);
 
   const {
     project: projectData,
@@ -162,43 +170,37 @@ export default function ProjectLayoutClient({ children, workspaceId, workspaceSl
     error: projectError,
     refetch: refetchProject,
     updateProject,
-  } = useProject({ projectId, isValidProjectId, workspaceId });
+  } = useProject({ projectId, isValidProjectId, workspaceId, initialProject });
 
-  const projectName = projectData?.name || "Loading...";
-  const projectUrl = projectData?.url
-    ? normalizeProjectUrl(projectData.url)?.hostname || ""
-    : "";
+  const projectName = projectData?.name || 'Loading...';
+  const projectUrl = projectData?.url ? normalizeProjectUrl(projectData.url)?.hostname || '' : '';
 
   const projectBasePath = `/${workspaceSlug}/projects/${projectId}`;
   const navigationItems = useMemo(() => getNavigationItems(projectBasePath), [projectBasePath]);
   const footerLinks = useMemo(() => getFooterLinks(workspaceSlug), [workspaceSlug]);
 
   useEffect(() => {
-    const pathParts = pathname.split("/").filter(Boolean);
-    setActivePageId(pathParts[3] || "analytics");
+    const pathParts = pathname.split('/').filter(Boolean);
+    setActivePageId(pathParts[3] || 'analytics');
   }, [pathname]);
 
+  const projectDataName = projectData?.name;
   useEffect(() => {
-    if (!projectData) return;
+    if (!projectDataName) return;
 
     const previousTitle = document.title;
-    document.title = `${projectData.name} - Analytics`;
+    document.title = `${projectDataName} - Analytics`;
 
     return () => {
       document.title = previousTitle;
     };
-  }, [projectData]);
+  }, [projectDataName]);
 
   if (isLoadingProject) return <ProjectLoadingSkeleton />;
 
   if (projectError || !projectData) {
-    const canRetry = projectId && projectError && !projectError.toLowerCase().includes("not found");
-    return (
-      <ErrorDisplay
-        message={PROJECT_LOAD_ERROR}
-        onRetry={canRetry ? refetchProject : undefined}
-      />
-    );
+    const canRetry = projectId && projectError && !projectError.toLowerCase().includes('not found');
+    return <ErrorDisplay message={PROJECT_LOAD_ERROR} onRetry={canRetry ? refetchProject : undefined} />;
   }
 
   return (
@@ -220,10 +222,7 @@ export default function ProjectLayoutClient({ children, workspaceId, workspaceSl
 
             <SidebarInset className="flex-1 flex flex-col min-w-0 overflow-hidden">
               <div className="lg:hidden">
-                <Header
-                  projectName={projectName}
-                  isLoading={isLoadingProject}
-                />
+                <Header projectName={projectName} isLoading={isLoadingProject} />
               </div>
               <div className="flex-1 overflow-y-auto scrollbar-thin">
                 <div className="w-full">{children}</div>

@@ -5,7 +5,7 @@ const WorkspaceSchema = new Schema(
     name: { type: String, required: true, trim: true, maxlength: 120 },
     slug: { type: String, required: true, unique: true, index: true, lowercase: true, trim: true, maxlength: 120 },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 export default mongoose.models.Workspace || mongoose.model('Workspace', WorkspaceSchema);

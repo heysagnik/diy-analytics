@@ -1,20 +1,13 @@
-import { NextRequest, NextResponse } from "next/server";
-import connectToDatabase from "@/lib/mongodb";
-import Project from "@/models/Project";
-import { PUBLIC_CORS_HEADERS as CORS_HEADERS } from "@/lib/corsHeaders";
+import { eq } from 'drizzle-orm';
+import { type NextRequest, NextResponse } from 'next/server';
+import { projects } from '@/db/schema';
+import { PUBLIC_CORS_HEADERS as CORS_HEADERS } from '@/lib/corsHeaders';
+import { db } from '@/lib/db';
 
 interface ProjectForScript {
   trackingCode: string;
-  domain?: string;
+  domain?: string | null;
   url: string;
-}
-
-interface ProjectDocument {
-  _id: unknown;
-  trackingCode: string;
-  domain?: string;
-  url?: string;
-  __v: number;
 }
 
 export async function OPTIONS() {
@@ -31,35 +24,28 @@ export async function GET(request: NextRequest) {
     const siteId = searchParams.get('site-id');
 
     if (!siteId) {
-      const errorMessage = 'DIY Analytics Error: Missing site-id parameter. Usage: /api/tracker.js?site-id=your-site-id';
-      return new NextResponse(
-        `console.error("${errorMessage}");`,
-        { 
-          status: 400, 
-          headers: { 
-            ...CORS_HEADERS,
-            'Content-Type': 'application/javascript'
-          } 
-        }
-      );
+      const errorMessage =
+        'DIY Analytics Error: Missing site-id parameter. Usage: /api/tracker.js?site-id=your-site-id';
+      return new NextResponse(`console.error("${errorMessage}");`, {
+        status: 400,
+        headers: {
+          ...CORS_HEADERS,
+          'Content-Type': 'application/javascript',
+        },
+      });
     }
 
-    await connectToDatabase();
-
-    const project = await Project.findOne({ trackingCode: siteId }).lean() as ProjectDocument | null;
+    const [project] = await db.select().from(projects).where(eq(projects.trackingCode, siteId)).limit(1);
 
     if (!project) {
       const errorMessage = 'DIY Analytics Error: Invalid site-id. Please check your tracking code.';
-      return new NextResponse(
-        `console.error("${errorMessage}");`,
-        { 
-          status: 404, 
-          headers: { 
-            ...CORS_HEADERS,
-            'Content-Type': 'application/javascript'
-          } 
-        }
-      );
+      return new NextResponse(`console.error("${errorMessage}");`, {
+        status: 404,
+        headers: {
+          ...CORS_HEADERS,
+          'Content-Type': 'application/javascript',
+        },
+      });
     }
 
     // Generate the tracking script with project-specific configuration.
@@ -69,7 +55,7 @@ export async function GET(request: NextRequest) {
     const projectForScript: ProjectForScript = {
       trackingCode: project.trackingCode,
       domain: project.domain,
-      url: project.url || ''
+      url: project.url || '',
     };
     const trackingScript = generateTrackingScript(projectForScript);
 
@@ -78,29 +64,27 @@ export async function GET(request: NextRequest) {
       headers: {
         ...CORS_HEADERS,
         'Content-Type': 'application/javascript',
-        'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate'
-      }
+        'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate',
+      },
     });
-
   } catch (error) {
     console.error('Tracker.js Error:', error);
     const errorMessage = 'DIY Analytics Error: Internal server error.';
-    return new NextResponse(
-      `console.error("${errorMessage}");`,
-      { 
-        status: 500, 
-        headers: { 
-          ...CORS_HEADERS,
-          'Content-Type': 'application/javascript'
-        } 
-      }
-    );
+    return new NextResponse(`console.error("${errorMessage}");`, {
+      status: 500,
+      headers: {
+        ...CORS_HEADERS,
+        'Content-Type': 'application/javascript',
+      },
+    });
   }
 }
 
 function generateTrackingScript(project: ProjectForScript) {
   if (!process.env.NEXT_PUBLIC_SITE_URL && process.env.NODE_ENV === 'production') {
-    console.warn('[tracker.js] NEXT_PUBLIC_SITE_URL is not set — generated scripts will point at http://localhost:3000/api/track, which will fail for real visitors.');
+    console.warn(
+      '[tracker.js] NEXT_PUBLIC_SITE_URL is not set — generated scripts will point at http://localhost:3000/api/track, which will fail for real visitors.',
+    );
   }
   const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000').replace(/\/+$/, '');
   const endpoint = `${siteUrl}/api/track`;
@@ -132,7 +116,7 @@ function generateTrackingScript(project: ProjectForScript) {
     const currentDomain = location.hostname;
     return ALLOWED_DOMAINS.some(domain => {
       if (!domain) return false;
-      const normalizedDomain = domain.replace(/^(?:www\.)?/i, "").split('/')[0];
+      const normalizedDomain = domain.replace(/^(?:www.)?/i, "").split('/')[0];
       return currentDomain === normalizedDomain || currentDomain.endsWith('.' + normalizedDomain);
     });
   }

@@ -1,9 +1,9 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Card } from '@/components/ui/card';
 import { CircleNotchIcon, SignOutIcon } from '@phosphor-icons/react';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { Card } from '@/components/ui/card';
 
 export default function LogoutPage() {
   const router = useRouter();
@@ -12,7 +12,7 @@ export default function LogoutPage() {
   useEffect(() => {
     const timer = setTimeout(() => {
       fetch('/api/auth/logout', { method: 'POST' })
-        .catch(() => { })
+        .catch(() => {})
         .finally(() => {
           setStatus('done');
           setTimeout(() => {
@@ -47,9 +47,7 @@ export default function LogoutPage() {
           </h2>
 
           <p className="text-xs text-muted-foreground mt-1.5 font-body text-pretty">
-            {status === 'clearing'
-              ? 'Revoking your active session'
-              : 'Redirecting to sign in…'}
+            {status === 'clearing' ? 'Revoking your active session' : 'Redirecting to sign in…'}
           </p>
         </Card>
       </div>

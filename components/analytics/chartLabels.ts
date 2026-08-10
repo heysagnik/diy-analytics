@@ -17,11 +17,9 @@ export function formatAxisLabel(label: string, granularity: ChartGranularity, co
     case 'day': {
       if (!compact) return label;
       const date = new Date(label);
-      if (isNaN(date.getTime())) return label;
+      if (Number.isNaN(date.getTime())) return label;
       const diffDays = Math.abs((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24));
-      return diffDays < 7
-        ? date.toLocaleDateString('en-US', { weekday: 'short' })
-        : label;
+      return diffDays < 7 ? date.toLocaleDateString('en-US', { weekday: 'short' }) : label;
     }
     default:
       return label;

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 import { analyticsController } from '../controllers/analyticsController';
 
 const CORS_HEADERS = {
@@ -6,7 +6,7 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Methods': 'GET, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
   'Access-Control-Max-Age': '86400',
-  'Vary': 'Origin'
+  Vary: 'Origin',
 } as const;
 
 function withCors(response: NextResponse): NextResponse {
@@ -24,8 +24,8 @@ export async function GET(request: NextRequest) {
     return withCors(
       NextResponse.json(
         { success: false, error: 'Internal server error', timestamp: new Date().toISOString() },
-        { status: 500 }
-      )
+        { status: 500 },
+      ),
     );
   }
 }

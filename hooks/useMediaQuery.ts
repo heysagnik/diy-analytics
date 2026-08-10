@@ -6,11 +6,14 @@ import { useCallback, useSyncExternalStore } from 'react';
  * whichever layout should never flash for the common case.
  */
 export const useMediaQuery = (query: string, defaultValue = false): boolean => {
-  const subscribe = useCallback((onChange: () => void) => {
-    const mediaQuery = window.matchMedia(query);
-    mediaQuery.addEventListener('change', onChange);
-    return () => mediaQuery.removeEventListener('change', onChange);
-  }, [query]);
+  const subscribe = useCallback(
+    (onChange: () => void) => {
+      const mediaQuery = window.matchMedia(query);
+      mediaQuery.addEventListener('change', onChange);
+      return () => mediaQuery.removeEventListener('change', onChange);
+    },
+    [query],
+  );
   const getSnapshot = useCallback(() => window.matchMedia(query).matches, [query]);
   const getServerSnapshot = useCallback(() => defaultValue, [defaultValue]);
 

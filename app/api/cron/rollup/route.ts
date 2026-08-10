@@ -1,12 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { Types } from 'mongoose';
-import connectToDatabase from '../../../../lib/mongodb';
-import Project from '../../../../models/Project';
+import { type NextRequest, NextResponse } from 'next/server';
+import { projects } from '@/db/schema';
+import { db } from '@/lib/db';
+import { pruneExpiredData } from '../../analytics/services/dataRetentionService';
 import { computeDailyRollup } from '../../analytics/services/rollupService';
-import { normalizeTimezone, periodStartFor, addPeriods } from '../../analytics/utils/dateUtils';
+import { addPeriods, normalizeTimezone, periodStartFor } from '../../analytics/utils/dateUtils';
 
 /**
- * Rolls up yesterday's pageviews into DailyRollup, one document per project.
+ * Rolls up yesterday's pageviews into daily_rollups, one row per project,
+ * then prunes any pageviews/events past the configured retention window.
  * Intended to run once a day (see vercel.json) well after most timezones'
  * "yesterday" has closed, so every rollup covers a day that's fully done
  * accumulating data — never the still-open current day.
@@ -21,27 +22,32 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  await connectToDatabase();
-
-  const projects = await Project.find({}).select('_id timezone').lean<Array<{ _id: Types.ObjectId; timezone?: string | null }>>();
+  const projectRows = await db.select({ id: projects.id, timezone: projects.timezone }).from(projects);
 
   let succeeded = 0;
   const failed: string[] = [];
 
-  for (const project of projects) {
+  for (const project of projectRows) {
     try {
       const tz = normalizeTimezone(project.timezone || 'UTC');
       const todayStart = periodStartFor(new Date(), 'day', tz);
       const yesterdayStart = addPeriods(todayStart, -1, 'day', tz);
-      await computeDailyRollup(project._id, yesterdayStart, todayStart);
+      await computeDailyRollup(project.id, yesterdayStart, todayStart);
       succeeded++;
     } catch (error) {
-      console.error(`Rollup failed for project ${project._id}:`, error);
-      failed.push(String(project._id));
+      console.error(`Rollup failed for project ${project.id}:`, error);
+      failed.push(project.id);
     }
   }
 
-  return NextResponse.json({ success: true, data: { projects: projects.length, succeeded, failed } });
+  let retention: { pageviewsDeleted: number; eventsDeleted: number } | null = null;
+  try {
+    retention = await pruneExpiredData();
+  } catch (error) {
+    console.error('Retention pruning failed:', error);
+  }
+
+  return NextResponse.json({ success: true, data: { projects: projectRows.length, succeeded, failed, retention } });
 }
 
 export const runtime = 'nodejs';

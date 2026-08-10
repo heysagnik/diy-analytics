@@ -1,5 +1,5 @@
-import React from 'react';
-import { Project } from '@/lib/api/projects';
+import type React from 'react';
+import type { Project } from '@/lib/api/projects';
 import { ProjectCard } from './ProjectCard';
 
 interface ProjectGridProps {

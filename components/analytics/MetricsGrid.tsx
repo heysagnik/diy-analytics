@@ -1,7 +1,7 @@
-import React from 'react';
-import { Card } from '@/components/ui/card';
+import type React from 'react';
 import { Badge } from '@/components/ui/badge';
-import { AnalyticsData } from '@/types/analytics';
+import { Card } from '@/components/ui/card';
+import type { AnalyticsData } from '@/types/analytics';
 
 interface MetricsGridProps {
   analyticsData: AnalyticsData;
@@ -45,23 +45,22 @@ export const MetricsGrid: React.FC<MetricsGridProps> = ({ analyticsData }) => {
             style={{ animationDelay: `${idx * 80}ms` }}
           >
             <div className="flex items-center justify-between">
-              <span className="label-eyebrow text-muted-foreground">
-                {metric.title}
-              </span>
+              <span className="label-eyebrow text-muted-foreground">{metric.title}</span>
             </div>
 
             <div className="flex items-baseline justify-between">
-              <span className="font-display text-xl font-semibold text-foreground tabular-nums">
-                {metric.value}
-              </span>
+              <span className="font-display text-xl font-semibold text-foreground tabular-nums">{metric.value}</span>
 
               <Badge
-                variant={isNeutral ? "secondary" : isPositive ? "default" : "destructive"}
+                variant={isNeutral ? 'secondary' : isPositive ? 'default' : 'destructive'}
                 className={`tabular-nums ${
                   isPositive ? 'bg-success/10 text-success hover:bg-success/10 border-none shadow-none' : ''
                 }`}
               >
-                <span>{isPositive && metric.change > 0 ? '+' : ''}{metric.change}%</span>
+                <span>
+                  {isPositive && metric.change > 0 ? '+' : ''}
+                  {metric.change}%
+                </span>
               </Badge>
             </div>
           </Card>

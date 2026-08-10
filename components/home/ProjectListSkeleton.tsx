@@ -1,11 +1,12 @@
-import React from 'react';
+import type React from 'react';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Card, CardHeader, CardContent } from '@/components/ui/card';
 
 export const ProjectListSkeleton: React.FC = () => {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 lg:gap-6">
       {Array.from({ length: 6 }).map((_, index) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: fixed-count placeholder list, never reorders
         <Card key={index}>
           <CardHeader className="flex-row justify-between items-start">
             <div className="flex flex-col gap-2 flex-1">

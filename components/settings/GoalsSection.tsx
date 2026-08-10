@@ -1,11 +1,19 @@
-import React, { useEffect, useState } from 'react';
-import { Project } from '../../types/settings';
-import { Input } from '@/components/ui/input';
+import { PlusIcon, TargetIcon, TrashIcon } from '@phosphor-icons/react';
+import type React from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
-import { PlusIcon, TrashIcon, TargetIcon } from '@phosphor-icons/react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import type { Project } from '../../types/settings';
 import { SettingsGroup } from './SettingsGroup';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 interface Goal {
   _id: string;
@@ -33,12 +41,19 @@ export const GoalsSection: React.FC<GoalsSectionProps> = ({ project, showToast }
     let cancelled = false;
     fetch(`/api/projects/${project._id}/goals`)
       .then((res) => res.json())
-      .then((data) => { if (!cancelled) setGoals(Array.isArray(data) ? data : []); })
-      .catch(() => { if (!cancelled) showToast('error', 'Failed to load goals.'); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [project?._id]);
+      .then((data) => {
+        if (!cancelled) setGoals(Array.isArray(data) ? data : []);
+      })
+      .catch(() => {
+        if (!cancelled) showToast('error', 'Failed to load goals.');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [project?._id, showToast]);
 
   const handleCreate = async () => {
     if (!project?._id) return;
@@ -100,9 +115,13 @@ export const GoalsSection: React.FC<GoalsSectionProps> = ({ project, showToast }
             aria-label="Goal name"
             className="sm:flex-1"
           />
-          <Select value={type} onValueChange={(v: unknown) => {
-            if (v === 'page' || v === 'event') setType(v);
-          }} disabled={isCreating}>
+          <Select
+            value={type}
+            onValueChange={(v: unknown) => {
+              if (v === 'page' || v === 'event') setType(v);
+            }}
+            disabled={isCreating}
+          >
             <SelectTrigger aria-label="Goal type">
               <SelectValue>{(v: 'page' | 'event') => (v === 'page' ? 'Page visit' : 'Custom event')}</SelectValue>
             </SelectTrigger>
@@ -154,16 +173,25 @@ export const GoalsSection: React.FC<GoalsSectionProps> = ({ project, showToast }
             ))}
           </ul>
         )}
-        <Dialog open={goalToDelete !== null} onOpenChange={(open) => { if (!open) setGoalToDelete(null); }}>
+        <Dialog
+          open={goalToDelete !== null}
+          onOpenChange={(open) => {
+            if (!open) setGoalToDelete(null);
+          }}
+        >
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Delete goal?</DialogTitle>
               <DialogDescription>
-                {goalToDelete ? `“${goalToDelete.name}” will be permanently deleted. Existing analytics data will not be changed.` : ''}
+                {goalToDelete
+                  ? `“${goalToDelete.name}” will be permanently deleted. Existing analytics data will not be changed.`
+                  : ''}
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setGoalToDelete(null)}>Cancel</Button>
+              <Button variant="outline" onClick={() => setGoalToDelete(null)}>
+                Cancel
+              </Button>
               <Button
                 variant="destructive"
                 onClick={() => {

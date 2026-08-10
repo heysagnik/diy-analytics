@@ -1,4 +1,4 @@
-import type { DateRange } from "../../types/analytics";
+import type { DateRange } from '../../types/analytics';
 
 export interface GeneratedLabels {
   labels: string[];
@@ -10,7 +10,7 @@ export interface GeneratedLabels {
 
 export function generateLabels(dateRange: DateRange): GeneratedLabels {
   const now = new Date();
-  
+
   const generateHourlyLabels = (): string[] => {
     const labels: string[] = [];
     for (let i = 23; i >= 0; i--) {
@@ -53,7 +53,7 @@ export function generateLabels(dateRange: DateRange): GeneratedLabels {
 
   const generateMainLabels = (range: DateRange): string[] => {
     const labels: string[] = [];
-    
+
     switch (range) {
       case 'Last Hour': {
         for (let i = 59; i >= 0; i--) {
@@ -122,7 +122,7 @@ export function generateLabels(dateRange: DateRange): GeneratedLabels {
         }
       }
     }
-    
+
     return labels;
   };
 
@@ -133,4 +133,4 @@ export function generateLabels(dateRange: DateRange): GeneratedLabels {
     weeklyLabels: generateWeeklyLabels(),
     months: generateMonthlyLabels(),
   };
-} 
+}

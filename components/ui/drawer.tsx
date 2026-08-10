@@ -1,29 +1,27 @@
-"use client"
+'use client';
 
-import * as React from "react"
-import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
-
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
-import { XIcon } from "lucide-react"
+import { Dialog as DialogPrimitive } from '@base-ui/react/dialog';
+import { XIcon } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 // Bottom sheet, built on the same Base UI Dialog primitive as components/ui/dialog.tsx
 // (portal, focus trap, escape-to-close, backdrop) — only the popup's position and
 // enter/exit animation differ from the centered dialog.
 function Drawer({ ...props }: DialogPrimitive.Root.Props) {
-  return <DialogPrimitive.Root data-slot="drawer" {...props} />
+  return <DialogPrimitive.Root data-slot="drawer" {...props} />;
 }
 
-function DrawerTrigger({ ...props }: DialogPrimitive.Trigger.Props) {
-  return <DialogPrimitive.Trigger data-slot="drawer-trigger" {...props} />
+function _DrawerTrigger({ ...props }: DialogPrimitive.Trigger.Props) {
+  return <DialogPrimitive.Trigger data-slot="drawer-trigger" {...props} />;
 }
 
 function DrawerPortal({ ...props }: DialogPrimitive.Portal.Props) {
-  return <DialogPrimitive.Portal data-slot="drawer-portal" {...props} />
+  return <DialogPrimitive.Portal data-slot="drawer-portal" {...props} />;
 }
 
-function DrawerClose({ ...props }: DialogPrimitive.Close.Props) {
-  return <DialogPrimitive.Close data-slot="drawer-close" {...props} />
+function _DrawerClose({ ...props }: DialogPrimitive.Close.Props) {
+  return <DialogPrimitive.Close data-slot="drawer-close" {...props} />;
 }
 
 function DrawerOverlay({ className, ...props }: DialogPrimitive.Backdrop.Props) {
@@ -31,12 +29,12 @@ function DrawerOverlay({ className, ...props }: DialogPrimitive.Backdrop.Props) 
     <DialogPrimitive.Backdrop
       data-slot="drawer-overlay"
       className={cn(
-        "fixed inset-0 isolate z-50 bg-black/30 duration-200 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
-        className
+        'fixed inset-0 isolate z-50 bg-black/30 duration-200 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0',
+        className,
       )}
       {...props}
     />
-  )
+  );
 }
 
 function DrawerContent({
@@ -45,7 +43,7 @@ function DrawerContent({
   showCloseButton = true,
   ...props
 }: DialogPrimitive.Popup.Props & {
-  showCloseButton?: boolean
+  showCloseButton?: boolean;
 }) {
   return (
     <DrawerPortal>
@@ -53,9 +51,9 @@ function DrawerContent({
       <DialogPrimitive.Popup
         data-slot="drawer-content"
         className={cn(
-          "fixed inset-x-0 bottom-0 z-50 flex max-h-[85vh] flex-col gap-0 rounded-t-2xl bg-popover text-sm text-popover-foreground ring-1 ring-foreground/10 outline-none",
-          "duration-300 ease-[var(--ease-drawer)] data-open:animate-in data-open:slide-in-from-bottom-100 data-closed:animate-out data-closed:slide-out-to-bottom-100",
-          className
+          'fixed inset-x-0 bottom-0 z-50 flex max-h-[85vh] flex-col gap-0 rounded-t-2xl bg-popover text-sm text-popover-foreground ring-1 ring-foreground/10 outline-none',
+          'duration-300 ease-[var(--ease-drawer)] data-open:animate-in data-open:slide-in-from-bottom-100 data-closed:animate-out data-closed:slide-out-to-bottom-100',
+          className,
         )}
         {...props}
       >
@@ -74,7 +72,7 @@ function DrawerContent({
         )}
       </DialogPrimitive.Popup>
     </DrawerPortal>
-  )
+  );
 }
 
-export { Drawer, DrawerPortal, DrawerOverlay, DrawerContent }
+export { Drawer, DrawerContent, DrawerOverlay, DrawerPortal };

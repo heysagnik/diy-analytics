@@ -1,4 +1,4 @@
-import { TimeRange, DateRangeConfig, DATE_RANGES } from '../types';
+import { DATE_RANGES, type DateRangeConfig, type TimeRange } from '../types';
 
 type Granularity = DateRangeConfig['granularity'];
 
@@ -25,7 +25,7 @@ function getZonedParts(date: Date, timeZone: string): ZonedParts {
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
-    second: '2-digit'
+    second: '2-digit',
   });
   const parts: Record<string, string> = {};
   for (const p of dtf.formatToParts(date)) {
@@ -37,7 +37,7 @@ function getZonedParts(date: Date, timeZone: string): ZonedParts {
     day: Number(parts.day),
     hour: Number(parts.hour),
     minute: Number(parts.minute),
-    second: Number(parts.second)
+    second: Number(parts.second),
   };
 }
 
@@ -77,7 +77,7 @@ function addCalendarMonthsInTz(date: Date, months: number, timeZone: string): Da
 
 export function getDateRangeDetails(
   dateRangeKey: string,
-  timezone: string = 'UTC'
+  timezone: string = 'UTC',
 ): { timeRange: TimeRange; config: DateRangeConfig; previousRange: TimeRange } {
   const config = DATE_RANGES[dateRangeKey];
 
@@ -104,7 +104,7 @@ export function generateTimeBuckets(
   startDate: Date,
   dataPoints: number,
   granularity: Granularity,
-  timezone: string = 'UTC'
+  timezone: string = 'UTC',
 ): Date[] {
   const tz = normalizeTimezone(timezone);
   const buckets: Date[] = [];
@@ -148,7 +148,7 @@ export function generateTimeLabels(
   startDate: Date,
   dataPoints: number,
   granularity: Granularity,
-  timezone: string = 'UTC'
+  timezone: string = 'UTC',
 ): string[] {
   const tz = normalizeTimezone(timezone);
   const buckets = generateTimeBuckets(startDate, dataPoints, granularity, tz);
@@ -157,11 +157,7 @@ export function generateTimeLabels(
   return buckets.map(formatters[granularity] || formatters.default);
 }
 
-export function createDateBucketKey(
-  date: Date,
-  granularity: Granularity,
-  timezone: string = 'UTC'
-): string {
+export function createDateBucketKey(date: Date, granularity: Granularity, timezone: string = 'UTC'): string {
   const tz = normalizeTimezone(timezone);
   const p = getZonedParts(date, tz);
   const year = p.year;
@@ -171,12 +167,18 @@ export function createDateBucketKey(
   const minute = String(p.minute).padStart(2, '0');
 
   switch (granularity) {
-    case 'minute': return `${year}-${month}-${day}T${hour}:${minute}`;
-    case 'hour': return `${year}-${month}-${day}T${hour}`;
-    case 'day': return `${year}-${month}-${day}`;
-    case 'week': return `${year}-W${String(getWeekNumber(date)).padStart(2, '0')}`;
-    case 'month': return `${year}-${month}`;
-    default: return date.toISOString();
+    case 'minute':
+      return `${year}-${month}-${day}T${hour}:${minute}`;
+    case 'hour':
+      return `${year}-${month}-${day}T${hour}`;
+    case 'day':
+      return `${year}-${month}-${day}`;
+    case 'week':
+      return `${year}-W${String(getWeekNumber(date)).padStart(2, '0')}`;
+    case 'month':
+      return `${year}-${month}`;
+    default:
+      return date.toISOString();
   }
 }
 
@@ -184,7 +186,7 @@ export function calculatePercentageChange(current: number, previous: number): nu
   if (previous === 0) {
     return current > 0 ? 100 : 0;
   }
-  return Number(((current - previous) / previous * 100).toFixed(2));
+  return Number((((current - previous) / previous) * 100).toFixed(2));
 }
 
 export function normalizeTimezone(timezone?: string): string {
@@ -223,7 +225,7 @@ function createPreviousTimeRange(current: TimeRange, config: DateRangeConfig, ti
     const spanMs = current.end.getTime() - current.start.getTime();
     return {
       start: new Date(current.start.getTime() - spanMs - 1),
-      end: new Date(current.start.getTime() - 1)
+      end: new Date(current.start.getTime() - 1),
     };
   }
 
@@ -253,19 +255,27 @@ export function periodStartFor(date: Date, granularity: Granularity, timezone: s
 
 function nextPeriodStart(periodStart: Date, granularity: Granularity, timezone: string): Date {
   switch (granularity) {
-    case 'day': return addCalendarDaysInTz(periodStart, 1, timezone);
-    case 'week': return addCalendarDaysInTz(periodStart, 1, timezone);
-    case 'month': return addCalendarMonthsInTz(periodStart, 1, timezone);
-    default: return periodStart;
+    case 'day':
+      return addCalendarDaysInTz(periodStart, 1, timezone);
+    case 'week':
+      return addCalendarDaysInTz(periodStart, 1, timezone);
+    case 'month':
+      return addCalendarMonthsInTz(periodStart, 1, timezone);
+    default:
+      return periodStart;
   }
 }
 
 function rewindPeriods(from: Date, count: number, granularity: Granularity, timezone: string): Date {
   switch (granularity) {
-    case 'day': return addCalendarDaysInTz(from, -count, timezone);
-    case 'week': return addCalendarDaysInTz(from, -count * 7, timezone);
-    case 'month': return addCalendarMonthsInTz(from, -count, timezone);
-    default: return from;
+    case 'day':
+      return addCalendarDaysInTz(from, -count, timezone);
+    case 'week':
+      return addCalendarDaysInTz(from, -count * 7, timezone);
+    case 'month':
+      return addCalendarMonthsInTz(from, -count, timezone);
+    default:
+      return from;
   }
 }
 
@@ -275,33 +285,38 @@ function shouldAlignToDayBoundaries(granularity: Granularity): boolean {
 
 function createLabelFormatters(timezone: string) {
   return {
-    minute: (date: Date) => date.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-      timeZone: timezone
-    }),
-    hour: (date: Date) => date.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      hour12: false,
-      timeZone: timezone
-    }),
-    day: (date: Date) => date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      timeZone: timezone
-    }),
-    week: (date: Date) => `Week of ${date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      timeZone: timezone
-    })}`,
-    month: (date: Date) => date.toLocaleDateString('en-US', {
-      month: 'short',
-      year: 'numeric',
-      timeZone: timezone
-    }),
-    default: (date: Date) => date.toISOString()
+    minute: (date: Date) =>
+      date.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+        timeZone: timezone,
+      }),
+    hour: (date: Date) =>
+      date.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        hour12: false,
+        timeZone: timezone,
+      }),
+    day: (date: Date) =>
+      date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        timeZone: timezone,
+      }),
+    week: (date: Date) =>
+      `Week of ${date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        timeZone: timezone,
+      })}`,
+    month: (date: Date) =>
+      date.toLocaleDateString('en-US', {
+        month: 'short',
+        year: 'numeric',
+        timeZone: timezone,
+      }),
+    default: (date: Date) => date.toISOString(),
   };
 }
 
@@ -312,7 +327,7 @@ function getWeekNumber(date: Date): number {
   const firstThursday = target.valueOf();
   target.setMonth(0, 1);
   if (target.getDay() !== 4) {
-    target.setMonth(0, 1 + ((4 - target.getDay()) + 7) % 7);
+    target.setMonth(0, 1 + ((4 - target.getDay() + 7) % 7));
   }
   return 1 + Math.ceil((firstThursday - target.valueOf()) / 604800000);
 }

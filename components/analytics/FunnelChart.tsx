@@ -1,4 +1,4 @@
-import React from 'react';
+import type React from 'react';
 
 export interface FunnelStepResult {
   step: number;
@@ -20,7 +20,8 @@ export const FunnelChart: React.FC<FunnelChartProps> = ({ steps }) => {
     <div className="flex flex-col gap-3">
       {steps.map((step, idx) => {
         const widthPct = (step.count / maxCount) * 100;
-        const retainedPct = idx === 0 || steps[0].count === 0 ? 100 : Math.round((step.count / steps[0].count) * 10000) / 100;
+        const retainedPct =
+          idx === 0 || steps[0].count === 0 ? 100 : Math.round((step.count / steps[0].count) * 10000) / 100;
 
         return (
           <div key={step.step}>

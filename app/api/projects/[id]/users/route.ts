@@ -1,15 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
-import connectToDatabase from '@/lib/mongodb';
-import PageView from '@/models/PageView';
-import mongoose, { isValidObjectId, PipelineStage } from 'mongoose';
+import { eq, gte, type SQL, sql } from 'drizzle-orm';
+import { type NextRequest, NextResponse } from 'next/server';
+import { events, pageViews } from '@/db/schema';
+import { db } from '@/lib/db';
 import { parseBoundedInt } from '@/lib/parseIntParam';
 import { requireProjectAccess } from '@/lib/serverAuth';
-
-interface PageViewFilter {
-  projectId: mongoose.Types.ObjectId;
-  country?: string;
-  timestamp?: { $gte: Date };
-}
+import { requireAnd } from '@/lib/sql';
+import { isValidUuid } from '@/lib/uuid';
 
 interface PaginationParams {
   page: number;
@@ -22,6 +18,20 @@ interface QueryFilters {
   lastSeen?: string;
   activity?: string;
   search?: string;
+}
+
+interface VisitorRow extends Record<string, unknown> {
+  user_id: string;
+  country: string | null;
+  browser: string | null;
+  device: string | null;
+  os: string | null;
+  last_seen: Date;
+  first_seen: Date;
+  activity_count: number;
+  path_count: number;
+  session_count: number;
+  session_ids: string[];
 }
 
 class UserAnalyticsHandler {
@@ -48,25 +58,22 @@ class UserAnalyticsHandler {
       date.setHours(0, 0, 0, 0);
       date.setDate(date.getDate() - 7);
       return date;
-    }
+    },
   } as const;
-
-  private static readonly ACTIVITY_LEVELS = {
-    low: { $gte: 1, $lte: 5 },
-    medium: { $gt: 5, $lte: 15 },
-    high: { $gt: 15 }
-  } as const;
-
-  private validateProjectId(projectId: string): mongoose.Types.ObjectId {
-    if (!isValidObjectId(projectId)) {
-      throw new Error('Invalid project ID format');
-    }
-    return new mongoose.Types.ObjectId(projectId);
-  }
 
   private extractPaginationParams(searchParams: URLSearchParams): PaginationParams {
-    const page = parseBoundedInt(searchParams.get('page'), UserAnalyticsHandler.DEFAULT_PAGE, 1, Number.MAX_SAFE_INTEGER);
-    const limit = parseBoundedInt(searchParams.get('limit'), UserAnalyticsHandler.DEFAULT_LIMIT, 1, UserAnalyticsHandler.MAX_LIMIT);
+    const page = parseBoundedInt(
+      searchParams.get('page'),
+      UserAnalyticsHandler.DEFAULT_PAGE,
+      1,
+      Number.MAX_SAFE_INTEGER,
+    );
+    const limit = parseBoundedInt(
+      searchParams.get('limit'),
+      UserAnalyticsHandler.DEFAULT_LIMIT,
+      1,
+      UserAnalyticsHandler.MAX_LIMIT,
+    );
     const skip = (page - 1) * limit;
 
     return { page, limit, skip };
@@ -81,44 +88,43 @@ class UserAnalyticsHandler {
     };
   }
 
-  private buildBaseFilter(projectId: mongoose.Types.ObjectId, filters: QueryFilters): PageViewFilter {
-    const baseFilter: PageViewFilter = { projectId };
-
-    if (filters.country) {
-      baseFilter.country = filters.country;
-    }
-
+  private buildBaseCondition(projectId: string, filters: QueryFilters): SQL {
+    const conditions: SQL[] = [eq(pageViews.projectId, projectId)];
+    if (filters.country) conditions.push(eq(pageViews.country, filters.country));
     if (filters.lastSeen && filters.lastSeen in UserAnalyticsHandler.TIME_RANGES) {
-      const timeCalculator = UserAnalyticsHandler.TIME_RANGES[filters.lastSeen as keyof typeof UserAnalyticsHandler.TIME_RANGES];
-      baseFilter.timestamp = { $gte: timeCalculator() };
+      const timeCalculator =
+        UserAnalyticsHandler.TIME_RANGES[filters.lastSeen as keyof typeof UserAnalyticsHandler.TIME_RANGES];
+      conditions.push(gte(pageViews.timestamp, timeCalculator()));
     }
-
-    return baseFilter;
+    return requireAnd(...conditions);
   }
 
-  private buildActivityFilter(activity?: string): PipelineStage[] {
-    if (!activity || !(activity.toLowerCase() in UserAnalyticsHandler.ACTIVITY_LEVELS)) {
-      return [];
+  private buildActivityCondition(activity?: string): SQL | undefined {
+    switch (activity?.toLowerCase()) {
+      case 'low':
+        return sql`activity_count BETWEEN 1 AND 5`;
+      case 'medium':
+        return sql`activity_count > 5 AND activity_count <= 15`;
+      case 'high':
+        return sql`activity_count > 15`;
+      default:
+        return undefined;
     }
-
-    const activityLevel = activity.toLowerCase() as keyof typeof UserAnalyticsHandler.ACTIVITY_LEVELS;
-    const condition = UserAnalyticsHandler.ACTIVITY_LEVELS[activityLevel];
-
-    return [{ $match: { activityCount: condition } }];
   }
 
-  private buildSearchFilter(search?: string): PipelineStage[] {
-    if (!search) return [];
+  private escapeLike(value: string): string {
+    return value.replace(/[%_\\]/g, (c) => `\\${c}`);
+  }
 
-    const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const regex = { $regex: escaped, $options: 'i' };
-    return [{ $match: { $or: [
-      { userId: regex },
-      { country: regex },
-      { browser: regex },
-      { device: regex },
-      { os: regex },
-    ] } }];
+  private buildSearchCondition(search?: string): SQL | undefined {
+    if (!search) return undefined;
+    const pattern = `%${this.escapeLike(search)}%`;
+    return sql`(user_id ILIKE ${pattern} OR country ILIKE ${pattern} OR browser ILIKE ${pattern} OR device ILIKE ${pattern} OR os ILIKE ${pattern})`;
+  }
+
+  private combineWhere(...conditions: (SQL | undefined)[]): SQL {
+    const list = conditions.filter((c): c is SQL => c !== undefined);
+    return list.length ? sql.join(list, sql` AND `) : sql`TRUE`;
   }
 
   /**
@@ -126,102 +132,78 @@ class UserAnalyticsHandler {
    * uid the tracker assigns) rather than `sessionId` — a returning visitor
    * across multiple sessions is one row, not one row per session. Falls
    * back to sessionId for the rare pageview predating the userId field.
-   * Session count is tracked separately so the UI can show "3 sessions"
-   * per visitor instead of collapsing that history away.
+   * `latest` picks the most recent pageview's dimension values per
+   * identity (DISTINCT ON), `agg` computes the rest via a plain GROUP BY —
+   * two passes over `base`, joined on identity, since Postgres window
+   * aggregates don't support DISTINCT (needed for path/session counts).
    */
-  private createBasePipeline(filter: PageViewFilter): PipelineStage[] {
-    return [
-      { $match: filter },
-      { $sort: { timestamp: -1 } },
-      {
-        $group: {
-          _id: { $ifNull: ['$userId', '$sessionId'] },
-          userId: { $first: { $ifNull: ['$userId', '$sessionId'] } },
-          country: { $first: '$country' },
-          lastSeen: { $max: '$timestamp' },
-          firstSeen: { $min: '$timestamp' },
-          browser: { $first: '$browser' },
-          device: { $first: '$device' },
-          os: { $first: '$os' },
-          paths: { $addToSet: '$path' },
-          sessionIds: { $addToSet: '$sessionId' },
-          activityCount: { $sum: 1 }
-        }
-      },
-      {
-        $addFields: {
-          sessionCount: { $size: '$sessionIds' }
-        }
-      }
-    ];
+  private visitorsCTE(baseCondition: SQL): SQL {
+    return sql`
+      base AS (
+        SELECT COALESCE(${pageViews.userId}, ${pageViews.sessionId}) AS identity,
+               ${pageViews.sessionId} AS session_id, ${pageViews.path} AS path, ${pageViews.timestamp} AS timestamp,
+               ${pageViews.country} AS country, ${pageViews.browser} AS browser, ${pageViews.device} AS device, ${pageViews.os} AS os
+        FROM ${pageViews}
+        WHERE ${baseCondition}
+      ),
+      latest AS (
+        SELECT DISTINCT ON (identity) identity, country, browser, device, os
+        FROM base
+        ORDER BY identity, timestamp DESC
+      ),
+      agg AS (
+        SELECT identity,
+               MAX(timestamp) AS last_seen,
+               MIN(timestamp) AS first_seen,
+               COUNT(*)::int AS activity_count,
+               COUNT(DISTINCT path)::int AS path_count,
+               COUNT(DISTINCT session_id)::int AS session_count,
+               array_agg(DISTINCT session_id) AS session_ids
+        FROM base
+        GROUP BY identity
+      ),
+      visitors AS (
+        SELECT latest.identity AS user_id, latest.country, latest.browser, latest.device, latest.os,
+               agg.last_seen, agg.first_seen, agg.activity_count, agg.path_count, agg.session_count, agg.session_ids
+        FROM latest JOIN agg ON latest.identity = agg.identity
+      )
+    `;
   }
 
-  private createRecentEventsLookup(projectId: mongoose.Types.ObjectId): PipelineStage {
-    return {
-      $lookup: {
-        from: 'events',
-        let: { userSessionIds: '$sessionIds', pId: projectId },
-        pipeline: [
-          {
-            $match: {
-              $expr: {
-                $and: [
-                  { $in: ['$sessionId', '$$userSessionIds'] },
-                  { $eq: ['$projectId', '$$pId'] }
-                ]
-              }
-            }
-          },
-          { $sort: { timestamp: -1 } },
-          { $limit: UserAnalyticsHandler.RECENT_EVENTS_LIMIT },
-          { $project: { _id: 0, name: 1, timestamp: 1 } }
-        ],
-        as: 'recentEvents'
-      }
-    };
+  private async fetchUsers(
+    projectId: string,
+    baseCondition: SQL,
+    outerWhere: SQL,
+    pagination: PaginationParams,
+  ): Promise<Array<VisitorRow & { recentEvents: { name: string; timestamp: Date }[] }>> {
+    const rows = await db.execute<VisitorRow & { recent_events: { name: string; timestamp: Date }[] | null }>(sql`
+      WITH ${this.visitorsCTE(baseCondition)}
+      SELECT v.*, COALESCE(re.recent_events, '[]'::json) AS recent_events
+      FROM visitors v
+      LEFT JOIN LATERAL (
+        SELECT json_agg(json_build_object('name', e.name, 'timestamp', e.timestamp) ORDER BY e.timestamp DESC) AS recent_events
+        FROM (
+          SELECT ${events.name} AS name, ${events.timestamp} AS timestamp
+          FROM ${events}
+          WHERE ${events.sessionId} = ANY(v.session_ids) AND ${events.projectId} = ${projectId}
+          ORDER BY ${events.timestamp} DESC
+          LIMIT ${UserAnalyticsHandler.RECENT_EVENTS_LIMIT}
+        ) e
+      ) re ON true
+      WHERE ${outerWhere}
+      ORDER BY v.last_seen DESC
+      LIMIT ${pagination.limit} OFFSET ${pagination.skip}
+    `);
+
+    return rows.map((r) => ({ ...r, recentEvents: r.recent_events ?? [] }));
   }
 
-  private createUsersPipeline(
-    baseFilter: PageViewFilter,
-    projectId: mongoose.Types.ObjectId,
-    activityFilter: PipelineStage[],
-    searchFilter: PipelineStage[],
-    pagination: PaginationParams
-  ): PipelineStage[] {
-    return [
-      ...this.createBasePipeline(baseFilter),
-      ...activityFilter,
-      ...searchFilter,
-      this.createRecentEventsLookup(projectId),
-      {
-        $project: {
-          _id: 0,
-          userId: 1,
-          country: 1,
-          lastSeen: 1,
-          firstSeen: 1,
-          browser: 1,
-          device: 1,
-          os: 1,
-          pathCount: { $size: '$paths' },
-          sessionCount: 1,
-          activityCount: 1,
-          recentEvents: 1
-        }
-      },
-      { $sort: { lastSeen: -1 } },
-      { $skip: pagination.skip },
-      { $limit: pagination.limit }
-    ];
-  }
-
-  private createCountPipeline(baseFilter: PageViewFilter, activityFilter: PipelineStage[], searchFilter: PipelineStage[]): PipelineStage[] {
-    return [
-      ...this.createBasePipeline(baseFilter),
-      ...activityFilter,
-      ...searchFilter,
-      { $count: 'total' }
-    ];
+  private async fetchCount(baseCondition: SQL, outerWhere: SQL): Promise<number> {
+    const [row] = await db.execute<{ total: number }>(sql`
+      WITH ${this.visitorsCTE(baseCondition)}
+      SELECT COUNT(*)::int AS total FROM visitors WHERE ${outerWhere}
+    `);
+    return row?.total ?? 0;
   }
 
   /**
@@ -230,83 +212,107 @@ class UserAnalyticsHandler {
    * average engagement — the "advanced analytics" the raw per-page table
    * can't answer on its own.
    */
-  private createSummaryPipeline(baseFilter: PageViewFilter, activityFilter: PipelineStage[], searchFilter: PipelineStage[]): PipelineStage[] {
-    return [
-      ...this.createBasePipeline(baseFilter),
-      ...activityFilter,
-      ...searchFilter,
-      {
-        $group: {
-          _id: null,
-          totalVisitors: { $sum: 1 },
-          returningVisitors: { $sum: { $cond: [{ $gt: ['$sessionCount', 1] }, 1, 0] } },
-          avgSessionsPerVisitor: { $avg: '$sessionCount' },
-          avgActivityPerVisitor: { $avg: '$activityCount' }
-        }
-      }
-    ];
+  private async fetchSummary(
+    baseCondition: SQL,
+    outerWhere: SQL,
+  ): Promise<{
+    totalVisitors: number;
+    returningVisitors: number;
+    avgSessionsPerVisitor: number;
+    avgActivityPerVisitor: number;
+  }> {
+    const [row] = await db.execute<{
+      total_visitors: number;
+      returning_visitors: number;
+      avg_sessions: string | null;
+      avg_activity: string | null;
+    }>(sql`
+      WITH ${this.visitorsCTE(baseCondition)}
+      SELECT
+        COUNT(*)::int AS total_visitors,
+        COUNT(*) FILTER (WHERE session_count > 1)::int AS returning_visitors,
+        AVG(session_count) AS avg_sessions,
+        AVG(activity_count) AS avg_activity
+      FROM visitors
+      WHERE ${outerWhere}
+    `);
+
+    return {
+      totalVisitors: row?.total_visitors ?? 0,
+      returningVisitors: row?.returning_visitors ?? 0,
+      avgSessionsPerVisitor: Number(row?.avg_sessions ?? 0),
+      avgActivityPerVisitor: Number(row?.avg_activity ?? 0),
+    };
   }
 
-  private async fetchCountries(projectId: mongoose.Types.ObjectId): Promise<string[]> {
-    const countries = await PageView.aggregate([
-      { $match: { projectId } },
-      { $group: { _id: '$country' } },
-      { $project: { country: '$_id', _id: 0 } },
-      { $sort: { country: 1 } }
-    ]);
+  private async fetchCountries(projectId: string): Promise<string[]> {
+    const rows = await db
+      .selectDistinct({ country: pageViews.country })
+      .from(pageViews)
+      .where(eq(pageViews.projectId, projectId))
+      .orderBy(pageViews.country);
 
-    return countries.map(c => c.country).filter(Boolean);
+    return rows.map((r) => r.country).filter((c): c is string => Boolean(c));
   }
 
   async handleRequest(request: NextRequest, context: { params: Promise<{ id: string }> }): Promise<NextResponse> {
     try {
-      const { id: projectIdString } = await context.params;
-      const projectId = this.validateProjectId(projectIdString);
-      const access = await requireProjectAccess(request, projectIdString);
+      const { id: projectId } = await context.params;
+      if (!isValidUuid(projectId)) {
+        throw new Error('Invalid project ID format');
+      }
+      const access = await requireProjectAccess(request, projectId);
       if (access instanceof NextResponse) return access;
-      await connectToDatabase();
 
       const searchParams = request.nextUrl.searchParams;
       const pagination = this.extractPaginationParams(searchParams);
       const queryFilters = this.extractQueryFilters(searchParams);
 
-      const baseFilter = this.buildBaseFilter(projectId, queryFilters);
-      const activityFilter = this.buildActivityFilter(queryFilters.activity);
-      const searchFilter = this.buildSearchFilter(queryFilters.search);
+      const baseCondition = this.buildBaseCondition(projectId, queryFilters);
+      const outerWhere = this.combineWhere(
+        this.buildActivityCondition(queryFilters.activity),
+        this.buildSearchCondition(queryFilters.search),
+      );
 
-      const usersPipeline = this.createUsersPipeline(baseFilter, projectId, activityFilter, searchFilter, pagination);
-      const countPipeline = this.createCountPipeline(baseFilter, activityFilter, searchFilter);
-      const summaryPipeline = this.createSummaryPipeline(baseFilter, activityFilter, searchFilter);
-
-      const [users, totalResult, countries, summaryResult] = await Promise.all([
-        PageView.aggregate(usersPipeline),
-        PageView.aggregate(countPipeline),
+      const [users, total, countries, summary] = await Promise.all([
+        this.fetchUsers(projectId, baseCondition, outerWhere, pagination),
+        this.fetchCount(baseCondition, outerWhere),
         this.fetchCountries(projectId),
-        PageView.aggregate(summaryPipeline)
+        this.fetchSummary(baseCondition, outerWhere),
       ]);
 
-      const total = totalResult.length > 0 ? totalResult[0].total : 0;
       const totalPages = Math.ceil(total / pagination.limit);
-      const summary = summaryResult[0] || { totalVisitors: 0, returningVisitors: 0, avgSessionsPerVisitor: 0, avgActivityPerVisitor: 0 };
 
       return NextResponse.json({
-        users,
+        users: users.map((u) => ({
+          userId: u.user_id,
+          country: u.country,
+          lastSeen: u.last_seen,
+          firstSeen: u.first_seen,
+          browser: u.browser,
+          device: u.device,
+          os: u.os,
+          pathCount: u.path_count,
+          sessionCount: u.session_count,
+          activityCount: u.activity_count,
+          recentEvents: u.recentEvents,
+        })),
         pagination: {
           page: pagination.page,
           limit: pagination.limit,
           total,
-          totalPages
+          totalPages,
         },
         filters: {
-          countries
+          countries,
         },
         summary: {
           totalVisitors: summary.totalVisitors,
           returningVisitors: summary.returningVisitors,
           newVisitors: summary.totalVisitors - summary.returningVisitors,
-          avgSessionsPerVisitor: Math.round((summary.avgSessionsPerVisitor || 0) * 100) / 100,
-          avgActivityPerVisitor: Math.round((summary.avgActivityPerVisitor || 0) * 100) / 100
-        }
+          avgSessionsPerVisitor: Math.round(summary.avgSessionsPerVisitor * 100) / 100,
+          avgActivityPerVisitor: Math.round(summary.avgActivityPerVisitor * 100) / 100,
+        },
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to fetch users';
@@ -317,10 +323,7 @@ class UserAnalyticsHandler {
   }
 }
 
-export async function GET(
-  request: NextRequest,
-  context: { params: Promise<{ id: string }> }
-): Promise<NextResponse> {
+export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }): Promise<NextResponse> {
   const handler = new UserAnalyticsHandler();
   return handler.handleRequest(request, context);
 }

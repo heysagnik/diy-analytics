@@ -7,7 +7,7 @@ const SessionSchema = new Schema(
     expiresAt: { type: Date, required: true, index: true },
     revokedAt: { type: Date },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 export default mongoose.models.Session || mongoose.model('Session', SessionSchema);

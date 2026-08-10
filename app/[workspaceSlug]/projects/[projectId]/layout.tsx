@@ -1,23 +1,60 @@
+import { and, eq } from 'drizzle-orm';
 import { notFound, redirect } from 'next/navigation';
-import mongoose from 'mongoose';
-import ProjectLayoutClient from './project-layout-client';
+import { projects, workspaceMembers, workspaces } from '@/db/schema';
+import { withMongoId } from '@/lib/api/serialize';
 import { getRequestUser } from '@/lib/auth';
-import Project from '@/models/Project';
-import Workspace from '@/models/Workspace';
-import WorkspaceMember from '@/models/WorkspaceMember';
+import { db } from '@/lib/db';
+import { isValidUuid } from '@/lib/uuid';
+import ProjectLayoutClient from './project-layout-client';
 
-export default async function WorkspaceProjectLayout({ children, params }: { children: React.ReactNode; params: Promise<{ workspaceSlug: string; projectId: string }> }) {
+export default async function WorkspaceProjectLayout({
+  children,
+  params,
+}: {
+  children: React.ReactNode;
+  params: Promise<{ workspaceSlug: string; projectId: string }>;
+}) {
   const { workspaceSlug, projectId } = await params;
   const user = await getRequestUser();
   if (!user) redirect(`/login?next=/${workspaceSlug}/projects/${projectId}`);
-  if (!mongoose.Types.ObjectId.isValid(projectId)) notFound();
-  const workspace = await Workspace.findOne({ slug: workspaceSlug }).select('_id slug').lean();
+  if (!isValidUuid(projectId)) notFound();
+  const [workspace] = await db
+    .select({ id: workspaces.id, slug: workspaces.slug })
+    .from(workspaces)
+    .where(eq(workspaces.slug, workspaceSlug))
+    .limit(1);
   if (!workspace) notFound();
-  const workspaceId = String(workspace._id);
-  const [membership, project] = await Promise.all([
-    WorkspaceMember.exists({ workspaceId, userId: user.id }),
-    Project.exists({ _id: projectId, workspaceId }),
+  const workspaceId = workspace.id;
+  const [[membership], [project]] = await Promise.all([
+    db
+      .select({ id: workspaceMembers.id })
+      .from(workspaceMembers)
+      .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, user.id)))
+      .limit(1),
+    db
+      .select()
+      .from(projects)
+      .where(and(eq(projects.id, projectId), eq(projects.workspaceId, workspaceId)))
+      .limit(1),
   ]);
   if (!membership || !project) notFound();
-  return <ProjectLayoutClient workspaceId={workspaceId} workspaceSlug={workspace.slug} projectId={projectId}>{children}</ProjectLayoutClient>;
+  // Fetched once here so the client tree can render immediately instead of
+  // showing a full-page skeleton while re-fetching the same row it just
+  // confirmed exists — see hooks/useProject.ts, which seeds react-query's
+  // cache from this instead of always fetching on mount.
+  const initialProject = {
+    ...withMongoId(project),
+    createdAt: project.createdAt.toISOString(),
+    domain: project.domain ?? undefined,
+  };
+  return (
+    <ProjectLayoutClient
+      workspaceId={workspaceId}
+      workspaceSlug={workspace.slug}
+      projectId={projectId}
+      initialProject={initialProject}
+    >
+      {children}
+    </ProjectLayoutClient>
+  );
 }

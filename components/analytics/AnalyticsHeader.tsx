@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
-import { Project, DateRange } from '@/types/analytics';
-import DateRangePicker, { CustomDateRange } from './DateRangePicker';
-import LiveVisitors from './LiveVisitors';
-import { CodeIcon, CheckIcon } from '@phosphor-icons/react';
+import { CheckIcon, CodeIcon } from '@phosphor-icons/react';
+import type React from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import type { DateRange, Project } from '@/types/analytics';
 import { normalizeProjectUrl } from '@/utils/url';
+import DateRangePicker, { type CustomDateRange } from './DateRangePicker';
+import LiveVisitors from './LiveVisitors';
 
 interface AnalyticsHeaderProps {
   project: Project;
@@ -26,7 +27,10 @@ export const AnalyticsHeader: React.FC<AnalyticsHeaderProps> = ({
   const projectUrlHref = normalizeProjectUrl(project.url)?.href;
 
   const getTrackingScript = () => {
-    const baseUrl = typeof window !== 'undefined' ? window.location.origin : (process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000');
+    const baseUrl =
+      typeof window !== 'undefined'
+        ? window.location.origin
+        : process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
     return `<script async defer src="${baseUrl}/api/tracker.js?site-id=${project.trackingCode}"></script>`;
   };
 
@@ -41,7 +45,7 @@ export const AnalyticsHeader: React.FC<AnalyticsHeaderProps> = ({
   };
 
   return (
-    <header className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 mb-6">
+    <header className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
       <div className="flex-1 min-w-0">
         <p className="text-xs font-medium tracking-kicker text-accent">Overview</p>
         <div className="flex items-center gap-3 flex-wrap">
@@ -61,9 +65,7 @@ export const AnalyticsHeader: React.FC<AnalyticsHeaderProps> = ({
               {project.domain || project.url}
             </a>
           ) : (
-            <span className="font-medium text-foreground truncate max-w-xs">
-              {project.domain || project.url}
-            </span>
+            <span className="font-medium text-foreground truncate max-w-xs">{project.domain || project.url}</span>
           )}
 
           <Button

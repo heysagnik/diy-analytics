@@ -1,4 +1,4 @@
-import { getDateRangeDetails, generateTimeBuckets, generateTimeLabels, addPeriods } from './dateUtils';
+import { addPeriods, generateTimeBuckets, generateTimeLabels, getDateRangeDetails } from './dateUtils';
 
 describe('dateUtils', () => {
   describe('getDateRangeDetails', () => {
@@ -17,7 +17,9 @@ describe('dateUtils', () => {
     it('previous range for LAST_7_DAYS is the 7 days immediately before the current range, no gap or overlap', () => {
       const { timeRange, previousRange } = getDateRangeDetails('LAST_7_DAYS', 'UTC');
       expect(previousRange.end.getTime()).toBe(timeRange.start.getTime() - 1);
-      const days = Math.round((previousRange.end.getTime() - previousRange.start.getTime() + 1) / (24 * 60 * 60 * 1000));
+      const days = Math.round(
+        (previousRange.end.getTime() - previousRange.start.getTime() + 1) / (24 * 60 * 60 * 1000),
+      );
       expect(days).toBe(7);
     });
 
@@ -63,9 +65,14 @@ describe('dateUtils', () => {
       // Should land on the same wall-clock hour the following calendar day,
       // even though the UTC offset changed underneath it.
       const fmt = new Intl.DateTimeFormat('en-US', {
-        timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hourCycle: 'h23'
+        timeZone: 'America/New_York',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        hourCycle: 'h23',
       });
-      const parts = Object.fromEntries(fmt.formatToParts(next).map(p => [p.type, p.value]));
+      const parts = Object.fromEntries(fmt.formatToParts(next).map((p) => [p.type, p.value]));
       expect(parts.day).toBe('10');
       expect(parts.hour).toBe('00');
     });

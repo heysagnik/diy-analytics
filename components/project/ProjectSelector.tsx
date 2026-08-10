@@ -1,19 +1,19 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useRef } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { CaretDownIcon, PlusIcon } from "@phosphor-icons/react";
-import { Badge } from "@/components/ui/badge";
-import { normalizeProjectUrl } from "@/utils/url";
-import { Button } from "@/components/ui/button";
+import { CaretDownIcon, PlusIcon } from '@phosphor-icons/react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from '@/components/ui/dropdown-menu';
+import { normalizeProjectUrl } from '@/utils/url';
 
 interface ProjectSelectorProps {
   projectId: string;
@@ -31,7 +31,7 @@ function ProjectAvatar({ name, url }: { name: string; url: string }) {
   if (hostname && !failed) {
     return (
       <div className="size-5 rounded-full flex-shrink-0 relative overflow-hidden bg-surface-secondary outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
+        {/* biome-ignore lint/performance/noImgElement: needs onError fallback for a favicon that may 404; next/image can't do that */}
         <img
           src={`/api/site-icon?domain=${encodeURIComponent(hostname)}`}
           alt={`${name} icon`}
@@ -60,7 +60,7 @@ export default function ProjectSelector({
   collapsed = false,
 }: ProjectSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [projects, setProjects] = useState<Array<{_id: string, name: string, url: string}>>([]);
+  const [projects, setProjects] = useState<Array<{ _id: string; name: string; url: string }>>([]);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   // Tracks which workspace the current `projects` list was fetched for, so
@@ -98,7 +98,7 @@ export default function ProjectSelector({
   };
 
   return (
-    <div className="px-3 py-2.5">
+    <div className="px-2 py-2">
       <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
         <DropdownMenuTrigger
           render={
@@ -106,7 +106,7 @@ export default function ProjectSelector({
               variant="outline"
               size="lg"
               type="button"
-              className={`w-full justify-start gap-2.5 text-left ${collapsed ? 'justify-center p-2' : 'px-2.5 py-2.5'}`}
+              className={`w-full justify-start gap-2.5 text-left ${collapsed ? 'justify-center p-2' : 'px-2.5 py-2'}`}
               aria-expanded={isOpen}
             />
           }
@@ -127,13 +127,9 @@ export default function ProjectSelector({
         <DropdownMenuContent align="start" className="w-72 p-1.5">
           <div className="max-h-56 overflow-y-auto scrollbar-thin">
             {loading ? (
-              <div className="p-4 text-center text-xs text-muted-foreground">
-                Loading projects...
-              </div>
+              <div className="p-4 text-center text-xs text-muted-foreground">Loading projects...</div>
             ) : projects.length === 0 ? (
-              <div className="p-4 text-center text-xs text-muted-foreground">
-                No projects available
-              </div>
+              <div className="p-4 text-center text-xs text-muted-foreground">No projects available</div>
             ) : (
               projects.map((project) => {
                 const isActive = project._id === projectId;
@@ -149,11 +145,7 @@ export default function ProjectSelector({
                     <div className="flex-1 overflow-hidden">
                       <span className="block truncate">{project.name || 'Unnamed Project'}</span>
                     </div>
-                    {isActive && (
-                      <Badge className="bg-accent text-accent-foreground">
-                        Active
-                      </Badge>
-                    )}
+                    {isActive && <Badge className="bg-accent text-accent-foreground">Active</Badge>}
                   </DropdownMenuItem>
                 );
               })

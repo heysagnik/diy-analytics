@@ -1,6 +1,6 @@
-import React from 'react';
+import type React from 'react';
 import { Card } from '@/components/ui/card';
-import { GoalConversionData } from '@/types/analytics';
+import type { GoalConversionData } from '@/types/analytics';
 
 interface GoalsPanelProps {
   goals: GoalConversionData[];
@@ -24,9 +24,7 @@ export const GoalsPanel: React.FC<GoalsPanelProps> = ({ goals }) => {
                 {goal.conversions.toLocaleString()} of {goal.totalSessions.toLocaleString()} sessions
               </p>
             </div>
-            <span className="text-sm font-semibold text-foreground tabular-nums shrink-0">
-              {goal.rate}%
-            </span>
+            <span className="text-sm font-semibold text-foreground tabular-nums shrink-0">{goal.rate}%</span>
           </div>
         ))}
       </div>

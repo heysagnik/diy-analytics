@@ -1,7 +1,7 @@
-import React from 'react';
-import { Card } from '@/components/ui/card';
+import type React from 'react';
 import { Badge } from '@/components/ui/badge';
-import { WebVitalData } from '@/types/analytics';
+import { Card } from '@/components/ui/card';
+import type { WebVitalData } from '@/types/analytics';
 
 interface WebVitalsPanelProps {
   webVitals: WebVitalData[];
@@ -22,8 +22,13 @@ const METRIC_LABELS: Record<WebVitalData['metric'], string> = {
 
 function ratingFor(metric: WebVitalData['metric'], value: number): { label: string; className: string } {
   const t = THRESHOLDS[metric];
-  if (value <= t.good) return { label: 'Good', className: 'bg-success/10 text-success hover:bg-success/10 border-none shadow-none' };
-  if (value <= t.poor) return { label: 'Needs Improvement', className: 'bg-warning/10 text-warning hover:bg-warning/10 border-none shadow-none' };
+  if (value <= t.good)
+    return { label: 'Good', className: 'bg-success/10 text-success hover:bg-success/10 border-none shadow-none' };
+  if (value <= t.poor)
+    return {
+      label: 'Needs Improvement',
+      className: 'bg-warning/10 text-warning hover:bg-warning/10 border-none shadow-none',
+    };
   return { label: 'Poor', className: 'bg-danger/10 text-danger hover:bg-danger/10 border-none shadow-none' };
 }
 
@@ -40,15 +45,13 @@ export const WebVitalsPanel: React.FC<WebVitalsPanelProps> = ({ webVitals }) => 
         {webVitals.map((v) => {
           const rating = ratingFor(v.metric, v.p75);
           return (
-            <div key={v.metric} className="p-3 rounded-lg bg-surface-secondary">
+            <div key={v.metric} className="p-3 rounded-lg bg-surface-tertiary">
               <p className="text-xs text-muted-foreground mb-1">{METRIC_LABELS[v.metric]}</p>
               <div className="flex items-baseline justify-between">
                 <span className="text-lg font-semibold text-foreground tabular-nums">
                   {THRESHOLDS[v.metric].format(v.p75)}
                 </span>
-                <Badge className={`text-xs font-medium ${rating.className}`}>
-                  {rating.label}
-                </Badge>
+                <Badge className={`text-xs font-medium ${rating.className}`}>{rating.label}</Badge>
               </div>
               <p className="text-xs text-muted-foreground mt-1">p75 · {v.samples.toLocaleString()} samples</p>
             </div>

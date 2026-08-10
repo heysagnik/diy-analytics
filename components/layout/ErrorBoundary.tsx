@@ -1,11 +1,11 @@
-"use client"
+'use client';
 
-import React, { ErrorInfo } from 'react';
 import { Warning } from '@phosphor-icons/react';
-import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import React, { type ErrorInfo } from 'react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 interface ErrorBoundaryProps {
-  children: React.ReactNode; 
+  children: React.ReactNode;
   fallback?: React.ReactNode;
 }
 
@@ -25,7 +25,7 @@ export default class ErrorBoundary extends React.Component<ErrorBoundaryProps, E
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error("Component error:", error, errorInfo);
+    console.error('Component error:', error, errorInfo);
   }
 
   render() {
@@ -33,15 +33,13 @@ export default class ErrorBoundary extends React.Component<ErrorBoundaryProps, E
       if (this.props.fallback) {
         return this.props.fallback;
       }
-      
+
       return (
         <div className="m-4">
           <Alert variant="destructive">
             <Warning />
             <AlertTitle>Something went wrong</AlertTitle>
-            <AlertDescription>
-              This part of the page couldn&apos;t load. Please refresh and try again.
-            </AlertDescription>
+            <AlertDescription>This part of the page couldn&apos;t load. Please refresh and try again.</AlertDescription>
           </Alert>
         </div>
       );

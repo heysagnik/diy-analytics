@@ -35,12 +35,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isMetricData(value: unknown): boolean {
-  return isRecord(value)
-    && typeof value.total === 'number'
-    && typeof value.change === 'number'
-    && Array.isArray(value.data)
-    && Array.isArray(value.labels)
-    && typeof value.previous === 'number';
+  return (
+    isRecord(value) &&
+    typeof value.total === 'number' &&
+    typeof value.change === 'number' &&
+    Array.isArray(value.data) &&
+    Array.isArray(value.labels) &&
+    typeof value.previous === 'number'
+  );
 }
 
 export function isAnalyticsResponse(value: unknown): value is AnalyticsResponse {
@@ -65,8 +67,9 @@ export function isAnalyticsResponse(value: unknown): value is AnalyticsResponse 
     'recentEvents',
   ] as const;
 
-  return metricKeys.every((key) => isMetricData(value[key]))
-    && collectionKeys.every((key) => Array.isArray(value[key]));
+  return (
+    metricKeys.every((key) => isMetricData(value[key])) && collectionKeys.every((key) => Array.isArray(value[key]))
+  );
 }
 
 export function serializeAnalyticsQuery({
@@ -144,9 +147,7 @@ export interface EventPropertyQueryOptions {
   filters?: AnalyticsFilters;
 }
 
-function serializeEventPropertyQuery(
-  options: EventPropertyQueryOptions & { propertyKey?: string }
-): URLSearchParams {
+function serializeEventPropertyQuery(options: EventPropertyQueryOptions & { propertyKey?: string }): URLSearchParams {
   const params = serializeAnalyticsQuery(options);
   params.set('eventName', options.eventName);
   if (options.propertyKey) params.set('propertyKey', options.propertyKey);
@@ -158,7 +159,12 @@ function isEventPropertyKeyData(value: unknown): value is EventPropertyKeyData {
 }
 
 function isEventPropertyValueData(value: unknown): value is EventPropertyValueData {
-  return isRecord(value) && typeof value.value === 'string' && typeof value.count === 'number' && typeof value.uniqueUsers === 'number';
+  return (
+    isRecord(value) &&
+    typeof value.value === 'string' &&
+    typeof value.count === 'number' &&
+    typeof value.uniqueUsers === 'number'
+  );
 }
 
 export async function fetchEventPropertyKeys(
@@ -171,7 +177,13 @@ export async function fetchEventPropertyKeys(
   });
   const result: unknown = await response.json().catch(() => null);
 
-  if (!response.ok || !isRecord(result) || result.success !== true || !Array.isArray(result.data) || !result.data.every(isEventPropertyKeyData)) {
+  if (
+    !response.ok ||
+    !isRecord(result) ||
+    result.success !== true ||
+    !Array.isArray(result.data) ||
+    !result.data.every(isEventPropertyKeyData)
+  ) {
     throw new AnalyticsRequestError(response.status);
   }
 
@@ -188,7 +200,13 @@ export async function fetchEventPropertyValues(
   });
   const result: unknown = await response.json().catch(() => null);
 
-  if (!response.ok || !isRecord(result) || result.success !== true || !Array.isArray(result.data) || !result.data.every(isEventPropertyValueData)) {
+  if (
+    !response.ok ||
+    !isRecord(result) ||
+    result.success !== true ||
+    !Array.isArray(result.data) ||
+    !result.data.every(isEventPropertyValueData)
+  ) {
     throw new AnalyticsRequestError(response.status);
   }
 

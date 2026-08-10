@@ -1,5 +1,3 @@
-import Link from 'next/link';
-import { notFound, redirect } from 'next/navigation';
 import {
   ArrowLeftIcon,
   CheckCircleIcon,
@@ -7,19 +5,21 @@ import {
   SignOutIcon,
   UsersIcon,
 } from '@phosphor-icons/react/dist/ssr';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { ThemeToggle } from '@/components/ui/theme-toggle';
+import { eq, inArray } from 'drizzle-orm';
+import Link from 'next/link';
+import { notFound, redirect } from 'next/navigation';
 import { VisitorAvatar } from '@/components/analytics/visitors/VisitorAvatar';
-import ProjectPageShell from '@/components/project/ProjectPageShell';
 import { SystemStorageCard } from '@/components/profile/SystemStorageCard';
-import { getRequestUser } from '@/lib/auth';
-import Workspace from '@/models/Workspace';
-import WorkspaceMember from '@/models/WorkspaceMember';
-import connectToDatabase from '@/lib/mongodb';
-import { getStorageStats, getGrowthTrend } from '@/lib/systemStats';
+import ProjectPageShell from '@/components/project/ProjectPageShell';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
+import { workspaceMembers, workspaces as workspacesTable } from '@/db/schema';
 import type { StorageStatsResponse } from '@/lib/api/system';
+import { getRequestUser } from '@/lib/auth';
+import { db } from '@/lib/db';
+import { getGrowthTrend, getStorageStats } from '@/lib/systemStats';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,14 +28,30 @@ export default async function ProfilePage({ params }: { params: Promise<{ worksp
   const user = await getRequestUser();
   if (!user) redirect(`/login?next=/${workspaceSlug}/profile`);
 
-  await connectToDatabase();
-  const currentWorkspace = await Workspace.findOne({ slug: workspaceSlug }).select('_id').lean();
+  const [currentWorkspace] = await db
+    .select({ id: workspacesTable.id })
+    .from(workspacesTable)
+    .where(eq(workspacesTable.slug, workspaceSlug))
+    .limit(1);
   if (!currentWorkspace) notFound();
-  const workspaceId = String(currentWorkspace._id);
-  const memberships = await WorkspaceMember.find({ userId: user.id }).lean<{ workspaceId: unknown; role: string }[]>();
-  if (!memberships.some((item) => String(item.workspaceId) === workspaceId)) notFound();
-  const workspaces = await Workspace.find({ _id: { $in: memberships.map((item) => item.workspaceId) } }).select('name slug').lean();
-  const roles = new Map(memberships.map((item) => [String(item.workspaceId), item.role]));
+  const workspaceId = currentWorkspace.id;
+  const memberships = await db
+    .select({ workspaceId: workspaceMembers.workspaceId, role: workspaceMembers.role })
+    .from(workspaceMembers)
+    .where(eq(workspaceMembers.userId, user.id));
+  if (!memberships.some((item) => item.workspaceId === workspaceId)) notFound();
+  const workspaces = memberships.length
+    ? await db
+        .select({ id: workspacesTable.id, name: workspacesTable.name, slug: workspacesTable.slug })
+        .from(workspacesTable)
+        .where(
+          inArray(
+            workspacesTable.id,
+            memberships.map((item) => item.workspaceId),
+          ),
+        )
+    : [];
+  const roles = new Map(memberships.map((item) => [item.workspaceId, item.role]));
 
   const storageStats: StorageStatsResponse = await (async () => {
     try {
@@ -122,7 +138,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ worksp
                     const isCurrent = workspace.slug === workspaceSlug;
                     return (
                       <Link
-                        key={String(workspace._id)}
+                        key={workspace.id}
                         href={`/${workspace.slug}`}
                         className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3 transition-colors ${
                           isCurrent
@@ -138,7 +154,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ worksp
                           <p className="truncate text-xs text-muted-foreground">/{workspace.slug}</p>
                         </div>
                         <Badge variant="secondary" className="ml-4 shrink-0 capitalize">
-                          {roles.get(String(workspace._id))}
+                          {roles.get(workspace.id)}
                         </Badge>
                       </Link>
                     );

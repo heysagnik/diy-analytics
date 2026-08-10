@@ -12,65 +12,65 @@ export interface DateRangeConfig {
 }
 
 export const DATE_RANGES: Record<string, DateRangeConfig> = {
-  'LAST_HOUR': {
+  LAST_HOUR: {
     key: 'LAST_HOUR',
     label: 'Last Hour',
     duration: 60 * 60 * 1000, // 1 hour
     granularity: 'minute',
-    dataPoints: 60
+    dataPoints: 60,
   },
-  'LAST_24_HOURS': {
+  LAST_24_HOURS: {
     key: 'LAST_24_HOURS',
     label: 'Last 24 Hours',
     duration: 24 * 60 * 60 * 1000, // 24 hours
     granularity: 'hour',
-    dataPoints: 24
+    dataPoints: 24,
   },
-  'LAST_7_DAYS': {
+  LAST_7_DAYS: {
     key: 'LAST_7_DAYS',
     label: 'Last 7 Days',
     duration: 7 * 24 * 60 * 60 * 1000, // 7 days
     granularity: 'day',
-    dataPoints: 7
+    dataPoints: 7,
   },
-  'LAST_30_DAYS': {
+  LAST_30_DAYS: {
     key: 'LAST_30_DAYS',
     label: 'Last 30 Days',
     duration: 30 * 24 * 60 * 60 * 1000, // 30 days
     granularity: 'day',
-    dataPoints: 30
+    dataPoints: 30,
   },
-  'LAST_6_MONTHS': {
+  LAST_6_MONTHS: {
     key: 'LAST_6_MONTHS',
     label: 'Last 6 Months',
     duration: 6 * 30 * 24 * 60 * 60 * 1000, // 6 months (approx)
     granularity: 'week',
-    dataPoints: 26
+    dataPoints: 26,
   },
-  'LAST_12_MONTHS': {
+  LAST_12_MONTHS: {
     key: 'LAST_12_MONTHS',
     label: 'Last 12 Months',
     duration: 12 * 30 * 24 * 60 * 60 * 1000, // 12 months (approx)
     granularity: 'month',
-    dataPoints: 12
+    dataPoints: 12,
   },
   // All-time — used by the CSV export, which has no UI date picker of its
   // own. 5 years comfortably covers any self-hosted deployment's history.
-  'ALL_TIME': {
+  ALL_TIME: {
     key: 'ALL_TIME',
     label: 'All Time',
     duration: 5 * 365 * 24 * 60 * 60 * 1000,
     granularity: 'month',
-    dataPoints: 60
+    dataPoints: 60,
   },
   // Custom range — actual window comes from startDate/endDate on the request.
-  'CUSTOM': {
+  CUSTOM: {
     key: 'CUSTOM',
     label: 'Custom Range',
     duration: 30 * 24 * 60 * 60 * 1000,
     granularity: 'day',
-    dataPoints: 30
-  }
+    dataPoints: 30,
+  },
 };
 
 export interface MetricData {

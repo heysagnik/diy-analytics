@@ -43,9 +43,22 @@ npm install
 npm run dev
 ```
 
-Set `MONGODB_URI` in `.env.local` to your MongoDB connection string, and
-`NEXT_PUBLIC_SITE_URL` to the URL the app will be served from (used when
-generating tracking snippets). The app runs at `http://localhost:3000`.
+Set `DATABASE_URL` in `.env.local` to your PostgreSQL connection string
+(the "Deploy with Vercel" button above does not provision a database for
+you — bring your own Postgres, e.g. Vercel Postgres, Neon, Supabase, or a
+self-hosted instance), and `NEXT_PUBLIC_SITE_URL` to the URL the app will
+be served from (used when generating tracking snippets). Then apply the
+schema and start the app:
+
+```bash
+npm run db:migrate
+npm run dev
+```
+
+The app runs at `http://localhost:3000`.
+
+> **Upgrading from a MongoDB-backed deployment?** This is a breaking
+> change — see [docs/migrating-from-mongodb.md](docs/migrating-from-mongodb.md).
 
 ## Adding it to a site
 

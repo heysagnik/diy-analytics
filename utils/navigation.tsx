@@ -1,17 +1,16 @@
 import {
-  HouseIcon,
-  UserCircleIcon,
-  GearIcon,
-  FunnelIcon,
-  ArrowsClockwiseIcon,
   ArrowBendUpLeftIcon,
-  FileTextIcon,
+  ArrowsClockwiseIcon,
   ChatCenteredIcon,
-  IconProps,
+  FileTextIcon,
+  FunnelIcon,
+  GearIcon,
+  HouseIcon,
+  type IconProps,
+  UserCircleIcon,
 } from '@phosphor-icons/react';
 import type { NavigationItem } from '../components/layout/Navigation';
 import type { FooterLink } from '../components/project/Footer';
-import React from 'react';
 
 // Wrapper components with data attributes for sidebar icon hover animations.
 const AnimatedHouseIcon = (props: IconProps) => <HouseIcon {...props} data-icon="HouseIcon" />;

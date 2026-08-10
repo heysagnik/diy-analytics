@@ -7,7 +7,7 @@ const UserSchema = new Schema(
     passwordHash: { type: String, required: true, select: false },
     emailVerifiedAt: { type: Date },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 export default mongoose.models.User || mongoose.model('User', UserSchema);

@@ -1,6 +1,7 @@
-import { Types } from 'mongoose';
-import PageView from '../../../../models/PageView';
-import Event from '../../../../models/Event';
+import { and, count, eq, gte, lte } from 'drizzle-orm';
+import { events, pageViews } from '@/db/schema';
+import { db } from '@/lib/db';
+import { isValidUuid } from '@/lib/uuid';
 import { getDateRangeDetails } from '../utils/dateUtils';
 
 export interface FunnelStepInput {
@@ -27,10 +28,9 @@ interface SessionEvent {
  * Funnel analysis walks each session's chronologically-ordered pageview +
  * event stream and finds the first in-order match for each configured
  * step, tallying how many sessions reached each one. Done in application
- * code rather than an aggregation pipeline — funnel step counts are small
- * (a handful of steps) and the per-session walk is far easier to reason
- * about than expressing ordered-subsequence matching in Mongo's query
- * language.
+ * code rather than a SQL query — funnel step counts are small (a handful
+ * of steps) and the per-session walk is far easier to reason about than
+ * expressing ordered-subsequence matching in SQL.
  */
 // Above this many combined pageview+event rows in the window, loading the
 // whole session graph into memory risks OOM/timeouts (especially on
@@ -41,54 +41,60 @@ export class FunnelService {
   async getFunnelAnalysis(
     projectId: string,
     steps: FunnelStepInput[],
-    dateRangeKey: string
+    dateRangeKey: string,
   ): Promise<FunnelStepResult[]> {
-    if (!Types.ObjectId.isValid(projectId)) {
+    if (!isValidUuid(projectId)) {
       throw new Error('Invalid project ID');
     }
     if (steps.length < 2) {
       throw new Error('A funnel needs at least 2 steps');
     }
 
-    const projectObjectId = new Types.ObjectId(projectId);
     const { timeRange } = getDateRangeDetails(dateRangeKey);
-    const window = { $gte: new Date(timeRange.start), $lte: new Date(timeRange.end) };
+    const start = new Date(timeRange.start);
+    const end = new Date(timeRange.end);
+    const pvWindow = and(
+      eq(pageViews.projectId, projectId),
+      gte(pageViews.timestamp, start),
+      lte(pageViews.timestamp, end),
+    );
+    const evWindow = and(eq(events.projectId, projectId), gte(events.timestamp, start), lte(events.timestamp, end));
 
-    const [pvCount, evCount] = await Promise.all([
-      PageView.countDocuments({ projectId: projectObjectId, timestamp: window }),
-      Event.countDocuments({ projectId: projectObjectId, timestamp: window })
+    const [[pv], [ev]] = await Promise.all([
+      db.select({ count: count() }).from(pageViews).where(pvWindow),
+      db.select({ count: count() }).from(events).where(evWindow),
     ]);
-    if (pvCount + evCount > MAX_FUNNEL_ROWS) {
+    if (pv.count + ev.count > MAX_FUNNEL_ROWS) {
       throw new Error(
-        `Funnel analysis window is too large (${pvCount + evCount} rows, limit ${MAX_FUNNEL_ROWS}). Narrow the date range and try again.`
+        `Funnel analysis window is too large (${pv.count + ev.count} rows, limit ${MAX_FUNNEL_ROWS}). Narrow the date range and try again.`,
       );
     }
 
-    const [pageviews, events] = await Promise.all([
-      PageView.find(
-        { projectId: projectObjectId, timestamp: window },
-        { sessionId: 1, path: 1, timestamp: 1, _id: 0 }
-      ).lean<{ sessionId: string; path: string; timestamp: Date }[]>(),
-      Event.find(
-        { projectId: projectObjectId, timestamp: window },
-        { sessionId: 1, name: 1, timestamp: 1, _id: 0 }
-      ).lean<{ sessionId: string; name: string; timestamp: Date }[]>()
+    const [pageviewRows, eventRows] = await Promise.all([
+      db
+        .select({ sessionId: pageViews.sessionId, path: pageViews.path, timestamp: pageViews.timestamp })
+        .from(pageViews)
+        .where(pvWindow),
+      db
+        .select({ sessionId: events.sessionId, name: events.name, timestamp: events.timestamp })
+        .from(events)
+        .where(evWindow),
     ]);
 
     const sessionSequences = new Map<string, SessionEvent[]>();
-    for (const pv of pageviews) {
-      (sessionSequences.get(pv.sessionId) ?? sessionSequences.set(pv.sessionId, []).get(pv.sessionId)!).push({
-        type: 'page',
-        value: pv.path,
-        timestamp: pv.timestamp
-      });
+    const sequenceFor = (sessionId: string): SessionEvent[] => {
+      let sequence = sessionSequences.get(sessionId);
+      if (!sequence) {
+        sequence = [];
+        sessionSequences.set(sessionId, sequence);
+      }
+      return sequence;
+    };
+    for (const pv of pageviewRows) {
+      sequenceFor(pv.sessionId).push({ type: 'page', value: pv.path, timestamp: pv.timestamp });
     }
-    for (const ev of events) {
-      (sessionSequences.get(ev.sessionId) ?? sessionSequences.set(ev.sessionId, []).get(ev.sessionId)!).push({
-        type: 'event',
-        value: ev.name,
-        timestamp: ev.timestamp
-      });
+    for (const ev of eventRows) {
+      sequenceFor(ev.sessionId).push({ type: 'event', value: ev.name, timestamp: ev.timestamp });
     }
 
     const stepCounts = new Array(steps.length).fill(0);
@@ -112,9 +118,7 @@ export class FunnelService {
       matchValue: step.matchValue,
       count: stepCounts[i],
       dropoffPct:
-        i === 0 || stepCounts[i - 1] === 0
-          ? 0
-          : Math.round((1 - stepCounts[i] / stepCounts[i - 1]) * 10000) / 100
+        i === 0 || stepCounts[i - 1] === 0 ? 0 : Math.round((1 - stepCounts[i] / stepCounts[i - 1]) * 10000) / 100,
     }));
   }
 }

@@ -1,9 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { AnalyticsService } from '../services/analyticsService';
-import { QueryOptions, ErrorResponse, DATE_RANGES } from '../types';
-import { normalizeTimezone } from '../utils/dateUtils';
-import connectToDatabase from '../../../../lib/mongodb';
+import { type NextRequest, NextResponse } from 'next/server';
 import { requireProjectAccess } from '../../../../lib/serverAuth';
+import { AnalyticsService } from '../services/analyticsService';
+import { DATE_RANGES, type ErrorResponse, type QueryOptions } from '../types';
+import { normalizeTimezone } from '../utils/dateUtils';
 
 export class AnalyticsController {
   private analyticsService: AnalyticsService;
@@ -14,8 +13,6 @@ export class AnalyticsController {
 
   async handleGetAnalytics(request: NextRequest): Promise<NextResponse> {
     try {
-      await connectToDatabase();
-
       const searchParams = request.nextUrl.searchParams;
       const projectId = searchParams.get('projectId');
       const dateRange = searchParams.get('dateRange') || 'LAST_7_DAYS';
@@ -33,25 +30,30 @@ export class AnalyticsController {
         projectId,
         dateRange,
         timezone,
-        filters
+        filters,
       });
 
       if (validationError) {
         return this.createErrorResponse(validationError, 400);
       }
+      // validateAnalyticsRequest already rejected a missing projectId above;
+      // this narrows the type for TS rather than asserting past it.
+      if (!projectId) {
+        return this.createErrorResponse('Project ID is required', 400);
+      }
 
-      const access = await requireProjectAccess(request, projectId!);
+      const access = await requireProjectAccess(request, projectId);
       if (access instanceof NextResponse) {
         return access;
       }
 
       const options: QueryOptions = {
-        projectId: projectId!,
+        projectId,
         dateRange,
         timezone: normalizeTimezone(timezone || undefined),
         startDate,
         endDate,
-        filters
+        filters,
       };
 
       const analyticsData = await this.analyticsService.getAnalytics(options);
@@ -59,23 +61,20 @@ export class AnalyticsController {
       return NextResponse.json({
         success: true,
         data: analyticsData,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
-
     } catch (error) {
       console.error('Analytics Controller Error:', error);
       return this.createErrorResponse(
         'Failed to fetch analytics data',
         500,
-        error instanceof Error ? error.message : 'Unknown error'
+        error instanceof Error ? error.message : 'Unknown error',
       );
     }
   }
 
   async handleGetRealtime(request: NextRequest): Promise<NextResponse> {
     try {
-      await connectToDatabase();
-
       const projectId = request.nextUrl.searchParams.get('projectId');
       if (!projectId) {
         return this.createErrorResponse('Project ID is required', 400);
@@ -88,19 +87,22 @@ export class AnalyticsController {
 
       const realtime = await this.analyticsService.getRealtime(projectId);
 
-      return NextResponse.json({
-        success: true,
-        data: realtime,
-        timestamp: new Date().toISOString()
-      }, {
-        headers: { 'Cache-Control': 'no-store' }
-      });
+      return NextResponse.json(
+        {
+          success: true,
+          data: realtime,
+          timestamp: new Date().toISOString(),
+        },
+        {
+          headers: { 'Cache-Control': 'no-store' },
+        },
+      );
     } catch (error) {
       console.error('Analytics Controller Error (realtime):', error);
       return this.createErrorResponse(
         'Failed to fetch realtime data',
         500,
-        error instanceof Error ? error.message : 'Unknown error'
+        error instanceof Error ? error.message : 'Unknown error',
       );
     }
   }
@@ -114,8 +116,6 @@ export class AnalyticsController {
    */
   async handleGetEventProperties(request: NextRequest): Promise<NextResponse> {
     try {
-      await connectToDatabase();
-
       const searchParams = request.nextUrl.searchParams;
       const projectId = searchParams.get('projectId');
       const eventName = searchParams.get('eventName');
@@ -133,7 +133,10 @@ export class AnalyticsController {
         return this.createErrorResponse('eventName is required', 400);
       }
       if (!DATE_RANGES[dateRange]) {
-        return this.createErrorResponse(`Invalid date range. Supported ranges: ${Object.keys(DATE_RANGES).join(', ')}`, 400);
+        return this.createErrorResponse(
+          `Invalid date range. Supported ranges: ${Object.keys(DATE_RANGES).join(', ')}`,
+          400,
+        );
       }
 
       const access = await requireProjectAccess(request, projectId);
@@ -148,7 +151,7 @@ export class AnalyticsController {
         timezone: normalizeTimezone(timezone || undefined),
         startDate,
         endDate,
-        filters
+        filters,
       };
 
       const data = propertyKey
@@ -158,22 +161,20 @@ export class AnalyticsController {
       return NextResponse.json({
         success: true,
         data,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
     } catch (error) {
       console.error('Analytics Controller Error (event properties):', error);
       return this.createErrorResponse(
         'Failed to fetch event property data',
         500,
-        error instanceof Error ? error.message : 'Unknown error'
+        error instanceof Error ? error.message : 'Unknown error',
       );
     }
   }
 
   async handlePostAnalytics(request: NextRequest): Promise<NextResponse> {
     try {
-      await connectToDatabase();
-
       const body = await request.json();
       const { projectId, dateRange, timezone, filters, startDate, endDate } = body;
 
@@ -185,7 +186,7 @@ export class AnalyticsController {
         projectId,
         dateRange,
         timezone,
-        filters
+        filters,
       });
 
       if (validationError) {
@@ -203,7 +204,7 @@ export class AnalyticsController {
         timezone: normalizeTimezone(timezone),
         startDate,
         endDate,
-        filters
+        filters,
       };
 
       const analyticsData = await this.analyticsService.getAnalytics(options);
@@ -211,15 +212,14 @@ export class AnalyticsController {
       return NextResponse.json({
         success: true,
         data: analyticsData,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
-
     } catch (error) {
       console.error('Analytics Controller Error:', error);
       return this.createErrorResponse(
         'Failed to fetch analytics data',
         500,
-        error instanceof Error ? error.message : 'Unknown error'
+        error instanceof Error ? error.message : 'Unknown error',
       );
     }
   }
@@ -259,10 +259,15 @@ export class AnalyticsController {
     const filters: QueryOptions['filters'] = {};
     let hasFilters = false;
 
-    (['country', 'browser', 'device', 'source', 'page', 'utmSource', 'utmMedium', 'utmCampaign', 'os', 'city'] as const).forEach((key) => {
+    (
+      ['country', 'browser', 'device', 'source', 'page', 'utmSource', 'utmMedium', 'utmCampaign', 'os', 'city'] as const
+    ).forEach((key) => {
       const raw = searchParams.get(key);
       if (raw) {
-        filters[key] = raw.split(',').map((v) => v.trim()).filter(Boolean);
+        filters[key] = raw
+          .split(',')
+          .map((v) => v.trim())
+          .filter(Boolean);
         hasFilters = true;
       }
     });
@@ -270,11 +275,7 @@ export class AnalyticsController {
     return hasFilters ? filters : undefined;
   }
 
-  private createErrorResponse(
-    message: string,
-    status: number,
-    details?: string | Error
-  ): NextResponse {
+  private createErrorResponse(message: string, status: number, details?: string | Error): NextResponse {
     // Only surface raw error internals in development. In production these
     // responses are reachable by anyone who can hit an authenticated route
     // with a malformed request; the underlying message can leak query/DB
@@ -282,48 +283,58 @@ export class AnalyticsController {
     const isDev = process.env.NODE_ENV === 'development';
     const formattedDetails: Record<string, unknown> | undefined =
       details instanceof Error
-        ? isDev ? { message: details.message, name: details.name, stack: details.stack } : undefined
+        ? isDev
+          ? { message: details.message, name: details.name, stack: details.stack }
+          : undefined
         : typeof details === 'string'
-          ? (isDev ? { message: details } : undefined)
+          ? isDev
+            ? { message: details }
+            : undefined
           : details;
 
     const errorResponse: ErrorResponse = {
       error: message,
       code: this.getErrorCode(status),
       details: formattedDetails,
-      timestamp: new Date()
+      timestamp: new Date(),
     };
 
     return NextResponse.json(
       {
         success: false,
-        ...errorResponse
+        ...errorResponse,
       },
-      { 
+      {
         status,
         headers: {
           'Content-Type': 'application/json',
           'Cache-Control': 'no-store, no-cache, must-revalidate',
           'Access-Control-Allow-Origin': '*',
           'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, Authorization'
-        }
-      }
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        },
+      },
     );
   }
 
   private getErrorCode(status: number): string {
     switch (status) {
-      case 400: return 'BAD_REQUEST';
-      case 401: return 'UNAUTHORIZED';
-      case 403: return 'FORBIDDEN';
-      case 404: return 'NOT_FOUND';
-      case 429: return 'RATE_LIMITED';
-      case 500: return 'INTERNAL_ERROR';
-      default: return 'UNKNOWN_ERROR';
+      case 400:
+        return 'BAD_REQUEST';
+      case 401:
+        return 'UNAUTHORIZED';
+      case 403:
+        return 'FORBIDDEN';
+      case 404:
+        return 'NOT_FOUND';
+      case 429:
+        return 'RATE_LIMITED';
+      case 500:
+        return 'INTERNAL_ERROR';
+      default:
+        return 'UNKNOWN_ERROR';
     }
   }
-
 }
 
 export const analyticsController = new AnalyticsController();

@@ -1,20 +1,14 @@
 'use client';
 
-import {
-  DatabaseIcon,
-  EyeIcon,
-  LightningIcon,
-  HourglassIcon,
-  PulseIcon,
-} from '@phosphor-icons/react';
-import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
+import { DatabaseIcon, EyeIcon, HourglassIcon, LightningIcon, PulseIcon } from '@phosphor-icons/react';
 import AreaChart from '@/components/analytics/AreaChart';
 import { MetricTile } from '@/components/common/MetricTile';
-import { formatBytes } from '@/utils/format';
-import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
+import { Card } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
 import type { StorageStatsResponse } from '@/lib/api/system';
+import { cn } from '@/lib/utils';
+import { formatBytes } from '@/utils/format';
 
 interface SystemStorageCardProps {
   stats: StorageStatsResponse;
@@ -28,17 +22,8 @@ function storageTier(pct: number): { label: string; badgeClass: string; barClass
 }
 
 export function SystemStorageCard({ stats, className }: SystemStorageCardProps) {
-  const {
-    connected,
-    latencyMs,
-    usedBytes,
-    capBytes,
-    usedPct,
-    pageviewCount,
-    eventCount,
-    estDaysUntilFull,
-    trend,
-  } = stats;
+  const { connected, latencyMs, usedBytes, capBytes, usedPct, pageviewCount, eventCount, estDaysUntilFull, trend } =
+    stats;
 
   const tier = storageTier(usedPct);
   const trendSeries = [{ name: 'Events', data: trend.map((p) => p.count), color: 'var(--chart-1)' }];
@@ -93,7 +78,9 @@ export function SystemStorageCard({ stats, className }: SystemStorageCardProps) 
 
         <div className="flex flex-col gap-1.5">
           <div className="flex items-baseline justify-between text-xs">
-            <span className="text-muted-foreground">{formatBytes(usedBytes)} of {formatBytes(capBytes)} used</span>
+            <span className="text-muted-foreground">
+              {formatBytes(usedBytes)} of {formatBytes(capBytes)} used
+            </span>
           </div>
           <Progress value={usedPct} indicatorClassName={tier.barClass} />
         </div>

@@ -1,9 +1,10 @@
-import React, { useState, useRef, useEffect, useId } from 'react';
-import { DateRange } from '@/types/analytics';
 import { CalendarIcon, CaretDownIcon, CaretLeftIcon, CaretRightIcon, CheckIcon } from '@phosphor-icons/react';
+import type React from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Field, FieldLabel, FieldError } from '@/components/ui/field';
+import { Field, FieldError, FieldLabel } from '@/components/ui/field';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import type { DateRange } from '@/types/analytics';
 
 export interface CustomDateRange {
   startDate: string;
@@ -96,22 +97,20 @@ function MiniCalendar({ value, onChange }: MiniCalendarProps) {
         </Button>
       </div>
 
-      <div
-        className="grid gap-y-0.5 text-center"
-        style={{ gridTemplateColumns: 'repeat(7, minmax(0, 1fr))' }}
-      >
+      <div className="grid gap-y-0.5 text-center" style={{ gridTemplateColumns: 'repeat(7, minmax(0, 1fr))' }}>
         {WEEKDAY_LABELS.map((d) => (
           <span key={d} className="label-eyebrow py-1 text-muted-foreground">
             {d}
           </span>
         ))}
         {cells.map((day, idx) => {
+          // biome-ignore lint/suspicious/noArrayIndexKey: fixed month grid, position is the only stable identity (day can be null/repeated)
           if (day === null) return <span key={`empty-${idx}`} />;
           const iso = toISODate(viewYear, viewMonth, day);
           const isSelected = value === iso;
-          const isToday =
-            today.getFullYear() === viewYear && today.getMonth() === viewMonth && today.getDate() === day;
-          const receivesInitialFocus = isSelected || (!parseISODate(value) && isToday) || (day === 1 && !isSelected && !isToday);
+          const isToday = today.getFullYear() === viewYear && today.getMonth() === viewMonth && today.getDate() === day;
+          const receivesInitialFocus =
+            isSelected || (!parseISODate(value) && isToday) || (day === 1 && !isSelected && !isToday);
 
           return (
             <button
@@ -126,8 +125,8 @@ function MiniCalendar({ value, onChange }: MiniCalendarProps) {
                 isSelected
                   ? 'bg-accent text-accent-foreground font-semibold'
                   : isToday
-                  ? 'font-semibold text-accent ring-1 ring-inset ring-accent/40 hover:bg-surface-secondary'
-                  : 'text-foreground hover:bg-surface-secondary'
+                    ? 'font-semibold text-accent ring-1 ring-inset ring-accent/40 hover:bg-surface-secondary'
+                    : 'text-foreground hover:bg-surface-secondary'
               }`}
             >
               {day}
@@ -242,9 +241,7 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
     }
   };
 
-  const displayText = customRange
-    ? `${customRange.startDate} - ${customRange.endDate}`
-    : dateRange;
+  const displayText = customRange ? `${customRange.startDate} - ${customRange.endDate}` : dateRange;
 
   return (
     <Popover open={isOpen} onOpenChange={handleOpenChange}>
@@ -290,9 +287,7 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
           </>
         ) : (
           <form onSubmit={handleApplyCustomRange} className="p-2 flex flex-col gap-3">
-            <div className="font-medium text-foreground border-b border-border pb-2 text-sm">
-              Select Custom Dates
-            </div>
+            <div className="font-medium text-foreground border-b border-border pb-2 text-sm">Select Custom Dates</div>
 
             <DateField
               label="Start Date"
@@ -325,7 +320,13 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
             />
 
             <div className="flex gap-2 pt-2">
-              <Button type="button" size="sm" variant="outline" onClick={() => setShowCustomPicker(false)} className="flex-1">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => setShowCustomPicker(false)}
+                className="flex-1"
+              >
                 Back
               </Button>
               <Button size="sm" type="submit" className="flex-1">

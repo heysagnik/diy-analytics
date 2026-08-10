@@ -1,8 +1,12 @@
-import { createProject, deleteProject, getProjects, updateProject } from './projects';
 import type { NewProjectData, Project } from './projects';
+import { createProject, deleteProject, getProjects, updateProject } from './projects';
 
 const project = {
-  _id: 'project-1', name: 'Example', url: 'https://example.com', trackingCode: 'code', createdAt: '2026-01-01',
+  _id: 'project-1',
+  name: 'Example',
+  url: 'https://example.com',
+  trackingCode: 'code',
+  createdAt: '2026-01-01',
 } as Project;
 const newProject: NewProjectData = { name: 'Example', url: 'https://example.com' };
 
@@ -33,7 +37,11 @@ describe('projects API client', () => {
     await expect(createProject({ ...newProject, workspaceId: 'workspace-id' })).resolves.toEqual(project);
     await expect(updateProject('project-1', { name: 'Updated' })).resolves.toEqual(project);
     await expect(deleteProject('project-1')).resolves.toBeUndefined();
-    expect(global.fetch).toHaveBeenNthCalledWith(2, '/api/projects/project-1', expect.objectContaining({ method: 'PATCH' }));
+    expect(global.fetch).toHaveBeenNthCalledWith(
+      2,
+      '/api/projects/project-1',
+      expect.objectContaining({ method: 'PATCH' }),
+    );
     expect(global.fetch).toHaveBeenNthCalledWith(3, '/api/projects/project-1', { method: 'DELETE' });
   });
 

@@ -40,7 +40,7 @@ const eventSchema = new mongoose.Schema(
   {
     timestamps: true,
     collection: 'events',
-  }
+  },
 );
 
 eventSchema.index({ projectId: 1, timestamp: -1 });

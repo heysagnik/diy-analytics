@@ -1,6 +1,6 @@
-import type { Project, NewProjectData } from '@/types/analytics';
+import type { NewProjectData, Project } from '@/types/analytics';
 
-export type { Project, NewProjectData };
+export type { NewProjectData, Project };
 
 /**
  * Backend error responses aren't shaped consistently (`{ error }`,
@@ -9,10 +9,9 @@ export type { Project, NewProjectData };
  * precedence order.
  */
 async function parseApiError(response: Response, fallback: string): Promise<string> {
-  const body = await response.json().catch(() => ({} as Record<string, unknown>));
-  const message = typeof body.error === 'string' ? body.error
-    : typeof body.message === 'string' ? body.message
-    : undefined;
+  const body = await response.json().catch(() => ({}) as Record<string, unknown>);
+  const message =
+    typeof body.error === 'string' ? body.error : typeof body.message === 'string' ? body.message : undefined;
   return message || fallback;
 }
 
@@ -39,7 +38,7 @@ export const createProject = async (projectData: NewProjectData & { workspaceId:
 export const updateProject = async (
   projectId: string,
   fields: Partial<Project>,
-  errorMessage?: string
+  errorMessage?: string,
 ): Promise<Project> => {
   const response = await fetch(`/api/projects/${projectId}`, {
     method: 'PATCH',
@@ -47,7 +46,7 @@ export const updateProject = async (
     body: JSON.stringify(fields),
   });
   if (!response.ok) {
-    throw new Error(errorMessage || await parseApiError(response, `Failed to update project (${response.status})`));
+    throw new Error(errorMessage || (await parseApiError(response, `Failed to update project (${response.status})`)));
   }
   return response.json();
 };
