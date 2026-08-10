@@ -21,20 +21,20 @@ import {
 } from "@phosphor-icons/react";
 
 function ProjectLogo({ name, url }: { name: string; url: string }) {
-  const [showFavicon, setShowFavicon] = useState(true);
+  const [failed, setFailed] = useState(false);
   const hostname = normalizeProjectUrl(url)?.hostname;
 
-  if (showFavicon && hostname) {
+  if (hostname && !failed) {
     return (
       <div className="w-9 h-9 rounded-xl flex-shrink-0 relative overflow-hidden bg-surface-secondary outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10">
-        <Image
-          src={`https://icons.duckduckgo.com/ip3/${encodeURIComponent(hostname)}.ico`}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={`/api/site-icon?domain=${encodeURIComponent(hostname)}`}
           alt=""
           width={36}
           height={36}
-          className="rounded-xl"
-          onError={() => setShowFavicon(false)}
-          unoptimized
+          className="rounded-xl size-full object-cover"
+          onError={() => setFailed(true)}
         />
       </div>
     );
@@ -319,10 +319,16 @@ export default function PublicDashboardClient({
           </div>
         )}
 
-        <footer className="mt-12 text-center text-xs text-muted-foreground">
-          Powered by{" "}
-          <a href="https://github.com/heysagnik/diy-analytics" target="_blank" rel="noopener noreferrer" className="underline">
-            DIY Analytics
+        <footer className="mt-12 flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
+          Powered by
+          <a
+            href="https://github.com/heysagnik/diy-analytics"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center"
+          >
+            <Image src="/brand/logo.svg" alt="DIY Analytics" width={91} height={12} className="h-3 w-auto dark:hidden" />
+            <Image src="/brand/logo-dark.svg" alt="DIY Analytics" width={91} height={12} className="hidden h-3 w-auto dark:block" />
           </a>
         </footer>
       </main>

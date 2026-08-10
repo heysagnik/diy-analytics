@@ -1,8 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { CaretDownIcon, PlusIcon } from "@phosphor-icons/react";
 import { Badge } from "@/components/ui/badge";
@@ -26,20 +25,20 @@ interface ProjectSelectorProps {
 }
 
 function ProjectAvatar({ name, url }: { name: string; url: string }) {
-  const [showFavicon, setShowFavicon] = useState(true);
+  const [failed, setFailed] = useState(false);
   const hostname = normalizeProjectUrl(url)?.hostname;
 
-  if (showFavicon && hostname) {
+  if (hostname && !failed) {
     return (
       <div className="size-5 rounded-full flex-shrink-0 relative overflow-hidden bg-surface-secondary outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10">
-        <Image
-          src={`https://icons.duckduckgo.com/ip3/${encodeURIComponent(hostname)}.ico`}
-          alt={`${name} favicon`}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={`/api/site-icon?domain=${encodeURIComponent(hostname)}`}
+          alt={`${name} icon`}
           width={20}
           height={20}
-          className="rounded-full"
-          onError={() => setShowFavicon(false)}
-          unoptimized
+          className="rounded-full size-full object-cover"
+          onError={() => setFailed(true)}
         />
       </div>
     );
@@ -64,9 +63,13 @@ export default function ProjectSelector({
   const [projects, setProjects] = useState<Array<{_id: string, name: string, url: string}>>([]);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  // Tracks which workspace the current `projects` list was fetched for, so
+  // reopening the dropdown reuses the cached list instead of re-fetching
+  // (and re-showing "Loading projects...") on every open.
+  const fetchedForWorkspace = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || fetchedForWorkspace.current === workspaceId) return;
 
     const fetchProjects = async () => {
       setLoading(true);
@@ -75,6 +78,7 @@ export default function ProjectSelector({
         if (response.ok) {
           const data = await response.json();
           setProjects(data);
+          fetchedForWorkspace.current = workspaceId;
         } else {
           console.error('Failed to fetch projects');
         }
