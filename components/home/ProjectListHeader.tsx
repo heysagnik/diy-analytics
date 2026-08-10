@@ -3,7 +3,6 @@ import { Button } from '@/components/ui/button';
 import { MagnifyingGlassIcon, PlusIcon } from '@phosphor-icons/react';
 import { Input } from '@/components/ui/input';
 import Link from 'next/link';
-import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { VisitorAvatar } from '@/components/analytics/visitors/VisitorAvatar';
 
 interface ProjectListHeaderProps {
@@ -49,7 +48,10 @@ export const ProjectListHeader: React.FC<ProjectListHeaderProps> = ({
         </div>
 
         <div className="flex items-center gap-3">
-          <ThemeToggle variant="outline" size="icon" className="shrink-0" />
+          <Button onClick={onNewSiteClick} className="flex-1 sm:flex-none">
+            <PlusIcon data-icon="inline-start" weight="bold" />
+            <span>New Site</span>
+          </Button>
 
           <Link
             href={`/${workspaceSlug}/profile`}
@@ -58,10 +60,6 @@ export const ProjectListHeader: React.FC<ProjectListHeaderProps> = ({
           >
             <VisitorAvatar userId={userId} size={26} />
           </Link>
-          <Button onClick={onNewSiteClick} className="flex-1 sm:flex-none">
-            <PlusIcon data-icon="inline-start" weight="bold" />
-            <span>New Site</span>
-          </Button>
         </div>
       </div>
     </header>
