@@ -47,8 +47,10 @@ Set `DATABASE_URL` in `.env.local` to your PostgreSQL connection string
 (the "Deploy with Vercel" button above does not provision a database for
 you — bring your own Postgres, e.g. Vercel Postgres, Neon, Supabase, or a
 self-hosted instance), and `NEXT_PUBLIC_SITE_URL` to the URL the app will
-be served from (used when generating tracking snippets). Then apply the
-schema and start the app:
+be served from (used when generating tracking snippets). `DATABASE_STORAGE_CAP_MB`
+is optional and defaults to 512MB — it sets the soft cap shown as "storage
+used" in the workspace/profile dashboards. Then apply the schema and start
+the app:
 
 ```bash
 npm run db:migrate
@@ -59,6 +61,17 @@ The app runs at `http://localhost:3000`.
 
 > **Upgrading from a MongoDB-backed deployment?** This is a breaking
 > change — see [docs/migrating-from-mongodb.md](docs/migrating-from-mongodb.md).
+
+### Daily rollup cron
+
+`vercel.json` schedules `GET /api/cron/rollup` once a day (03:00 UTC) to
+roll up the prior day's pageviews into `daily_rollups` and prune data past
+the configured retention window. On Vercel this is wired up automatically —
+set `CRON_SECRET` in your project's environment variables and Vercel Cron
+sends it as `Authorization: Bearer $CRON_SECRET` on every invocation. If
+`CRON_SECRET` is unset the route accepts unauthenticated requests, so set it
+before exposing the app publicly. Self-hosting elsewhere: point your own
+scheduler at that route with the same header once a day.
 
 ## Adding it to a site
 

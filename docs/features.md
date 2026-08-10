@@ -26,7 +26,7 @@ tracking script, see the [Integration Guide](integration.md).
 
 ## Overview dashboard
 
-The main project page (`/projects/:id`) shows:
+The main project page (`/[workspaceSlug]/projects/[projectId]`) shows:
 
 - **Core metrics** — page views, unique users, sessions, bounce rate, and
   average session duration, each with a percent change against the prior
@@ -37,9 +37,9 @@ The main project page (`/projects/:id`) shows:
   the last hour or the last year.
 
 Unique users are identified by a persistent anonymous ID when available,
-falling back to the session ID. A session ends after 30 minutes of
-inactivity (page visibility change, click, keypress, or scroll all count as
-activity).
+falling back to the session ID. The tracking script rotates the session ID
+after 20 minutes of inactivity (page visibility change, click, keypress, or
+scroll all count as activity).
 
 ![Traffic Insights chart and Web Vitals](images/overview-chart.jpg)
 
