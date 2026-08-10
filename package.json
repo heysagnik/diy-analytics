@@ -11,7 +11,7 @@
   "homepage": "https://github.com/heysagnik/diy-analytics#readme",
   "bugs": "https://github.com/heysagnik/diy-analytics/issues",
   "engines": {
-    "node": ">=20"
+    "node": "24.x"
   },
   "scripts": {
     "dev": "next dev",

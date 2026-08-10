@@ -1,7 +1,7 @@
-import { send } from '@vercel/queue';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { PUBLIC_CORS_HEADERS as CORS_HEADERS } from '@/lib/corsHeaders';
+import { send } from '@/lib/queue';
 import { isRateLimited } from '@/lib/rateLimit';
 import type { TrackingContext, TrackingPayload } from '../analytics/services/trackingService';
 import { TRACKING_EVENTS_TOPIC } from '../queues/track-write/topic';

@@ -1,4 +1,4 @@
-import { handleCallback } from '@vercel/queue';
+import { handleCallback } from '@/lib/queue';
 import type { TrackingContext, TrackingPayload } from '../../analytics/services/trackingService';
 import { trackingService } from '../../analytics/services/trackingService';
 
