@@ -471,6 +471,21 @@ function generateTrackingScript(project: ProjectForScript) {
         errorSeverity: 'warning',
       });
     });
+
+    // Resource load failures (script/img/link) only fire in the capture
+    // phase, not bubble — a separate capture-phase listener is required to
+    // see them at all. event.target === window still means "real JS
+    // exception", already handled above; skip it here to avoid double-report.
+    window.addEventListener('error', function(event) {
+      const target = event.target;
+      if (!target || target === window || !target.tagName) return;
+      const src = target.src || target.href || '';
+      sendError({
+        errorMessage: ('Failed to load ' + target.tagName.toLowerCase() + (src ? ': ' + src : '')).slice(0, 500),
+        errorSourceUrl: src ? src.slice(0, 2048) : undefined,
+        errorSeverity: 'warning',
+      });
+    }, true);
   })();
 
    // Public opt-out / opt-in hooks — used by the dashboard's "don't track
