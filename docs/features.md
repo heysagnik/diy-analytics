@@ -208,7 +208,7 @@ with a switcher to jump between them.
   and the copyable tracking snippet.
 - **Goals** — create/delete conversion goals.
 - **Alerts** — create/delete alerts and trigger an on-demand check.
-- **Data** — export an aggregate CSV snapshot (see below).
+- **Data** — export raw telemetry CSV data (see below).
 - **Danger Zone** — permanently delete the project and all its analytics
   data. Requires typing a confirmation phrase and a short safety delay
   before the button becomes active.
@@ -217,8 +217,10 @@ with a switcher to jump between them.
 
 ## Data export
 
-**Settings → Data → Download CSV** exports an all-time aggregate snapshot as
-a single CSV file, sectioned by pages, entry pages, exit pages, sources,
-campaigns, countries, browsers, devices, goals, and top events. This is an
-aggregate report generated on demand — it does not include raw,
-per-visitor session data.
+**Settings → Data → Export All Data** exports all raw telemetry data for a project as
+a structured CSV file. The exported CSV contains structured sections for:
+
+- **Raw Page Views**: Detailed page view logs including ID, timestamp, session ID, user identity, URL, path, referrer, traffic source, browser (and version), OS (and version), device type, vendor, model, geographic locations (country, region, city), and all UTM parameters.
+- **Raw Custom Events**: Detailed event logs including ID, timestamp, event name, session ID, user identity, URL, path, referrer, source, browser, OS, device, geography, UTM parameters, and JSON custom payload (`data`).
+
+

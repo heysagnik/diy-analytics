@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 While the major version is `0`, breaking changes may ship in a minor release.
 
+## [0.1.2] - 2026-08-11
+
+### Added
+
+- **Error tracking** — uncaught exceptions and unhandled promise rejections are
+  now captured client-side (sampled, capped per page load), grouped by a
+  message+stack fingerprint, and shown on a new Errors tab with severity,
+  regression detection (a resolved error reoccurring reopens it), and a
+  resolve/reopen workflow. Stack frames can be resolved to original source
+  via an on-demand source map fetch (no server-side map storage required).
+- **Page Flow** — a page-to-page transition diagram (top sources → top
+  destinations) computed from session-ordered pageviews.
+- **Segments** — visitors grouped into four recency/frequency segments
+  (Active & frequent, Active & occasional, Lapsing, Dormant). Anonymous by
+  default; call the new `window.identify(uid)` tracker API to segment real
+  people instead of browsers.
+- **Anomaly alerts** — a new "Anomalous vs. trailing average" alert threshold
+  compares the live value against a 14-day rolling mean/stddev from daily
+  rollups, instead of a fixed number.
+- **Goal- and funnel-based alerts** — alerts can now target a goal's or a
+  funnel's conversion rate, not just a site-wide metric.
+- **Slack, Discord, and PagerDuty alert channels**, alongside the existing
+  generic webhook.
+- **Web Vitals**: p50 shown alongside p75, plus a breakdown by page, country,
+  device, and browser (previously site-wide only).
+- **Resource timing** — the slowest page assets (script/image/fetch/etc.) are
+  now sampled and surfaced as a waterfall-style panel.
+
 ## [0.1.1] - 2026-08-11
 
 ### Changed
@@ -36,5 +64,6 @@ While the major version is `0`, breaking changes may ship in a minor release.
 - Self-hosted tracking script (`/api/tracker.js`) with automatic SPA pageview
   tracking, custom events, Core Web Vitals, and a visitor opt-out API.
 
+[0.1.2]: https://github.com/heysagnik/diy-analytics/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/heysagnik/diy-analytics/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/heysagnik/diy-analytics/releases/tag/v0.1.0

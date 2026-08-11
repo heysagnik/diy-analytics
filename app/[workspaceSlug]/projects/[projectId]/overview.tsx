@@ -10,6 +10,7 @@ import { GoalsPanel } from '@/components/analytics/GoalsPanel';
 import { MainChart } from '@/components/analytics/MainChart';
 import { MetricsGrid } from '@/components/analytics/MetricsGrid';
 import OnboardingHero from '@/components/analytics/OnboardingHero';
+import { ResourceTimingPanel } from '@/components/analytics/ResourceTimingPanel';
 import { WebVitalsPanel } from '@/components/analytics/WebVitalsPanel';
 import ErrorState from '@/components/common/ErrorState';
 import ProjectPageShell from '@/components/project/ProjectPageShell';
@@ -137,7 +138,8 @@ export default function ProjectPage() {
           <MetricsGrid analyticsData={analyticsData} />
           <MainChart analyticsData={analyticsData} dateRange={dateRange} />
           <GoalsPanel goals={analyticsData.goals} />
-          <WebVitalsPanel webVitals={analyticsData.webVitals} />
+          <WebVitalsPanel webVitals={analyticsData.webVitals} webVitalsBreakdown={analyticsData.webVitalsBreakdown} />
+          <ResourceTimingPanel resourceTimings={analyticsData.resourceTimings} />
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <BreakdownPanel

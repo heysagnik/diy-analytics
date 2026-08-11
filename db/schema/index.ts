@@ -1,6 +1,7 @@
 export * from './alerts';
 export * from './dailyRollups';
 export * from './enums';
+export * from './errors';
 export * from './events';
 export * from './funnels';
 export * from './goals';

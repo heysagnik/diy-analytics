@@ -55,19 +55,15 @@ export default function AuthBrandPanel({ headline, subtext }: AuthBrandPanelProp
           <div className="flex items-center justify-between">
             <p className="text-xs font-medium tracking-wide text-muted-foreground">Pageviews this week</p>
             <p className="flex items-center gap-1 text-xs font-medium text-emerald-400">
-              <span aria-hidden="true" className="text-[10px]">▲</span> 18%
+              <span aria-hidden="true" className="text-[10px]">
+                ▲
+              </span>{' '}
+              18%
             </p>
           </div>
-          <p className="mt-1 font-mono text-2xl font-semibold tracking-tight tabular-nums text-foreground">
-            12,406
-          </p>
+          <p className="mt-1 font-mono text-2xl font-semibold tracking-tight tabular-nums text-foreground">12,406</p>
           <div className="relative mt-3 h-10 w-full">
-            <svg
-              viewBox="0 0 100 40"
-              className="h-full w-full"
-              preserveAspectRatio="none"
-              aria-hidden="true"
-            >
+            <svg viewBox="0 0 100 40" className="h-full w-full" preserveAspectRatio="none" aria-hidden="true">
               <defs>
                 <linearGradient id="auth-sparkline-fill" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="var(--chart-1)" stopOpacity="0.2" />

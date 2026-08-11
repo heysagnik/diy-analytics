@@ -1,13 +1,14 @@
-import { eq } from 'drizzle-orm';
+import { createHash } from 'node:crypto';
+import { and, eq } from 'drizzle-orm';
 import { UAParser } from 'ua-parser-js';
-import { events, pageViews, projects } from '../../../../db/schema';
+import { type ErrorSeverity, errors, events, pageViews, projects } from '../../../../db/schema';
 import { db } from '../../../../lib/db';
 import { normalizeProjectUrl } from '../../../../utils/url';
 
 export interface TrackingPayload {
   siteId: string;
   domain: string;
-  type: 'pageview' | 'event';
+  type: 'pageview' | 'event' | 'error';
   url: string;
   referrer?: string;
   eventName?: string;
@@ -15,6 +16,13 @@ export interface TrackingPayload {
   sessionId?: string;
   uid?: string;
   timestamp?: string | number | Date;
+  errorMessage?: string;
+  errorStack?: string;
+  errorSourceUrl?: string;
+  errorLine?: number;
+  errorCol?: number;
+  errorSeverity?: ErrorSeverity;
+  release?: string;
 }
 
 export interface TrackingContext {
@@ -154,6 +162,8 @@ export class TrackingService {
         await this.trackPageView(project.id, payload, context, deviceInfo, sessionId, geoData, urlData);
       } else if (payload.type === 'event') {
         await this.trackEvent(project.id, payload, deviceInfo, sessionId, geoData);
+      } else if (payload.type === 'error') {
+        await this.trackError(project.id, payload, urlData);
       }
 
       return {
@@ -186,6 +196,10 @@ export class TrackingService {
     eventName: 128,
     sessionId: 100,
     uid: 100,
+    errorMessage: 500,
+    errorStack: 4000,
+    errorSourceUrl: 2048,
+    release: 100,
   } as const;
 
   private isBoundedString(value: unknown, maxLength: number): value is string {
@@ -214,8 +228,8 @@ export class TrackingService {
       return 'Domain is required and must be a string';
     }
 
-    if (!payload.type || !['pageview', 'event'].includes(payload.type)) {
-      return 'Type must be either "pageview" or "event"';
+    if (!payload.type || !['pageview', 'event', 'error'].includes(payload.type)) {
+      return 'Type must be "pageview", "event", or "error"';
     }
 
     if (!this.isBoundedString(payload.url, LEN.url)) {
@@ -251,6 +265,24 @@ export class TrackingService {
     if (payload.type === 'event') {
       if (!this.isBoundedString(payload.eventName, LEN.eventName)) {
         return 'Event name is required and must be a string within length limits';
+      }
+    }
+
+    if (payload.type === 'error') {
+      if (!this.isBoundedString(payload.errorMessage, LEN.errorMessage)) {
+        return 'errorMessage is required and must be a string within length limits';
+      }
+      if (payload.errorStack !== undefined && !this.isBoundedString(payload.errorStack, LEN.errorStack)) {
+        return 'errorStack must be a string within length limits';
+      }
+      if (payload.errorSourceUrl !== undefined && !this.isBoundedString(payload.errorSourceUrl, LEN.errorSourceUrl)) {
+        return 'errorSourceUrl must be a string within length limits';
+      }
+      if (payload.errorSeverity !== undefined && !['error', 'warning'].includes(payload.errorSeverity)) {
+        return 'errorSeverity must be "error" or "warning"';
+      }
+      if (payload.release !== undefined && !this.isBoundedString(payload.release, LEN.release)) {
+        return 'release must be a string within length limits';
       }
     }
 
@@ -585,6 +617,70 @@ export class TrackingService {
       utmContent: urlData.utm.content,
       timestamp: this.parseTimestamp(payload.timestamp),
     });
+  }
+
+  /**
+   * Track an uncaught exception or unhandled rejection. Grouped by
+   * fingerprint (not append-only like events): a repeat occurrence
+   * increments `count` and refreshes `lastSeenAt`/`stack` on the existing
+   * row instead of inserting a new one. A resolved error that reoccurs is
+   * reopened and its `regressedAt` is stamped.
+   */
+  private async trackError(projectId: string, payload: TrackingPayload, urlData: UrlData): Promise<void> {
+    if (!payload.errorMessage) {
+      throw new Error('trackError called without an errorMessage');
+    }
+
+    const fingerprint = this.computeErrorFingerprint(payload.errorMessage, payload.errorStack);
+    const now = new Date();
+
+    const [existing] = await db
+      .select()
+      .from(errors)
+      .where(and(eq(errors.projectId, projectId), eq(errors.fingerprint, fingerprint)))
+      .limit(1);
+
+    if (existing) {
+      const isRegression = existing.status === 'resolved';
+      await db
+        .update(errors)
+        .set({
+          count: existing.count + 1,
+          lastSeenAt: now,
+          stack: payload.errorStack || existing.stack,
+          path: urlData.pathname,
+          status: 'active',
+          regressedAt: isRegression ? now : existing.regressedAt,
+          updatedAt: now,
+        })
+        .where(eq(errors.id, existing.id));
+      return;
+    }
+
+    await db.insert(errors).values({
+      projectId,
+      fingerprint,
+      message: payload.errorMessage,
+      stack: payload.errorStack,
+      sourceUrl: payload.errorSourceUrl,
+      line: payload.errorLine,
+      col: payload.errorCol,
+      path: urlData.pathname,
+      severity: payload.errorSeverity || 'error',
+      release: payload.release,
+      firstSeenAt: now,
+      lastSeenAt: now,
+    });
+  }
+
+  /**
+   * Groups occurrences of "the same" error together — same message plus the
+   * same top stack frame (file/function, not line/col, since minified
+   * builds can shift columns between otherwise-identical errors).
+   */
+  private computeErrorFingerprint(message: string, stack?: string): string {
+    const topFrame = stack?.split('\n')[1]?.trim() ?? '';
+    return createHash('sha1').update(`${message}|${topFrame}`).digest('hex');
   }
 
   // Event.data is a Mixed field with no schema-level size limit — cap the

@@ -376,6 +376,103 @@ function generateTrackingScript(project: ProjectForScript) {
     window.addEventListener('pagehide', report);
   })();
 
+   // Resource timing for the slowest assets per page load — sampled at
+   // 20% of pageviews to bound event volume, and capped to the 5 slowest
+   // entries over 200ms so one heavy page can't flood storage.
+   (function initResourceTiming() {
+    if (typeof PerformanceObserver === 'undefined' || Math.random() > 0.2) return;
+
+    const SLOW_THRESHOLD_MS = 200;
+    const MAX_RESOURCES = 5;
+    let resources = [];
+    let reported = false;
+
+    function resourceLabel(url) {
+      try {
+        const parsed = new URL(url, location.href);
+        return parsed.origin === location.origin ? parsed.pathname : parsed.hostname + parsed.pathname;
+      } catch (e) {
+        return url;
+      }
+    }
+
+    try {
+      new PerformanceObserver((list) => {
+        for (const entry of list.getEntries()) {
+          if (entry.duration < SLOW_THRESHOLD_MS) continue;
+          resources.push({
+            name: resourceLabel(entry.name),
+            type: entry.initiatorType || 'other',
+            duration: Math.round(entry.duration),
+            size: entry.transferSize || 0,
+          });
+        }
+      }).observe({ type: 'resource', buffered: true });
+    } catch (e) { /* unsupported */ }
+
+    function report() {
+      if (reported || !sid || resources.length === 0) return;
+      reported = true;
+      const slowest = resources.sort((a, b) => b.duration - a.duration).slice(0, MAX_RESOURCES);
+      window.trackEvent('__resource_timing', { path: location.pathname, resources: slowest });
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') report();
+    });
+    window.addEventListener('pagehide', report);
+  })();
+
+   // Uncaught exceptions and unhandled promise rejections. Capped per page
+   // load so a throw-in-a-loop bug can't flood the ingestion endpoint.
+   (function initErrorTracking() {
+    const MAX_ERRORS_PER_LOAD = 10;
+    let reported = 0;
+
+    function sendError(payload) {
+      if (!sid || reported >= MAX_ERRORS_PER_LOAD) return;
+      reported++;
+      const { browser, os, device } = getBrowserInfo();
+      send(Object.assign({
+        siteId: SITE_ID,
+        domain: location.hostname,
+        type: 'error',
+        url: location.href,
+        sessionId: sid,
+        uid: getUID(),
+        browser: browser,
+        os: os,
+        device: device,
+        userAgent: navigator.userAgent,
+        v: SV,
+        ts: Date.now(),
+        release: window.__DIY_RELEASE__ || undefined,
+      }, payload));
+    }
+
+    window.addEventListener('error', function(event) {
+      if (!event.error && !event.message) return;
+      sendError({
+        errorMessage: String(event.message || (event.error && event.error.message) || 'Unknown error').slice(0, 500),
+        errorStack: event.error && event.error.stack ? String(event.error.stack).slice(0, 4000) : undefined,
+        errorSourceUrl: event.filename || undefined,
+        errorLine: typeof event.lineno === 'number' ? event.lineno : undefined,
+        errorCol: typeof event.colno === 'number' ? event.colno : undefined,
+        errorSeverity: 'error',
+      });
+    });
+
+    window.addEventListener('unhandledrejection', function(event) {
+      const reason = event.reason;
+      const message = reason && reason.message ? reason.message : String(reason);
+      sendError({
+        errorMessage: String(message || 'Unhandled rejection').slice(0, 500),
+        errorStack: reason && reason.stack ? String(reason.stack).slice(0, 4000) : undefined,
+        errorSeverity: 'warning',
+      });
+    });
+  })();
+
    // Public opt-out / opt-in hooks — used by the dashboard's "don't track
    // my visits" toggle.
    window.optOutAnalytics = function() {
@@ -395,7 +492,18 @@ function generateTrackingScript(project: ProjectForScript) {
   window.isOptedOut = function() {
     return !!localStorage.getItem(OPT_KEY);
   };
-  
+
+  // Overrides the random anonymous uid with a stable id from the host
+  // site's own auth (e.g. window.identify(currentUser.id)). Without this,
+  // "frequency" only ever measures distinct browsers, not distinct people —
+  // logged-out visits and cross-device visits from the same person can't be
+  // tied together.
+  window.identify = function(uid) {
+    if (!uid || localStorage.getItem(OPT_KEY)) return;
+    localStorage.setItem(UID_KEY, String(uid));
+    log('Identified as', uid);
+  };
+
   log('Ready');
 })();
 `;

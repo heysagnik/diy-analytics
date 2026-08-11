@@ -17,7 +17,9 @@ export function MetricTile({ icon, label, value, footnote, idx = 0 }: MetricTile
     >
       <div className="flex items-center justify-between">
         <span className="label-eyebrow text-muted-foreground">{label}</span>
-        <span className="icon-chip size-6 rounded-md flex items-center justify-center text-muted-foreground">{icon}</span>
+        <span className="icon-chip size-6 rounded-md flex items-center justify-center text-muted-foreground">
+          {icon}
+        </span>
       </div>
       <div className="flex items-baseline justify-between gap-2">
         <span className="font-mono text-2xl font-semibold tracking-tight text-foreground tabular-nums">{value}</span>

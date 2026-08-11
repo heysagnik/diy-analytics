@@ -1,0 +1,2 @@
+ALTER TABLE "alerts" DROP CONSTRAINT "alerts_threshold_type_check";--> statement-breakpoint
+ALTER TABLE "alerts" ADD CONSTRAINT "alerts_threshold_type_check" CHECK ("alerts"."threshold_type" IN ('drop_pct', 'value_below', 'anomaly'));

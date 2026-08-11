@@ -19,16 +19,26 @@ interface Alert {
   _id: string;
   name: string;
   metric: 'pageViews' | 'uniqueUsers' | 'sessions';
-  thresholdType: 'drop_pct' | 'value_below';
+  thresholdType: 'drop_pct' | 'value_below' | 'anomaly';
   thresholdValue: number;
   webhookUrl: string;
+  channel: 'generic' | 'slack' | 'discord' | 'pagerduty';
+  goalId: string | null;
+  funnelId: string | null;
   lastTriggeredAt?: string;
+}
+
+interface NamedResource {
+  _id: string;
+  name: string;
 }
 
 interface AlertsSectionProps {
   project: Project;
   showToast: (type: 'success' | 'error' | 'info', message: string) => void;
 }
+
+type AlertTarget = 'metric' | 'goal' | 'funnel';
 
 const METRIC_LABELS: Record<Alert['metric'], string> = {
   pageViews: 'Page Views',
@@ -40,29 +50,62 @@ function isAlertMetric(value: unknown): value is Alert['metric'] {
 }
 
 function isThresholdType(value: unknown): value is Alert['thresholdType'] {
-  return value === 'drop_pct' || value === 'value_below';
+  return value === 'drop_pct' || value === 'value_below' || value === 'anomaly';
+}
+
+function isAlertTarget(value: unknown): value is AlertTarget {
+  return value === 'metric' || value === 'goal' || value === 'funnel';
+}
+
+const CHANNEL_LABELS: Record<Alert['channel'], string> = {
+  generic: 'Generic webhook',
+  slack: 'Slack',
+  discord: 'Discord',
+  pagerduty: 'PagerDuty',
+};
+function isAlertChannel(value: unknown): value is Alert['channel'] {
+  return value === 'generic' || value === 'slack' || value === 'discord' || value === 'pagerduty';
+}
+
+function alertTargetLabel(alert: Alert, goalsById: Map<string, string>, funnelsById: Map<string, string>): string {
+  if (alert.goalId) return `Goal: ${goalsById.get(alert.goalId) ?? 'Unknown'}`;
+  if (alert.funnelId) return `Funnel: ${funnelsById.get(alert.funnelId) ?? 'Unknown'}`;
+  return METRIC_LABELS[alert.metric];
 }
 
 export const AlertsSection: React.FC<AlertsSectionProps> = ({ project, showToast }) => {
   const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [goalOptions, setGoalOptions] = useState<NamedResource[]>([]);
+  const [funnelOptions, setFunnelOptions] = useState<NamedResource[]>([]);
   const [loading, setLoading] = useState(true);
   const [isChecking, setIsChecking] = useState(false);
 
   const [name, setName] = useState('');
+  const [target, setTarget] = useState<AlertTarget>('metric');
   const [metric, setMetric] = useState<Alert['metric']>('pageViews');
+  const [goalId, setGoalId] = useState('');
+  const [funnelId, setFunnelId] = useState('');
   const [thresholdType, setThresholdType] = useState<Alert['thresholdType']>('drop_pct');
   const [thresholdValue, setThresholdValue] = useState('50');
   const [webhookUrl, setWebhookUrl] = useState('');
+  const [channel, setChannel] = useState<Alert['channel']>('generic');
   const [isCreating, setIsCreating] = useState(false);
   const [alertToDelete, setAlertToDelete] = useState<Alert | null>(null);
 
   useEffect(() => {
     if (!project?._id) return;
     let cancelled = false;
-    fetch(`/api/projects/${project._id}/alerts`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (!cancelled) setAlerts(Array.isArray(data) ? data : []);
+
+    Promise.all([
+      fetch(`/api/projects/${project._id}/alerts`).then((res) => res.json()),
+      fetch(`/api/projects/${project._id}/goals`).then((res) => res.json()),
+      fetch(`/api/projects/${project._id}/funnels`).then((res) => res.json()),
+    ])
+      .then(([alertData, goalData, funnelData]) => {
+        if (cancelled) return;
+        setAlerts(Array.isArray(alertData) ? alertData : []);
+        setGoalOptions(Array.isArray(goalData) ? goalData : []);
+        setFunnelOptions(Array.isArray(funnelData) ? funnelData : []);
       })
       .catch(() => {
         if (!cancelled) showToast('error', 'Failed to load alerts.');
@@ -70,6 +113,7 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({ project, showToast
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
+
     return () => {
       cancelled = true;
     };
@@ -82,13 +126,30 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({ project, showToast
       showToast('error', 'Name, webhook URL, and a valid threshold are required.');
       return;
     }
+    if (target === 'goal' && !goalId) {
+      showToast('error', 'Select a goal to alert on.');
+      return;
+    }
+    if (target === 'funnel' && !funnelId) {
+      showToast('error', 'Select a funnel to alert on.');
+      return;
+    }
 
     setIsCreating(true);
     try {
       const response = await fetch(`/api/projects/${project._id}/alerts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, metric, thresholdType, thresholdValue: value, webhookUrl }),
+        body: JSON.stringify({
+          name,
+          metric,
+          thresholdType: target === 'metric' ? thresholdType : 'value_below',
+          thresholdValue: value,
+          webhookUrl,
+          channel,
+          goalId: target === 'goal' ? goalId : undefined,
+          funnelId: target === 'funnel' ? funnelId : undefined,
+        }),
       });
       if (!response.ok) {
         const errorData = await response.json();
@@ -170,60 +231,153 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({ project, showToast
             className="sm:flex-1"
           />
           <Select
-            value={metric}
+            value={target}
             onValueChange={(v: unknown) => {
-              if (isAlertMetric(v)) setMetric(v);
+              if (isAlertTarget(v)) setTarget(v);
             }}
             disabled={isCreating}
           >
-            <SelectTrigger aria-label="Metric">
-              <SelectValue>{(v: Alert['metric']) => METRIC_LABELS[v]}</SelectValue>
+            <SelectTrigger aria-label="Target" className="sm:w-36">
+              <SelectValue>
+                {(v: AlertTarget) => (v === 'metric' ? 'Site metric' : v === 'goal' ? 'Goal' : 'Funnel')}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              {Object.entries(METRIC_LABELS).map(([value, label]) => (
+              <SelectItem value="metric">Site metric</SelectItem>
+              <SelectItem value="goal">Goal</SelectItem>
+              <SelectItem value="funnel">Funnel</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {target === 'metric' && (
+            <Select
+              value={metric}
+              onValueChange={(v: unknown) => {
+                if (isAlertMetric(v)) setMetric(v);
+              }}
+              disabled={isCreating}
+            >
+              <SelectTrigger aria-label="Metric">
+                <SelectValue>{(v: Alert['metric']) => METRIC_LABELS[v]}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(METRIC_LABELS).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          {target === 'goal' && (
+            <Select value={goalId} onValueChange={(v: unknown) => setGoalId(String(v))} disabled={isCreating}>
+              <SelectTrigger aria-label="Goal">
+                <SelectValue>{() => goalOptions.find((g) => g._id === goalId)?.name ?? 'Select a goal'}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {goalOptions.map((goal) => (
+                  <SelectItem key={goal._id} value={goal._id}>
+                    {goal.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          {target === 'funnel' && (
+            <Select value={funnelId} onValueChange={(v: unknown) => setFunnelId(String(v))} disabled={isCreating}>
+              <SelectTrigger aria-label="Funnel">
+                <SelectValue>
+                  {() => funnelOptions.find((f) => f._id === funnelId)?.name ?? 'Select a funnel'}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {funnelOptions.map((funnel) => (
+                  <SelectItem key={funnel._id} value={funnel._id}>
+                    {funnel.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-2">
+          {target === 'metric' ? (
+            <Select
+              value={thresholdType}
+              onValueChange={(v: unknown) => {
+                if (isThresholdType(v)) setThresholdType(v);
+              }}
+              disabled={isCreating}
+            >
+              <SelectTrigger aria-label="Threshold type">
+                <SelectValue>
+                  {(v: Alert['thresholdType']) =>
+                    v === 'drop_pct'
+                      ? 'Drops by (%) vs prior 24h'
+                      : v === 'anomaly'
+                        ? 'Anomalous vs. trailing average'
+                        : 'Falls below (raw value)'
+                  }
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="drop_pct">Drops by (%) vs prior 24h</SelectItem>
+                <SelectItem value="value_below">Falls below (raw value)</SelectItem>
+                <SelectItem value="anomaly">Anomalous vs. trailing average</SelectItem>
+              </SelectContent>
+            </Select>
+          ) : (
+            <div className="flex items-center px-3 rounded-md border border-border text-xs text-muted-foreground">
+              Conversion rate falls below (%)
+            </div>
+          )}
+          <Input
+            type="number"
+            value={thresholdValue}
+            onChange={(e) => setThresholdValue(e.target.value)}
+            placeholder={
+              target !== 'metric' ? '5' : thresholdType === 'drop_pct' ? '50' : thresholdType === 'anomaly' ? '2' : '10'
+            }
+            disabled={isCreating}
+            aria-label={thresholdType === 'anomaly' ? 'Standard deviations' : 'Threshold value'}
+            className="sm:w-32"
+          />
+        </div>
+        {target === 'metric' && thresholdType === 'anomaly' && (
+          <p className="text-xs text-muted-foreground -mt-2">
+            Fires when today&apos;s value falls this many standard deviations below the trailing 14-day daily average.
+            Needs at least 5 days of history.
+          </p>
+        )}
+
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Select
+            value={channel}
+            onValueChange={(v: unknown) => {
+              if (isAlertChannel(v)) setChannel(v);
+            }}
+            disabled={isCreating}
+          >
+            <SelectTrigger aria-label="Channel" className="sm:w-40">
+              <SelectValue>{(v: Alert['channel']) => CHANNEL_LABELS[v]}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {Object.entries(CHANNEL_LABELS).map(([value, label]) => (
                 <SelectItem key={value} value={value}>
                   {label}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
-        </div>
-
-        <div className="flex flex-col sm:flex-row gap-2">
-          <Select
-            value={thresholdType}
-            onValueChange={(v: unknown) => {
-              if (isThresholdType(v)) setThresholdType(v);
-            }}
-            disabled={isCreating}
-          >
-            <SelectTrigger aria-label="Threshold type">
-              <SelectValue>
-                {(v: Alert['thresholdType']) =>
-                  v === 'drop_pct' ? 'Drops by (%) vs prior 24h' : 'Falls below (raw value)'
-                }
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="drop_pct">Drops by (%) vs prior 24h</SelectItem>
-              <SelectItem value="value_below">Falls below (raw value)</SelectItem>
-            </SelectContent>
-          </Select>
-          <Input
-            type="number"
-            value={thresholdValue}
-            onChange={(e) => setThresholdValue(e.target.value)}
-            placeholder={thresholdType === 'drop_pct' ? '50' : '10'}
-            disabled={isCreating}
-            aria-label="Threshold value"
-            className="sm:w-32"
-          />
           <Input
             value={webhookUrl}
             onChange={(e) => setWebhookUrl(e.target.value)}
-            placeholder="https://hooks.example.com/..."
+            placeholder={channel === 'pagerduty' ? 'PagerDuty Events API routing key' : 'https://hooks.example.com/...'}
             disabled={isCreating}
-            aria-label="Webhook URL"
+            aria-label={channel === 'pagerduty' ? 'PagerDuty routing key' : 'Webhook URL'}
             className="sm:flex-1"
           />
           <Button size="sm" onClick={handleCreate} disabled={isCreating}>
@@ -241,28 +395,36 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({ project, showToast
           </div>
         ) : (
           <ul className="divide-y divide-border border border-border rounded-lg overflow-hidden">
-            {alerts.map((alert) => (
-              <li key={alert._id} className="flex items-center justify-between gap-3 px-3 py-2.5">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">{alert.name}</p>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {METRIC_LABELS[alert.metric]}{' '}
-                    {alert.thresholdType === 'drop_pct'
-                      ? `drops ≥ ${alert.thresholdValue}%`
-                      : `< ${alert.thresholdValue}`}
-                    {alert.lastTriggeredAt && ` · last triggered ${new Date(alert.lastTriggeredAt).toLocaleString()}`}
-                  </p>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setAlertToDelete(alert)}
-                  aria-label={`Delete alert ${alert.name}`}
-                >
-                  <TrashIcon size={14} className="text-danger" />
-                </Button>
-              </li>
-            ))}
+            {alerts.map((alert) => {
+              const goalsById = new Map(goalOptions.map((g) => [g._id, g.name]));
+              const funnelsById = new Map(funnelOptions.map((f) => [f._id, f.name]));
+              return (
+                <li key={alert._id} className="flex items-center justify-between gap-3 px-3 py-2.5">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">{alert.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {alertTargetLabel(alert, goalsById, funnelsById)}{' '}
+                      {alert.thresholdType === 'drop_pct'
+                        ? `drops ≥ ${alert.thresholdValue}%`
+                        : alert.thresholdType === 'anomaly'
+                          ? `> ${alert.thresholdValue} std dev below average`
+                          : `< ${alert.thresholdValue}${alert.goalId || alert.funnelId ? '%' : ''}`}
+                      {' · '}
+                      {CHANNEL_LABELS[alert.channel]}
+                      {alert.lastTriggeredAt && ` · last triggered ${new Date(alert.lastTriggeredAt).toLocaleString()}`}
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setAlertToDelete(alert)}
+                    aria-label={`Delete alert ${alert.name}`}
+                  >
+                    <TrashIcon size={14} className="text-danger" />
+                  </Button>
+                </li>
+              );
+            })}
           </ul>
         )}
         <Dialog

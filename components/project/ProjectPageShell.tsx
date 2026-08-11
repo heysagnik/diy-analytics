@@ -23,7 +23,9 @@ export default function ProjectPageShell({
 
   return (
     <div className={`relative min-h-screen w-full flex flex-col justify-between font-body ${className}`}>
-      <main className={`relative z-10 w-full max-w-6xl mx-auto px-4 py-6 sm:px-6 sm:py-8 lg:px-8 flex-1 flex flex-col ${mainClassName}`}>
+      <main
+        className={`relative z-10 w-full max-w-6xl mx-auto px-4 py-6 sm:px-6 sm:py-8 lg:px-8 flex-1 flex flex-col ${mainClassName}`}
+      >
         {hasHeader && (
           <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-col gap-2">

@@ -39,6 +39,8 @@ const analyticsResponse: AnalyticsResponse = {
   exitPages: [],
   goals: [],
   webVitals: [],
+  webVitalsBreakdown: { page: [], country: [], device: [], browser: [] },
+  resourceTimings: [],
   topEvents: [],
   recentEvents: [],
 };

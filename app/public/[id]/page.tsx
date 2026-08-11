@@ -5,9 +5,9 @@ import { AnalyticsService } from '@/app/api/analytics/services/analyticsService'
 import { Card } from '@/components/ui/card';
 import { projects } from '@/db/schema';
 import { db } from '@/lib/db';
+import { isValidUuid } from '@/lib/uuid';
 import type { AnalyticsData, DateRange } from '@/types/analytics';
 import { createEmptyAnalyticsData } from '@/utils/analytics';
-import { isValidUuid } from '@/lib/uuid';
 import PublicDashboardClient from './PublicDashboardClient';
 
 export const dynamic = 'force-dynamic';

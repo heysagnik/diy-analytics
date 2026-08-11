@@ -12,6 +12,8 @@
 
 import type { AnalyticsResponse as ServerAnalyticsResponse } from '../app/api/analytics/types';
 
+export { WEB_VITAL_BREAKDOWN_DIMENSIONS } from '../app/api/analytics/types';
+
 export interface TimeRange {
   start: string;
   end: string;
@@ -45,9 +47,13 @@ export type {
   OSData,
   PageData,
   RecentEvent,
+  ResourceTimingData,
   SourceData,
   UtmBreakdownData,
+  WebVitalBreakdown,
+  WebVitalBreakdownItem,
   WebVitalData,
+  WebVitalDimension,
 } from '../app/api/analytics/types';
 
 export type AnalyticsData = Omit<AnalyticsResponse, 'timeRange'>;

@@ -113,7 +113,30 @@ export interface GoalConversionData {
 
 export interface WebVitalData {
   metric: 'LCP' | 'CLS' | 'INP';
+  p50: number;
   p75: number;
+  samples: number;
+}
+
+// Per-dimension web vitals p75, so a slow LCP can be traced to a specific
+// route, region, device, or browser rather than only a site-wide aggregate.
+export interface WebVitalBreakdownItem {
+  key: string;
+  lcp?: number;
+  cls?: number;
+  inp?: number;
+  samples: number;
+}
+
+export const WEB_VITAL_BREAKDOWN_DIMENSIONS = ['page', 'country', 'device', 'browser'] as const;
+export type WebVitalDimension = (typeof WEB_VITAL_BREAKDOWN_DIMENSIONS)[number];
+export type WebVitalBreakdown = Record<WebVitalDimension, WebVitalBreakdownItem[]>;
+
+export interface ResourceTimingData {
+  name: string;
+  type: string;
+  p75Duration: number;
+  avgSize: number;
   samples: number;
 }
 
@@ -219,6 +242,8 @@ export interface AnalyticsResponse {
   exitPages: PageData[];
   goals: GoalConversionData[];
   webVitals: WebVitalData[];
+  webVitalsBreakdown: WebVitalBreakdown;
+  resourceTimings: ResourceTimingData[];
   topEvents: EventData[];
   recentEvents: RecentEvent[];
 }

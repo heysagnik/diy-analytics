@@ -8,6 +8,41 @@
       "when": 1786393620098,
       "tag": "0000_tearful_wallop",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1786454501689,
+      "tag": "0001_previous_warbird",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786454873810,
+      "tag": "0002_open_sir_ram",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1786458028355,
+      "tag": "0003_lame_swordsman",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1786459365134,
+      "tag": "0004_past_stephen_strange",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1786461006933,
+      "tag": "0005_sleepy_rogue",
+      "breakpoints": true
     }
   ]
 }

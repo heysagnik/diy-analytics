@@ -1,9 +1,17 @@
-import { GearIcon, LightningIcon, MagnifyingGlassIcon, MoonIcon, PlusIcon, SignOutIcon, SunIcon } from '@phosphor-icons/react';
-import { useTheme } from 'next-themes';
+import {
+  GearIcon,
+  LightningIcon,
+  MagnifyingGlassIcon,
+  MoonIcon,
+  PlusIcon,
+  SignOutIcon,
+  SunIcon,
+} from '@phosphor-icons/react';
+import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
+import { useTheme } from 'next-themes';
 import type React from 'react';
 import { useEffect, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { VisitorAvatar } from '@/components/analytics/visitors/VisitorAvatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -80,7 +88,11 @@ export const ProjectListHeader: React.FC<ProjectListHeaderProps> = ({
         </div>
 
         <div className="flex items-center gap-2.5">
-          <Button onClick={onNewSiteClick} size="lg" className="flex-1 sm:flex-none active:scale-[0.96] transition-transform">
+          <Button
+            onClick={onNewSiteClick}
+            size="lg"
+            className="flex-1 sm:flex-none active:scale-[0.96] transition-transform"
+          >
             <PlusIcon data-icon="inline-start" weight="bold" />
             <span>New Site</span>
           </Button>

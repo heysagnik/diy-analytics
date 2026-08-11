@@ -73,7 +73,9 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, workspaceSlug
         {hasData ? (
           <Badge
             className={
-              project.analytics?.growth.startsWith('+') ? 'bg-success/10 text-success font-mono' : 'bg-danger/10 text-danger font-mono'
+              project.analytics?.growth.startsWith('+')
+                ? 'bg-success/10 text-success font-mono'
+                : 'bg-danger/10 text-danger font-mono'
             }
           >
             <span className="tabular-nums">{project.analytics?.growth}</span>

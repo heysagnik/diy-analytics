@@ -1,4 +1,5 @@
 import { and, count, countDistinct, desc, eq, gte, inArray, lte, max, min, type SQL, sql } from 'drizzle-orm';
+import type { PgColumn } from 'drizzle-orm/pg-core';
 import { events, goals as goalsTable, pageViews, projects } from '@/db/schema';
 import { db } from '@/lib/db';
 import { requireAnd } from '@/lib/sql';
@@ -22,12 +23,16 @@ import type {
   QueryOptions,
   RealtimeResponse,
   RecentEvent,
+  ResourceTimingData,
   SourceData,
   TimeRange,
   UtmBreakdownData,
+  WebVitalBreakdown,
+  WebVitalBreakdownItem,
   WebVitalData,
+  WebVitalDimension,
 } from '../types';
-import { DATE_RANGES } from '../types';
+import { DATE_RANGES, WEB_VITAL_BREAKDOWN_DIMENSIONS } from '../types';
 import {
   addPeriods,
   calculatePercentageChange,
@@ -65,6 +70,13 @@ const ANALYTICS_CACHE_TTL_MS = 60_000;
 function analyticsCacheKey(options: QueryOptions): string {
   const { projectId, dateRange, timezone, filters, startDate, endDate } = options;
   return JSON.stringify({ projectId, dateRange, timezone, filters, startDate, endDate });
+}
+
+/** Nearest-rank percentile over an already-sorted numeric array. */
+function percentile(sorted: number[], p: number): number {
+  if (sorted.length === 0) return 0;
+  const idx = Math.min(sorted.length - 1, Math.floor(sorted.length * p));
+  return sorted[idx] ?? 0;
 }
 
 /**
@@ -336,6 +348,8 @@ export class AnalyticsService {
       { entryPages, exitPages },
       goalConversions,
       webVitals,
+      webVitalsBreakdown,
+      resourceTimings,
       topEvents,
       recentEvents,
     ] = await Promise.all([
@@ -360,6 +374,8 @@ export class AnalyticsService {
       this.getEntryExitPages(projectId, dimConditions, timeRange),
       this.getGoalConversions(projectGoals, projectId, dimConditions, eventDimConditions, timeRange),
       this.getWebVitals(projectId, eventDimConditions, timeRange),
+      this.getWebVitalsBreakdown(projectId, eventDimConditions, timeRange),
+      this.getResourceTimings(projectId, eventDimConditions, timeRange),
       this.getTopEvents(projectId, eventDimConditions, timeRange),
       this.getRecentEvents(projectId, eventDimConditions, timeRange),
     ]);
@@ -381,6 +397,8 @@ export class AnalyticsService {
       exitPages,
       goals: goalConversions,
       webVitals,
+      webVitalsBreakdown,
+      resourceTimings,
       topEvents,
       recentEvents,
     };
@@ -789,6 +807,22 @@ export class AnalyticsService {
   }
 
   /**
+   * Conversion rate for a single goal over a preset date range, unfiltered
+   * by dashboard dimensions — used by goal-based alerting (see
+   * app/api/projects/[id]/alerts/check/route.ts), which evaluates a goal
+   * against its site-wide rate rather than a dashboard-scoped view.
+   */
+  async getGoalConversionRate(
+    projectId: string,
+    goal: { id: string; name: string; type: 'page' | 'event'; matchValue: string },
+    dateRangeKey: string,
+  ): Promise<GoalConversionData> {
+    const { timeRange } = this.resolveTimeRange(dateRangeKey);
+    const [result] = await this.getGoalConversions([goal], projectId, [], [], timeRange);
+    return result;
+  }
+
+  /**
    * Goal conversion rates — for each defined goal, counts distinct sessions
    * that hit the matching page (type:'page') or fired the matching custom
    * event (type:'event') within the window, against the same dimension
@@ -864,12 +898,14 @@ export class AnalyticsService {
   }
 
   /**
-   * Web Vitals (LCP/CLS/INP) — p75 per metric, the standard threshold used
-   * to judge "good"/"needs improvement"/"poor" (matches Google's own
-   * reporting convention). Computed in application code from a grouped
-   * value array rather than a SQL percentile function, for parity with the
-   * Mongo-era implementation (which avoided requiring MongoDB 7+'s
-   * $percentile) — a straight port keeps behavior identical.
+   * Web Vitals (LCP/CLS/INP) — p50 and p75 per metric. p75 is the standard
+   * threshold used to judge "good"/"needs improvement"/"poor" (matches
+   * Google's own reporting convention); p50 is shown alongside it so a p75
+   * regression can be told apart from a shift in the typical (median)
+   * experience vs. just a heavier slow tail. Computed in application code
+   * from a grouped value array rather than a SQL percentile function, for
+   * parity with the Mongo-era implementation (which avoided requiring
+   * MongoDB 7+'s $percentile) — a straight port keeps behavior identical.
    */
   private async getWebVitals(
     projectId: string,
@@ -887,9 +923,125 @@ export class AnalyticsService {
       .filter((r): r is { metric: 'LCP' | 'CLS' | 'INP'; values: number[] } => ['LCP', 'CLS', 'INP'].includes(r.metric))
       .map((r) => {
         const sorted = [...r.values].sort((a, b) => a - b);
-        const idx = Math.min(sorted.length - 1, Math.floor(sorted.length * 0.75));
-        return { metric: r.metric, p75: sorted[idx] ?? 0, samples: sorted.length };
+        return {
+          metric: r.metric,
+          p50: percentile(sorted, 0.5),
+          p75: percentile(sorted, 0.75),
+          samples: sorted.length,
+        };
       });
+  }
+
+  /**
+   * p75-per-metric grouped by an extra dimension (page path, country,
+   * device, or browser) so a regression can be traced to a specific slice
+   * instead of only the site-wide aggregate. Each dimension is a top-level
+   * indexed events column, not the jsonb `data` field — trackEvent already
+   * writes both.
+   */
+  private async getWebVitalsBreakdown(
+    projectId: string,
+    eventDimConditions: SQL[],
+    timeRange: TimeRange,
+  ): Promise<WebVitalBreakdown> {
+    const dimensionColumns: Record<WebVitalDimension, PgColumn> = {
+      page: events.path,
+      country: events.country,
+      device: events.device,
+      browser: events.browser,
+    };
+
+    const entries = await Promise.all(
+      WEB_VITAL_BREAKDOWN_DIMENSIONS.map(async (dimension) => {
+        const items = await this.getWebVitalsByDimension(
+          projectId,
+          eventDimConditions,
+          timeRange,
+          dimensionColumns[dimension],
+        );
+        return [dimension, items] as const;
+      }),
+    );
+
+    return Object.fromEntries(entries) as WebVitalBreakdown;
+  }
+
+  private async getWebVitalsByDimension(
+    projectId: string,
+    eventDimConditions: SQL[],
+    timeRange: TimeRange,
+    dimensionColumn: PgColumn,
+  ): Promise<WebVitalBreakdownItem[]> {
+    const rows = await db.execute<{ key: string | null; metric: string; values: number[] }>(sql`
+      SELECT ${dimensionColumn} AS key, (${events.data} ->> 'metric') AS metric, array_agg((${events.data} ->> 'value')::double precision) AS values
+      FROM ${events}
+      WHERE ${and(eq(events.projectId, projectId), ...eventDimConditions, eq(events.name, '__web_vital'), gte(events.timestamp, new Date(timeRange.start)), lte(events.timestamp, new Date(timeRange.end)))}
+      GROUP BY key, metric
+    `);
+
+    const itemByKey = new Map<string, WebVitalBreakdownItem>();
+    for (const row of rows) {
+      if (!row.key || !['LCP', 'CLS', 'INP'].includes(row.metric)) continue;
+      const sorted = [...row.values].sort((a, b) => a - b);
+      const p75 = percentile(sorted, 0.75);
+
+      const item = itemByKey.get(row.key) ?? { key: row.key, samples: 0 };
+      if (row.metric === 'LCP') item.lcp = p75;
+      else if (row.metric === 'CLS') item.cls = p75;
+      else if (row.metric === 'INP') item.inp = p75;
+      item.samples += sorted.length;
+      itemByKey.set(row.key, item);
+    }
+
+    return [...itemByKey.values()].sort((a, b) => b.samples - a.samples).slice(0, 20);
+  }
+
+  /**
+   * Slowest resources across all page loads. The tracker only reports
+   * resources over 200ms, sampled at 20% of pageviews (see tracker.js), so
+   * `samples` undercounts real request volume — it's a signal of which
+   * assets are slow, not a precise hit count.
+   */
+  private async getResourceTimings(
+    projectId: string,
+    eventDimConditions: SQL[],
+    timeRange: TimeRange,
+  ): Promise<ResourceTimingData[]> {
+    const rows = await db.execute<{ name: string; type: string; duration: number; size: number }>(sql`
+      SELECT
+        (resource ->> 'name') AS name,
+        (resource ->> 'type') AS type,
+        (resource ->> 'duration')::double precision AS duration,
+        (resource ->> 'size')::double precision AS size
+      FROM ${events}, jsonb_array_elements(${events.data} -> 'resources') AS resource
+      WHERE ${and(eq(events.projectId, projectId), ...eventDimConditions, eq(events.name, '__resource_timing'), gte(events.timestamp, new Date(timeRange.start)), lte(events.timestamp, new Date(timeRange.end)))}
+    `);
+
+    const durationsByResource = new Map<
+      string,
+      { name: string; type: string; durations: number[]; totalSize: number }
+    >();
+    for (const row of rows) {
+      const key = `${row.name}::${row.type}`;
+      const entry = durationsByResource.get(key) ?? { name: row.name, type: row.type, durations: [], totalSize: 0 };
+      entry.durations.push(row.duration);
+      entry.totalSize += row.size;
+      durationsByResource.set(key, entry);
+    }
+
+    return [...durationsByResource.values()]
+      .map((entry) => ({
+        name: entry.name,
+        type: entry.type,
+        p75Duration: percentile(
+          [...entry.durations].sort((a, b) => a - b),
+          0.75,
+        ),
+        avgSize: Math.round(entry.totalSize / entry.durations.length),
+        samples: entry.durations.length,
+      }))
+      .sort((a, b) => b.p75Duration - a.p75Duration)
+      .slice(0, 15);
   }
 
   /**

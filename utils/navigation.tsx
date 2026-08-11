@@ -1,8 +1,10 @@
 import {
   ArrowBendUpLeftIcon,
   ArrowsClockwiseIcon,
+  BugIcon,
   ChatCenteredIcon,
   FileTextIcon,
+  FlowArrowIcon,
   FunnelIcon,
   GearIcon,
   HouseIcon,
@@ -18,11 +20,15 @@ const AnimatedUserIcon = (props: IconProps) => <UserCircleIcon {...props} data-i
 const AnimatedGearIcon = (props: IconProps) => <GearIcon {...props} data-icon="GearIcon" />;
 const AnimatedFunnelIcon = (props: IconProps) => <FunnelIcon {...props} data-icon="FunnelIcon" />;
 const AnimatedRetentionIcon = (props: IconProps) => <ArrowsClockwiseIcon {...props} data-icon="ArrowsClockwiseIcon" />;
+const AnimatedBugIcon = (props: IconProps) => <BugIcon {...props} data-icon="BugIcon" />;
+const AnimatedFlowIcon = (props: IconProps) => <FlowArrowIcon {...props} data-icon="FlowArrowIcon" />;
 
 export const getNavigationItems = (projectBasePath: string): NavigationItem[] => [
   { id: 'analytics', label: 'Overview', icon: AnimatedHouseIcon, href: projectBasePath },
   { id: 'funnels', label: 'Funnels', icon: AnimatedFunnelIcon, href: `${projectBasePath}/funnels` },
+  { id: 'flow', label: 'Page Flow', icon: AnimatedFlowIcon, href: `${projectBasePath}/flow` },
   { id: 'retention', label: 'Retention', icon: AnimatedRetentionIcon, href: `${projectBasePath}/retention` },
+  { id: 'errors', label: 'Errors', icon: AnimatedBugIcon, href: `${projectBasePath}/errors` },
   { id: 'users', label: 'Visitors', icon: AnimatedUserIcon, href: `${projectBasePath}/users` },
   { id: 'settings', label: 'Settings', icon: AnimatedGearIcon, href: `${projectBasePath}/settings` },
 ];

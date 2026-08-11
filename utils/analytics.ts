@@ -1,5 +1,7 @@
 import { generateLabels } from '../lib/utils/labelUtils';
-import type { AnalyticsData, DateRange, Granularity, MetricData } from '../types/analytics';
+import type { AnalyticsData, DateRange, Granularity, MetricData, WebVitalBreakdown } from '../types/analytics';
+
+const EMPTY_WEB_VITAL_BREAKDOWN: WebVitalBreakdown = { page: [], country: [], device: [], browser: [] };
 
 const generateDefaultNumericArray = (length: number): number[] => Array(length).fill(0);
 
@@ -39,6 +41,8 @@ export const createEmptyAnalyticsData = (dateRange: DateRange): AnalyticsData =>
     exitPages: [],
     goals: [],
     webVitals: [],
+    webVitalsBreakdown: EMPTY_WEB_VITAL_BREAKDOWN,
+    resourceTimings: [],
     countries: [],
     browsers: [],
     devices: [],

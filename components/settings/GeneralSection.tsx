@@ -186,7 +186,9 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({ project, onProje
           >
             <SelectTrigger className="w-full sm:max-w-xs" aria-label="Timezone">
               <SelectValue>
-                {(v: string) => (v === AUTO_TIMEZONE ? `Automatic${browserTimezone ? ` (${browserTimezone})` : ''}` : v)}
+                {(v: string) =>
+                  v === AUTO_TIMEZONE ? `Automatic${browserTimezone ? ` (${browserTimezone})` : ''}` : v
+                }
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
