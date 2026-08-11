@@ -7,6 +7,7 @@ import { projects } from '@/db/schema';
 import { db } from '@/lib/db';
 import type { AnalyticsData, DateRange } from '@/types/analytics';
 import { createEmptyAnalyticsData } from '@/utils/analytics';
+import { isValidUuid } from '@/lib/uuid';
 import PublicDashboardClient from './PublicDashboardClient';
 
 export const dynamic = 'force-dynamic';
@@ -17,6 +18,10 @@ interface PageProps {
 
 export default async function PublicDashboardPage({ params }: PageProps) {
   const { id } = await params;
+
+  if (!isValidUuid(id)) {
+    notFound();
+  }
 
   const [project] = await db
     .select({
