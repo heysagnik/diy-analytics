@@ -35,6 +35,11 @@ interface ErrorGroup {
   regressedAt: string | null;
 }
 
+interface ReleaseCount {
+  release: string | null;
+  count: number;
+}
+
 const ERRORS_LOAD_FAILED = "We couldn't load errors. Please try again.";
 
 const SEVERITY_BADGE: Record<ErrorGroup['severity'], string> = {
@@ -50,6 +55,12 @@ function relativeTime(iso: string): string {
   const hours = Math.round(minutes / 60);
   if (hours < 24) return `${hours}h ago`;
   return `${Math.round(hours / 24)}d ago`;
+}
+
+const NEW_ERROR_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+function isNewError(firstSeenAt: string): boolean {
+  return Date.now() - new Date(firstSeenAt).getTime() < NEW_ERROR_WINDOW_MS;
 }
 
 interface ResolvedSource {
@@ -104,10 +115,16 @@ function ErrorRow({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             <Badge className={`text-xs font-medium ${SEVERITY_BADGE[error.severity]}`}>{error.severity}</Badge>
-            {error.regressedAt && (
+            {error.regressedAt ? (
               <Badge className="text-xs font-medium bg-danger/10 text-danger hover:bg-danger/10 border-none shadow-none">
                 regression
               </Badge>
+            ) : (
+              isNewError(error.firstSeenAt) && (
+                <Badge className="text-xs font-medium bg-accent/10 text-accent hover:bg-accent/10 border-none shadow-none">
+                  new
+                </Badge>
+              )
             )}
             {error.release && (
               <Badge variant="outline" className="text-xs">
@@ -201,6 +218,8 @@ export default function ErrorsPage({
   const { projectId } = use(promiseParams);
 
   const [status, setStatus] = useState<ErrorStatus>('active');
+  const [releaseFilter, setReleaseFilter] = useState('all');
+  const [releases, setReleases] = useState<ReleaseCount[]>([]);
   const [errorGroups, setErrorGroups] = useState<ErrorGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -210,15 +229,20 @@ export default function ErrorsPage({
     setLoading(true);
     setLoadError(null);
     try {
-      const res = await fetch(`/api/projects/${projectId}/errors?status=${status}`, { cache: 'no-store' });
-      if (!res.ok) throw new Error(`Error ${res.status}`);
-      setErrorGroups(await res.json());
+      const errorsQuery = releaseFilter === 'all' ? '' : `&release=${encodeURIComponent(releaseFilter)}`;
+      const [errorsRes, releasesRes] = await Promise.all([
+        fetch(`/api/projects/${projectId}/errors?status=${status}${errorsQuery}`, { cache: 'no-store' }),
+        fetch(`/api/projects/${projectId}/errors/releases?status=${status}`, { cache: 'no-store' }),
+      ]);
+      if (!errorsRes.ok) throw new Error(`Error ${errorsRes.status}`);
+      setErrorGroups(await errorsRes.json());
+      setReleases(releasesRes.ok ? await releasesRes.json() : []);
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : 'Failed to load errors');
     } finally {
       setLoading(false);
     }
-  }, [projectId, status]);
+  }, [projectId, status, releaseFilter]);
 
   useEffect(() => {
     fetchErrors();
@@ -238,24 +262,50 @@ export default function ErrorsPage({
     await fetch(`/api/projects/${projectId}/errors/${errorId}`, { method: 'DELETE' }).catch(() => fetchErrors());
   };
 
+  const releaseLabel = (release: string | null) => (release === null ? 'No release' : release);
+
   return (
     <ProjectPageShell
       eyebrow="Insights"
       title="Errors"
       description="Uncaught exceptions and unhandled rejections, grouped by fingerprint."
       actions={
-        <Select
-          value={status}
-          onValueChange={(v: unknown) => (v === 'active' || v === 'resolved' ? setStatus(v) : undefined)}
-        >
-          <SelectTrigger aria-label="Status">
-            <SelectValue>{(v: ErrorStatus) => (v === 'active' ? 'Active' : 'Resolved')}</SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="active">Active</SelectItem>
-            <SelectItem value="resolved">Resolved</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-2">
+          {releases.length > 0 && (
+            <Select value={releaseFilter} onValueChange={(v: unknown) => typeof v === 'string' && setReleaseFilter(v)}>
+              <SelectTrigger aria-label="Release">
+                <SelectValue>
+                  {(v: string) => (v === 'all' ? 'All releases' : releaseLabel(v === 'none' ? null : v))}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All releases</SelectItem>
+                {releases.map((r) => (
+                  <SelectItem key={r.release ?? 'none'} value={r.release ?? 'none'}>
+                    {releaseLabel(r.release)} ({r.count})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          <Select
+            value={status}
+            onValueChange={(v: unknown) => {
+              if (v === 'active' || v === 'resolved') {
+                setStatus(v);
+                setReleaseFilter('all');
+              }
+            }}
+          >
+            <SelectTrigger aria-label="Status">
+              <SelectValue>{(v: ErrorStatus) => (v === 'active' ? 'Active' : 'Resolved')}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="resolved">Resolved</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       }
     >
       {loading ? (

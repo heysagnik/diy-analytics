@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 While the major version is `0`, breaking changes may ship in a minor release.
 
+## [0.1.3] - 2026-08-12
+
+### Added
+
+- **Explore** — an ad-hoc session query builder: combine attribute (country,
+  browser, device, source, page, UTM, OS, city), "visited page", and "fired
+  event" conditions with AND/OR to find matching sessions without a
+  predefined funnel or goal.
+- **Errors**: a "new" badge for errors first seen within the last 24h, and a
+  release filter/breakdown (grouped counts per `release` tag) on the Errors
+  page.
+- Resource-load failures (blocked/failed script, image, and link loads) are
+  now captured alongside JS exceptions and unhandled rejections, via a
+  capture-phase listener — previously only thrown errors were tracked.
+
+### Fixed
+
+- Explore queries failed with a driver-level type error because date-range
+  bounds were interpolated as raw `Date` objects into hand-written SQL
+  instead of going through drizzle's typed comparison operators.
+
 ## [0.1.2] - 2026-08-11
 
 ### Added
@@ -64,6 +85,7 @@ While the major version is `0`, breaking changes may ship in a minor release.
 - Self-hosted tracking script (`/api/tracker.js`) with automatic SPA pageview
   tracking, custom events, Core Web Vitals, and a visitor opt-out API.
 
+[0.1.3]: https://github.com/heysagnik/diy-analytics/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/heysagnik/diy-analytics/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/heysagnik/diy-analytics/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/heysagnik/diy-analytics/releases/tag/v0.1.0
