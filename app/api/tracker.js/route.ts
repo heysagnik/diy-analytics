@@ -8,6 +8,7 @@ interface ProjectForScript {
   trackingCode: string;
   domain?: string | null;
   url: string;
+  additionalDomains?: string[];
 }
 
 export async function OPTIONS() {
@@ -56,6 +57,7 @@ export async function GET(request: NextRequest) {
       trackingCode: project.trackingCode,
       domain: project.domain,
       url: project.url || '',
+      additionalDomains: project.additionalDomains,
     };
     const trackingScript = generateTrackingScript(projectForScript);
 
@@ -89,7 +91,7 @@ function generateTrackingScript(project: ProjectForScript) {
   const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000').replace(/\/+$/, '');
   const endpoint = `${siteUrl}/api/track`;
   const siteId = project.trackingCode;
-  const allowedDomains = [project.domain, project.url].filter(Boolean);
+  const allowedDomains = [project.domain, project.url, ...(project.additionalDomains ?? [])].filter(Boolean);
 
   // Every injected value goes through JSON.stringify rather than raw
   // template interpolation, so a value containing a quote/backslash can't

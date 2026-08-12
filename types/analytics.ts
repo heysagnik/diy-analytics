@@ -67,6 +67,7 @@ export interface Project {
   name: string;
   url: string;
   domain?: string;
+  additionalDomains?: string[];
   trackingCode: string;
   publicMode?: boolean;
   timezone?: string | null;

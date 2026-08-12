@@ -175,6 +175,13 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({ project, onProje
       </SettingsRow>
 
       <SettingsRow
+        label="Site URL"
+        description="The primary domain for this project. Manage additional authorized domains from the Tracking tab."
+      >
+        <Input readOnly value={project?.url || ''} className="font-mono text-xs" aria-label="Site URL" />
+      </SettingsRow>
+
+      <SettingsRow
         label="Timezone"
         description="Charts and reports are bucketed and labeled in this timezone for everyone who views the project. Leave on Automatic to use each viewer's own browser timezone instead."
       >

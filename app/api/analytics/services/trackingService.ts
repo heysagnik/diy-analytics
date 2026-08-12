@@ -78,6 +78,7 @@ interface ProjectDocument {
   trackingCode: string;
   excludedIPs?: string[];
   excludedPaths?: string[];
+  additionalDomains?: string[];
 }
 
 interface SessionInfo {
@@ -131,7 +132,7 @@ export class TrackingService {
           details: {
             siteId: payload.siteId,
             domain: payload.domain,
-            allowedDomains: [project.domain, project.url].filter(Boolean),
+            allowedDomains: [project.domain, project.url, ...(project.additionalDomains ?? [])].filter(Boolean),
           },
         };
       }
@@ -329,7 +330,7 @@ export class TrackingService {
    * Validate domain authorization
    */
   private validateDomainAuthorization(project: ProjectDocument, requestDomain: string): string | null {
-    const allowedDomains = [project.domain, project.url].filter(Boolean);
+    const allowedDomains = [project.domain, project.url, ...(project.additionalDomains ?? [])].filter(Boolean);
 
     if (allowedDomains.length === 0) {
       return 'Project has no authorized domains configured';

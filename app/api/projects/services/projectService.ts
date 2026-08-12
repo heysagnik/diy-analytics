@@ -16,6 +16,18 @@ export interface UpdateProjectInput {
   excludedIPs?: string[];
   excludedPaths?: string[];
   timezone?: string | null;
+  additionalDomains?: string[];
+}
+
+function normalizeAdditionalDomains(domains: string[], primaryDomain: string): string[] | null {
+  const normalized = new Set<string>();
+  for (const raw of domains) {
+    const result = normalizeProjectUrl(raw);
+    if (!result) return null;
+    if (result.domain === primaryDomain) continue;
+    normalized.add(result.domain);
+  }
+  return [...normalized];
 }
 
 /**
@@ -54,6 +66,21 @@ export async function updateProject(id: string, workspaceId: string, input: Upda
     if (!normalized) return { error: 'invalid_url' as const };
     updateData.url = normalized.hostname;
     updateData.domain = normalized.domain;
+  }
+
+  if (input.additionalDomains !== undefined) {
+    let primaryDomain = updateData.domain;
+    if (primaryDomain === undefined) {
+      const [existing] = await db
+        .select({ domain: projects.domain })
+        .from(projects)
+        .where(eq(projects.id, id))
+        .limit(1);
+      primaryDomain = existing?.domain ?? undefined;
+    }
+    const normalized = normalizeAdditionalDomains(input.additionalDomains, primaryDomain ?? '');
+    if (!normalized) return { error: 'invalid_domain' as const };
+    updateData.additionalDomains = normalized;
   }
 
   if (Object.keys(updateData).length === 0) {

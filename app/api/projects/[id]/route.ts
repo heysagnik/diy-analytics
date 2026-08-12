@@ -45,6 +45,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       excludedIPs?: string[];
       excludedPaths?: string[];
       timezone?: string | null;
+      additionalDomains?: string[];
     } = {};
 
     if (typeof body.name === 'string') updateInput.name = body.name.trim();
@@ -61,6 +62,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
     if (typeof body.url === 'string') {
       updateInput.url = body.url;
+    }
+    if (Array.isArray(body.additionalDomains)) {
+      const domains = body.additionalDomains
+        .map((v: unknown) => (typeof v === 'string' ? v.trim() : ''))
+        .filter(Boolean);
+      updateInput.additionalDomains = domains;
     }
     if (typeof body.publicMode === 'boolean') updateInput.publicMode = body.publicMode;
     if (Array.isArray(body.excludedIPs)) {
@@ -85,6 +92,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const result = await updateProject(id, access.project.workspaceId, updateInput);
     if (result.error === 'invalid_url') {
       return NextResponse.json({ error: 'Invalid URL' }, { status: 400 });
+    }
+    if (result.error === 'invalid_domain') {
+      return NextResponse.json({ error: 'Invalid domain' }, { status: 400 });
     }
     if (result.error === 'no_fields') {
       return NextResponse.json({ error: 'No update fields provided' }, { status: 400 });

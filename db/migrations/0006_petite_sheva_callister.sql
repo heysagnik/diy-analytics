@@ -1,0 +1,1 @@
+ALTER TABLE "projects" ADD COLUMN "additional_domains" text[] DEFAULT '{}' NOT NULL;

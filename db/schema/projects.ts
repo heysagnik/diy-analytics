@@ -19,6 +19,9 @@ export const projects = pgTable(
     // Derived from `url` by app code (see projectService.ts) — Drizzle has
     // no schema-level hook equivalent to Mongoose's pre-save middleware.
     domain: varchar('domain', { length: 255 }),
+    // Extra hostnames authorized to send tracking data, e.g. a *.vercel.app
+    // preview domain kept alongside a later custom domain.
+    additionalDomains: text('additional_domains').array().notNull().default([]),
     trackingCode: varchar('tracking_code', { length: 64 }).notNull().unique().$defaultFn(generateTrackingCode),
     publicMode: boolean('public_mode').notNull().default(false),
     // Reporting timezone (IANA name, e.g. "Asia/Kolkata"). Null means "use

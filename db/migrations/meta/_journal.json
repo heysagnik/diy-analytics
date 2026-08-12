@@ -43,6 +43,13 @@
       "when": 1786461006933,
       "tag": "0005_sleepy_rogue",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786571291947,
+      "tag": "0006_petite_sheva_callister",
+      "breakpoints": true
     }
   ]
 }
