@@ -1,22 +1,15 @@
-import {
-  ArrowLeftIcon,
-  CheckCircleIcon,
-  EnvelopeSimpleIcon,
-  SignOutIcon,
-  UsersIcon,
-} from '@phosphor-icons/react/dist/ssr';
+import { ArrowLeftIcon, SignOutIcon } from '@phosphor-icons/react/dist/ssr';
 import { eq, inArray } from 'drizzle-orm';
+import { headers } from 'next/headers';
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
-import { VisitorAvatar } from '@/components/analytics/visitors/VisitorAvatar';
-import { SystemStorageCard } from '@/components/profile/SystemStorageCard';
+import { ProfileShell } from '@/components/profile/ProfileShell';
 import ProjectPageShell from '@/components/project/ProjectPageShell';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { workspaceMembers, workspaces as workspacesTable } from '@/db/schema';
 import type { StorageStatsResponse } from '@/lib/api/system';
+import { listApiKeys } from '@/lib/apiKeys';
 import { getRequestUser } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getGrowthTrend, getStorageStats } from '@/lib/systemStats';
@@ -52,6 +45,18 @@ export default async function ProfilePage({ params }: { params: Promise<{ worksp
         )
     : [];
   const roles = new Map(memberships.map((item) => [item.workspaceId, item.role]));
+
+  const apiKeys = await listApiKeys(user.id);
+  // Derived from the actual request host, not NEXT_PUBLIC_SITE_URL — this
+  // app is self-hosted per-deployment and a project can be reachable from
+  // multiple domains (see additionalDomains), so the MCP endpoint shown
+  // must match whatever domain the user is actually browsing on.
+  const requestHeaders = await headers();
+  const host = requestHeaders.get('host');
+  const origin = host
+    ? `${requestHeaders.get('x-forwarded-proto') || 'https'}://${host}`
+    : process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+  const mcpEndpoint = `${origin.replace(/\/+$/, '')}/api/mcp`;
 
   const storageStats: StorageStatsResponse = await (async () => {
     try {
@@ -110,63 +115,21 @@ export default async function ProfilePage({ params }: { params: Promise<{ worksp
             </header>
           </div>
 
-          <div className="grid gap-5 md:grid-cols-2">
-            <Card className="p-6">
-              <div className="mb-5">
-                <VisitorAvatar userId={user.id} size={56} />
-              </div>
-              <h2 className="font-display text-xl font-semibold text-foreground">{user.name}</h2>
-              <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
-                <EnvelopeSimpleIcon size={15} weight="bold" className="shrink-0" />
-                <span className="break-all">{user.email}</span>
-              </div>
-            </Card>
-
-            <Card className="p-6">
-              <div className="mb-5 flex items-center justify-between">
-                <div>
-                  <p className="label-eyebrow text-muted-foreground">Your workspaces</p>
-                  <h2 className="mt-1 font-display text-xl font-semibold text-foreground">Workspace access</h2>
-                </div>
-                <UsersIcon size={20} weight="bold" className="text-muted-foreground" />
-              </div>
-              <div className="flex flex-col gap-2">
-                {workspaces.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">You are not a member of any workspace.</p>
-                ) : (
-                  workspaces.map((workspace) => {
-                    const isCurrent = workspace.slug === workspaceSlug;
-                    return (
-                      <Link
-                        key={workspace.id}
-                        href={`/${workspace.slug}`}
-                        className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3 transition-colors ${
-                          isCurrent
-                            ? 'border-accent/30 bg-accent/5'
-                            : 'border-border bg-background hover:bg-surface-secondary'
-                        }`}
-                      >
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <p className="truncate text-sm font-medium text-foreground">{workspace.name}</p>
-                            {isCurrent && <CheckCircleIcon size={14} weight="fill" className="shrink-0 text-accent" />}
-                          </div>
-                          <p className="truncate text-xs text-muted-foreground">/{workspace.slug}</p>
-                        </div>
-                        <Badge variant="secondary" className="ml-4 shrink-0 capitalize">
-                          {roles.get(workspace.id)}
-                        </Badge>
-                      </Link>
-                    );
-                  })
-                )}
-              </div>
-            </Card>
-
-            <div className="md:col-span-2">
-              <SystemStorageCard stats={storageStats} />
-            </div>
-          </div>
+          <ProfileShell
+            user={{ id: user.id, name: user.name, email: user.email }}
+            workspaceSlug={workspaceSlug}
+            workspaces={workspaces}
+            roles={roles}
+            apiKeys={apiKeys.map((key) => ({
+              id: key.id,
+              name: key.name,
+              tokenPrefix: key.tokenPrefix,
+              lastUsedAt: key.lastUsedAt?.toISOString() ?? null,
+              createdAt: key.createdAt.toISOString(),
+            }))}
+            mcpEndpoint={mcpEndpoint}
+            storageStats={storageStats}
+          />
         </div>
       </ProjectPageShell>
     </main>

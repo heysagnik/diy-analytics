@@ -1,13 +1,19 @@
 'use client';
 
-import { TagIcon } from '@phosphor-icons/react';
+import { ArrowClockwiseIcon, TagIcon, WarningCircleIcon } from '@phosphor-icons/react';
 import type React from 'react';
 import { useEffect, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
-import { type AnalyticsFilters, fetchEventPropertyKeys, fetchEventPropertyValues } from '@/lib/api/analytics';
+import {
+  type AnalyticsFilters,
+  fetchEventPropertyKeys,
+  fetchEventPropertyValues,
+  normalizeAnalyticsError,
+} from '@/lib/api/analytics';
 import type { DateRange, EventData, EventPropertyKeyData, EventPropertyValueData } from '@/types/analytics';
 import type { CustomDateRange } from './DateRangePicker';
 
@@ -65,16 +71,24 @@ export const EventPropertyDrilldown: React.FC<EventPropertyDrilldownProps> = ({
   const [values, setValues] = useState<EventPropertyValueData[]>([]);
   const [loadingKeys, setLoadingKeys] = useState(false);
   const [loadingValues, setLoadingValues] = useState(false);
+  const [keysError, setKeysError] = useState<string | null>(null);
+  const [valuesError, setValuesError] = useState<string | null>(null);
+  // Bumped to force-rerun the fetch effects below without changing any of
+  // their real dependencies — the retry button's only job.
+  const [keysRetryToken, setKeysRetryToken] = useState(0);
+  const [valuesRetryToken, setValuesRetryToken] = useState(0);
 
   // Fetch the property keys for the event whenever the dialog opens on a
   // new event — reset downstream key/value selection so a stale key from
   // the previous event isn't shown mid-fetch.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keysRetryToken isn't read in the effect body — it's a pure re-run trigger for the retry button.
   useEffect(() => {
     if (!selectedEvent) return;
     let cancelled = false;
     setKeys([]);
     setSelectedKey(null);
     setValues([]);
+    setKeysError(null);
     setLoadingKeys(true);
 
     fetchEventPropertyKeys({ projectId, eventName: selectedEvent, dateRange, customRange, filters })
@@ -83,7 +97,11 @@ export const EventPropertyDrilldown: React.FC<EventPropertyDrilldownProps> = ({
         setKeys(data);
         if (data.length > 0) setSelectedKey(data[0].key);
       })
-      .catch(() => {})
+      .catch((error) => {
+        if (cancelled) return;
+        const message = normalizeAnalyticsError(error);
+        if (message) setKeysError(message);
+      })
       .finally(() => {
         if (!cancelled) setLoadingKeys(false);
       });
@@ -91,11 +109,13 @@ export const EventPropertyDrilldown: React.FC<EventPropertyDrilldownProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [selectedEvent, projectId, dateRange, customRange, filters]);
+  }, [selectedEvent, projectId, dateRange, customRange, filters, keysRetryToken]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: valuesRetryToken isn't read in the effect body — it's a pure re-run trigger for the retry button.
   useEffect(() => {
     if (!selectedEvent || !selectedKey) return;
     let cancelled = false;
+    setValuesError(null);
     setLoadingValues(true);
 
     fetchEventPropertyValues({
@@ -109,7 +129,11 @@ export const EventPropertyDrilldown: React.FC<EventPropertyDrilldownProps> = ({
       .then((data) => {
         if (!cancelled) setValues(data);
       })
-      .catch(() => {})
+      .catch((error) => {
+        if (cancelled) return;
+        const message = normalizeAnalyticsError(error);
+        if (message) setValuesError(message);
+      })
       .finally(() => {
         if (!cancelled) setLoadingValues(false);
       });
@@ -117,7 +141,7 @@ export const EventPropertyDrilldown: React.FC<EventPropertyDrilldownProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [selectedEvent, selectedKey, projectId, dateRange, customRange, filters]);
+  }, [selectedEvent, selectedKey, projectId, dateRange, customRange, filters, valuesRetryToken]);
 
   const sorted = [...events].sort((a, b) => b.count - a.count);
   const shown = sorted.slice(0, rowsToShow);
@@ -200,6 +224,15 @@ export const EventPropertyDrilldown: React.FC<EventPropertyDrilldownProps> = ({
               <div className="flex items-center justify-center py-12">
                 <Spinner className="size-5 text-accent" />
               </div>
+            ) : keysError ? (
+              <div className="flex flex-col items-center gap-2 py-12 text-center">
+                <WarningCircleIcon size={32} className="text-danger" weight="duotone" />
+                <p className="text-sm text-muted-foreground">{keysError}</p>
+                <Button variant="outline" size="sm" onClick={() => setKeysRetryToken((n) => n + 1)}>
+                  <ArrowClockwiseIcon size={14} />
+                  <span>Retry</span>
+                </Button>
+              </div>
             ) : keys.length === 0 ? (
               <div className="flex flex-col items-center gap-2 py-12 text-center">
                 <TagIcon size={32} className="text-muted-foreground" weight="duotone" />
@@ -208,6 +241,15 @@ export const EventPropertyDrilldown: React.FC<EventPropertyDrilldownProps> = ({
             ) : loadingValues ? (
               <div className="flex items-center justify-center py-12">
                 <Spinner className="size-5 text-accent" />
+              </div>
+            ) : valuesError ? (
+              <div className="flex flex-col items-center gap-2 py-12 text-center">
+                <WarningCircleIcon size={32} className="text-danger" weight="duotone" />
+                <p className="text-sm text-muted-foreground">{valuesError}</p>
+                <Button variant="outline" size="sm" onClick={() => setValuesRetryToken((n) => n + 1)}>
+                  <ArrowClockwiseIcon size={14} />
+                  <span>Retry</span>
+                </Button>
               </div>
             ) : values.length === 0 ? (
               <div className="flex flex-col items-center gap-2 py-12 text-center">

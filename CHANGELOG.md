@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 While the major version is `0`, breaking changes may ship in a minor release.
 
+## [0.1.4] - 2026-08-13
+
+### Added
+
+- **MCP server** — every deployment now serves an [MCP](https://modelcontextprotocol.io)
+  endpoint at `/api/mcp`, so an AI assistant (Claude Desktop, Cursor, or any
+  other MCP-compatible client) can query analytics, funnels, retention,
+  errors, and more directly. Ships with 14 read-only tools; nothing can be
+  created, edited, or deleted through MCP yet.
+- **API keys** — a new **Profile → API Keys** page for creating/revoking
+  personal bearer tokens used to authenticate MCP clients. Keys are
+  user-scoped (not project-scoped); every project-scoped tool call
+  re-checks access on every invocation, so a revoked workspace membership
+  takes effect immediately.
+- **Multiple domains per project** — projects can now authorize one or more
+  additional domains (e.g. a `*.vercel.app` preview kept alongside a custom
+  domain) from **Settings → Tracking**, on top of the existing primary URL.
+  Authorizing a domain also authorizes its subdomains, one-directionally.
+
+### Changed
+
+- The Profile page is now a sidebar layout (Account / Workspaces / API Keys
+  / Storage) instead of a single scrolling column of cards.
+- Renamed the **Page Flow** tab to **Journeys** throughout the app and docs.
+- `docs/features.md` and `docs/integration.md` were substantially rewritten:
+  reorganized to match the app's actual sidebar order, and filled in
+  previously-undocumented features (Explore, Journeys, Error tracking,
+  Segments, multi-domain authorization, MCP server).
+
 ## [0.1.3] - 2026-08-12
 
 ### Added

@@ -29,7 +29,7 @@ export const getNavigationItems = (projectBasePath: string): NavigationItem[] =>
   { id: 'analytics', label: 'Overview', icon: AnimatedHouseIcon, href: projectBasePath },
   { id: 'explore', label: 'Explore', icon: AnimatedExploreIcon, href: `${projectBasePath}/explore` },
   { id: 'funnels', label: 'Funnels', icon: AnimatedFunnelIcon, href: `${projectBasePath}/funnels` },
-  { id: 'flow', label: 'Page Flow', icon: AnimatedFlowIcon, href: `${projectBasePath}/flow` },
+  { id: 'flow', label: 'Journeys', icon: AnimatedFlowIcon, href: `${projectBasePath}/flow` },
   { id: 'retention', label: 'Retention', icon: AnimatedRetentionIcon, href: `${projectBasePath}/retention` },
   { id: 'errors', label: 'Errors', icon: AnimatedBugIcon, href: `${projectBasePath}/errors` },
   { id: 'users', label: 'Visitors', icon: AnimatedUserIcon, href: `${projectBasePath}/users` },

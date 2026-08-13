@@ -51,7 +51,7 @@ export default function FlowPage({
   return (
     <ProjectPageShell
       eyebrow="Insights"
-      title="Page Flow"
+      title="Journeys"
       description="The most common page-to-page transitions within a session."
       actions={
         <Select value={dateRange} onValueChange={(v: unknown) => typeof v === 'string' && setDateRange(v)}>

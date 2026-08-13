@@ -15,6 +15,10 @@ const PUBLIC_PATH_PATTERNS: Array<RegExp> = [
   // app/api/cron/rollup/route.ts), so this only needs to bypass the
   // cookie check here, not skip auth entirely.
   /^\/api\/cron(\/.*)?$/,
+  // MCP clients authenticate via `Authorization: Bearer <api key>`, not a
+  // session cookie — app/api/mcp/route.ts enforces that itself via
+  // requireApiKeyUser, so this only bypasses the cookie check.
+  /^\/api\/mcp(\/.*)?$/,
   /^\/public(\/.*)?$/,
   /^\/login(\/.*)?$/,
   /^\/register(\/.*)?$/,

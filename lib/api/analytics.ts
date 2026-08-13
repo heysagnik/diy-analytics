@@ -147,6 +147,40 @@ export interface EventPropertyQueryOptions {
   filters?: AnalyticsFilters;
 }
 
+function isAbortError(error: unknown): boolean {
+  return (error instanceof DOMException || error instanceof Error) && error.name === 'AbortError';
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * A first request right after the database's compute resumes from
+ * autosuspend (see docs/database.md) pays a multi-second cold-start
+ * penalty and can fail outright rather than just being slow — retrying
+ * once or twice with a short backoff lets that resolve itself instead of
+ * surfacing a transient infra hiccup as a user-facing error. 5xx and raw
+ * network failures (no response at all) are retried; 4xx are not, since
+ * those won't succeed on retry.
+ */
+async function withTransientRetry<T>(run: () => Promise<T>, attempts = 3): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    try {
+      return await run();
+    } catch (error) {
+      lastError = error;
+      if (isAbortError(error)) throw error;
+      const status = error instanceof AnalyticsRequestError ? error.status : undefined;
+      const retriable = status === undefined || status >= 500;
+      if (!retriable || attempt === attempts - 1) throw error;
+      await sleep(400 * 2 ** attempt);
+    }
+  }
+  throw lastError;
+}
+
 function serializeEventPropertyQuery(options: EventPropertyQueryOptions & { propertyKey?: string }): URLSearchParams {
   const params = serializeAnalyticsQuery(options);
   params.set('eventName', options.eventName);
@@ -171,44 +205,48 @@ export async function fetchEventPropertyKeys(
   options: EventPropertyQueryOptions,
   signal?: AbortSignal,
 ): Promise<EventPropertyKeyData[]> {
-  const response = await fetch(`/api/analytics/events/properties?${serializeEventPropertyQuery(options).toString()}`, {
-    cache: 'no-store',
-    signal,
+  return withTransientRetry(async () => {
+    const response = await fetch(
+      `/api/analytics/events/properties?${serializeEventPropertyQuery(options).toString()}`,
+      { cache: 'no-store', signal },
+    );
+    const result: unknown = await response.json().catch(() => null);
+
+    if (
+      !response.ok ||
+      !isRecord(result) ||
+      result.success !== true ||
+      !Array.isArray(result.data) ||
+      !result.data.every(isEventPropertyKeyData)
+    ) {
+      throw new AnalyticsRequestError(response.status);
+    }
+
+    return result.data;
   });
-  const result: unknown = await response.json().catch(() => null);
-
-  if (
-    !response.ok ||
-    !isRecord(result) ||
-    result.success !== true ||
-    !Array.isArray(result.data) ||
-    !result.data.every(isEventPropertyKeyData)
-  ) {
-    throw new AnalyticsRequestError(response.status);
-  }
-
-  return result.data;
 }
 
 export async function fetchEventPropertyValues(
   options: EventPropertyQueryOptions & { propertyKey: string },
   signal?: AbortSignal,
 ): Promise<EventPropertyValueData[]> {
-  const response = await fetch(`/api/analytics/events/properties?${serializeEventPropertyQuery(options).toString()}`, {
-    cache: 'no-store',
-    signal,
+  return withTransientRetry(async () => {
+    const response = await fetch(
+      `/api/analytics/events/properties?${serializeEventPropertyQuery(options).toString()}`,
+      { cache: 'no-store', signal },
+    );
+    const result: unknown = await response.json().catch(() => null);
+
+    if (
+      !response.ok ||
+      !isRecord(result) ||
+      result.success !== true ||
+      !Array.isArray(result.data) ||
+      !result.data.every(isEventPropertyValueData)
+    ) {
+      throw new AnalyticsRequestError(response.status);
+    }
+
+    return result.data;
   });
-  const result: unknown = await response.json().catch(() => null);
-
-  if (
-    !response.ok ||
-    !isRecord(result) ||
-    result.success !== true ||
-    !Array.isArray(result.data) ||
-    !result.data.every(isEventPropertyValueData)
-  ) {
-    throw new AnalyticsRequestError(response.status);
-  }
-
-  return result.data;
 }

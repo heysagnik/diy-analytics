@@ -13,6 +13,11 @@
 > **Status:** alpha. The core dashboard is functional, but expect breaking
 > changes before `1.0.0`. See [CHANGELOG.md](CHANGELOG.md).
 
+You run diy-analytics yourself (Vercel + Postgres), point a tracking
+snippet at it, and get a dashboard with the traffic metrics, funnels, error
+tracking, and session-level tools described below — no third-party
+processor ever sees your visitors' data.
+
 ![Dashboard screenshot](docs/images/overview-chart.jpg)
 
 ## Features
@@ -22,10 +27,18 @@
 - Traffic, pages, sources, campaigns, countries, devices, and browsers, with
   click-to-filter breakdowns.
 - Live visitor count and historical views with per-project timezone support.
-- Goals, multi-step funnels, and retention cohorts.
+- Goals, multi-step funnels, retention cohorts, ad-hoc session exploration,
+  and page-to-page journey diagrams.
+- Automatic error tracking with release tagging and on-demand source map
+  resolution.
+- Auto-computed recency/frequency visitor segments.
 - Threshold-based alerts delivered via webhook.
 - Optional public, read-only dashboards via a shareable link.
+- Track a project from multiple domains (e.g. a `*.vercel.app` preview
+  alongside a custom domain).
 - Workspaces with role-based member access.
+- A built-in [MCP](https://modelcontextprotocol.io) server so AI assistants
+  can query your analytics directly.
 
 ## Getting started
 
@@ -102,8 +115,8 @@ snippets, the custom-events API, and troubleshooting.
 
 Full documentation lives in [`docs/`](docs/):
 
-- [Features](docs/features.md) — a detailed reference for everything in the dashboard.
-- [Integration Guide](docs/integration.md) — installing the tracking script and custom events.
+- [Features](docs/features.md) — a detailed reference for everything in the dashboard, including error tracking, explore, journeys, visitor segments, and the MCP server.
+- [Integration Guide](docs/integration.md) — installing the tracking script, custom events, and multi-domain authorization.
 
 ## Contributing
 
