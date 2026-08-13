@@ -371,6 +371,14 @@ shown — it's displayed exactly once and can't be retrieved again
 afterward. The same page shows the exact MCP endpoint URL for the domain
 you're currently on, ready to paste into your client's configuration.
 
+Most clients (Claude Desktop, Cursor) let you configure a custom
+`Authorization: Bearer <key>` header, which is the preferred way to send
+the key. Clients that only accept a bare URL with no custom headers — such
+as claude.ai's "Add custom connector" dialog — can instead append the key
+as a query parameter: `https://your-instance.example.com/api/mcp?key=YOUR_API_KEY`.
+Leave the connector's OAuth Client ID/Secret fields blank; this server
+doesn't use OAuth.
+
 ### What a key can do
 
 A key authenticates as *you*, not as a specific project — it can query any
