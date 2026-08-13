@@ -16,7 +16,7 @@ import { DataManagementSection } from '@/components/settings/DataManagementSecti
 import { GeneralSection } from '@/components/settings/GeneralSection';
 import { GoalsSection } from '@/components/settings/GoalsSection';
 import { TrackingSection } from '@/components/settings/TrackingSection';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent, TabsIndicator, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/useToast';
 import { useProjectContext } from '../project-context';
 
@@ -51,21 +51,18 @@ export default function SettingsPage() {
       >
         <div className="max-w-full overflow-x-auto scrollbar-hide">
           <TabsList className="w-max">
+            <TabsIndicator className={activeTab === 'danger' ? 'border-danger/20 bg-danger/10 shadow-none' : ''} />
             {SETTINGS_TABS.map((tab) => {
               const TabIcon = tab.icon;
+              const isDanger = tab.id === 'danger';
               return (
-                <TabsTrigger
-                  key={tab.id}
-                  value={tab.id}
-                  className={
-                    tab.id === 'danger'
-                      ? 'text-danger data-active:bg-danger data-active:text-white data-active:border-danger/20 data-active:shadow-xs'
-                      : ''
-                  }
-                >
-                  <TabIcon size={14} weight={tab.id === activeTab ? 'bold' : 'regular'} />
-                  <span>{tab.label}</span>
-                </TabsTrigger>
+                <div key={tab.id} className="flex items-center">
+                  {isDanger && <div aria-hidden className="mx-1 h-4 w-px bg-border/60" />}
+                  <TabsTrigger value={tab.id} className={isDanger ? 'text-danger data-active:!text-danger' : ''}>
+                    <TabIcon size={14} weight={tab.id === activeTab ? 'bold' : 'regular'} />
+                    <span>{tab.label}</span>
+                  </TabsTrigger>
+                </div>
               );
             })}
           </TabsList>

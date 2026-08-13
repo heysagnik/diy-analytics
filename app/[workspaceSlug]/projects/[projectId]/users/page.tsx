@@ -6,7 +6,7 @@ import { SegmentsPanel } from '@/components/analytics/visitors/SegmentsPanel';
 import { VisitorDetailPanel } from '@/components/analytics/visitors/VisitorDetailPanel';
 import { VisitorFilters, VisitorList } from '@/components/analytics/visitors/VisitorList';
 import ProjectPageShell from '@/components/project/ProjectPageShell';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent, TabsIndicator, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useVisitors } from '@/hooks/useVisitors';
 import type { VisitorListViewState } from '@/types/visitors';
 
@@ -52,6 +52,7 @@ export default function UsersPage() {
         className="gap-4"
       >
         <TabsList className="w-max">
+          <TabsIndicator />
           <TabsTrigger value="directory">Directory</TabsTrigger>
           <TabsTrigger value="segments">Segments</TabsTrigger>
         </TabsList>

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsIndicator, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { FilterDimension } from '@/types/filters';
 
 export interface BreakdownItem {
@@ -68,19 +69,16 @@ function TabSwitcher({
       </div>
 
       <div className="hidden sm:block max-w-full overflow-x-auto scrollbar-hide">
-        <div className="bg-muted/80 backdrop-blur-sm p-0.5 rounded-lg flex items-center gap-0.5 border border-border/40 w-max">
-          {tabs.map((tab) => (
-            <Button
-              key={tab.id}
-              size="xs"
-              variant={tab.id === activeId ? 'default' : 'ghost'}
-              onClick={() => onChange(tab.id)}
-              className="rounded-md font-medium shrink-0 active:scale-[0.96] transition-[color,background-color,border-color,box-shadow,transform] duration-150 ease-out"
-            >
-              {tab.label}
-            </Button>
-          ))}
-        </div>
+        <Tabs value={activeId} onValueChange={(v) => typeof v === 'string' && onChange(v)}>
+          <TabsList className="w-max">
+            <TabsIndicator />
+            {tabs.map((tab) => (
+              <TabsTrigger key={tab.id} value={tab.id} className="shrink-0 px-2.5 py-1 text-[11px]">
+                {tab.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
       </div>
     </>
   );

@@ -139,7 +139,6 @@ export default function ProjectPage() {
           <MainChart analyticsData={analyticsData} dateRange={dateRange} />
           <GoalsPanel goals={analyticsData.goals} />
           <WebVitalsPanel webVitals={analyticsData.webVitals} webVitalsBreakdown={analyticsData.webVitalsBreakdown} />
-          <ResourceTimingPanel resourceTimings={analyticsData.resourceTimings} />
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <BreakdownPanel
@@ -253,6 +252,8 @@ export default function ProjectPage() {
               ]}
             />
           </div>
+
+          <ResourceTimingPanel resourceTimings={analyticsData.resourceTimings} />
 
           <EventPropertyDrilldown
             events={analyticsData.topEvents}

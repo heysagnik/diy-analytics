@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsIndicator, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { type FilterDimension, filterLabel } from '@/types/filters';
 
 const EXPLORE_DIMENSIONS: FilterDimension[] = [
@@ -257,24 +258,17 @@ export default function ExplorePage({
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground">Sessions matching</span>
-              <div className="flex items-center gap-1 bg-muted/80 p-0.5 rounded-lg">
-                <Button
-                  size="xs"
-                  variant={combinator === 'AND' ? 'default' : 'ghost'}
-                  onClick={() => setCombinator('AND')}
-                  className="rounded-md"
-                >
-                  ALL (AND)
-                </Button>
-                <Button
-                  size="xs"
-                  variant={combinator === 'OR' ? 'default' : 'ghost'}
-                  onClick={() => setCombinator('OR')}
-                  className="rounded-md"
-                >
-                  ANY (OR)
-                </Button>
-              </div>
+              <Tabs value={combinator} onValueChange={(v) => typeof v === 'string' && setCombinator(v as 'AND' | 'OR')}>
+                <TabsList className="w-fit">
+                  <TabsIndicator />
+                  <TabsTrigger value="AND" className="px-2.5 py-1 text-[11px]">
+                    ALL (AND)
+                  </TabsTrigger>
+                  <TabsTrigger value="OR" className="px-2.5 py-1 text-[11px]">
+                    ANY (OR)
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
               <span className="text-xs text-muted-foreground">of these conditions</span>
             </div>
             <Select value={dateRange} onValueChange={(v: unknown) => typeof v === 'string' && setDateRange(v)}>

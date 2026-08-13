@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsIndicator, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { WebVitalBreakdown, WebVitalData, WebVitalDimension } from '@/types/analytics';
 import { WEB_VITAL_BREAKDOWN_DIMENSIONS } from '@/types/analytics';
 import { getCountryName } from '@/utils/country';
@@ -149,19 +150,16 @@ function TabSwitcher({
       </div>
 
       <div className="hidden sm:block max-w-full overflow-x-auto scrollbar-hide">
-        <div className="bg-muted/80 backdrop-blur-sm p-0.5 rounded-lg flex items-center gap-0.5 border border-border/40 w-max">
-          {dimensions.map((d) => (
-            <Button
-              key={d}
-              size="xs"
-              variant={d === activeDimension ? 'default' : 'ghost'}
-              onClick={() => onChange(d)}
-              className="rounded-md font-medium shrink-0 active:scale-[0.96] transition-[color,background-color,border-color,box-shadow,transform] duration-150 ease-out"
-            >
-              {DIMENSION_LABELS[d]}
-            </Button>
-          ))}
-        </div>
+        <Tabs value={activeDimension} onValueChange={(v) => typeof v === 'string' && onChange(v as WebVitalDimension)}>
+          <TabsList className="w-max">
+            <TabsIndicator />
+            {dimensions.map((d) => (
+              <TabsTrigger key={d} value={d} className="shrink-0 px-2.5 py-1 text-[11px]">
+                {DIMENSION_LABELS[d]}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
       </div>
     </>
   );

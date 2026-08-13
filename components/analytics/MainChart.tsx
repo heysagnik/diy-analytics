@@ -2,10 +2,10 @@ import { ChartLineIcon } from '@phosphor-icons/react';
 import dynamic from 'next/dynamic';
 import type React from 'react';
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsIndicator, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { AnalyticsData, DateRange } from '@/types/analytics';
 import { useCompactChart } from './useCompactChart';
 
@@ -67,28 +67,13 @@ export const MainChart: React.FC<MainChartProps> = ({ analyticsData, dateRange }
           <p className="text-xs text-muted-foreground mt-1 font-body">Data overview for {dateRange}</p>
         </div>
 
-        <div className="flex items-center gap-1 bg-surface-secondary/50 p-0.5 rounded-lg border border-border w-fit">
-          <Button
-            variant={chartType === 'area' ? 'default' : 'ghost'}
-            size="sm"
-            onClick={() => setChartType('area')}
-            className={`rounded-md cursor-pointer ${
-              chartType === 'area' ? 'shadow-xs border-border/10 dark:border-border/30' : 'text-muted-foreground'
-            }`}
-          >
-            Area Chart
-          </Button>
-          <Button
-            variant={chartType === 'bar' ? 'default' : 'ghost'}
-            size="sm"
-            onClick={() => setChartType('bar')}
-            className={`rounded-md cursor-pointer ${
-              chartType === 'bar' ? 'shadow-xs border-border/10 dark:border-border/30' : 'text-muted-foreground'
-            }`}
-          >
-            Bar Chart
-          </Button>
-        </div>
+        <Tabs value={chartType} onValueChange={(v) => typeof v === 'string' && setChartType(v as ChartType)}>
+          <TabsList className="w-fit">
+            <TabsIndicator />
+            <TabsTrigger value="area">Area Chart</TabsTrigger>
+            <TabsTrigger value="bar">Bar Chart</TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
 
       {hasData ? (
