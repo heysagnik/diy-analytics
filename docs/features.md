@@ -376,8 +376,22 @@ Most clients (Claude Desktop, Cursor) let you configure a custom
 the key. Clients that only accept a bare URL with no custom headers — such
 as claude.ai's "Add custom connector" dialog — can instead append the key
 as a query parameter: `https://your-instance.example.com/api/mcp?key=YOUR_API_KEY`.
-Leave the connector's OAuth Client ID/Secret fields blank; this server
-doesn't use OAuth.
+
+### Connecting from claude.ai
+
+claude.ai's web connector UI performs an OAuth handshake before it will use
+a remote MCP server, rather than accepting a bare API key. Every deployment
+also serves an OAuth 2.1 authorization server for this — discoverable at
+`/.well-known/oauth-authorization-server` — with dynamic client
+registration, PKCE (S256), and its own short-lived access/refresh tokens
+layered on top of the same account/workspace access rules as an API key.
+
+To connect: in claude.ai, **Settings → Connectors → Add custom connector**,
+set the URL to `https://your-instance.example.com/api/mcp`, and leave the
+OAuth Client ID/Secret fields blank — claude.ai registers itself
+automatically. You'll be redirected to sign in (if not already) and then to
+a consent screen; approving it completes the connection. No manual API key
+is needed for this path.
 
 ### What a key can do
 

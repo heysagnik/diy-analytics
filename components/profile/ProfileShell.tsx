@@ -5,6 +5,7 @@ import {
   DatabaseIcon,
   EnvelopeSimpleIcon,
   KeyIcon,
+  PlugsIcon,
   UserCircleIcon,
   UsersIcon,
 } from '@phosphor-icons/react';
@@ -12,6 +13,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { VisitorAvatar } from '@/components/analytics/visitors/VisitorAvatar';
 import { ApiKeysCard } from '@/components/profile/ApiKeysCard';
+import { ConnectedAppsCard } from '@/components/profile/ConnectedAppsCard';
 import { SystemStorageCard } from '@/components/profile/SystemStorageCard';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
@@ -32,12 +34,19 @@ interface WorkspaceSummary {
   slug: string;
 }
 
+interface ConnectedAppSummary {
+  clientId: string;
+  clientName: string;
+  createdAt: string;
+}
+
 interface ProfileShellProps {
   user: { id: string; name: string; email: string };
   workspaceSlug: string;
   workspaces: WorkspaceSummary[];
   roles: Map<string, string>;
   apiKeys: ApiKeySummary[];
+  connectedApps: ConnectedAppSummary[];
   mcpEndpoint: string;
   storageStats: StorageStatsResponse;
 }
@@ -46,6 +55,7 @@ const SECTIONS = [
   { id: 'account', label: 'Account', icon: UserCircleIcon },
   { id: 'workspaces', label: 'Workspaces', icon: UsersIcon },
   { id: 'api-keys', label: 'API Keys', icon: KeyIcon },
+  { id: 'connected-apps', label: 'Connected Apps', icon: PlugsIcon },
   { id: 'storage', label: 'Storage', icon: DatabaseIcon },
 ] as const;
 
@@ -57,6 +67,7 @@ export function ProfileShell({
   workspaces,
   roles,
   apiKeys,
+  connectedApps,
   mcpEndpoint,
   storageStats,
 }: ProfileShellProps) {
@@ -146,6 +157,8 @@ export function ProfileShell({
         )}
 
         {activeSection === 'api-keys' && <ApiKeysCard initialKeys={apiKeys} mcpEndpoint={mcpEndpoint} />}
+
+        {activeSection === 'connected-apps' && <ConnectedAppsCard initialApps={connectedApps} />}
 
         {activeSection === 'storage' && <SystemStorageCard stats={storageStats} />}
       </div>

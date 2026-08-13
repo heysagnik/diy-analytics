@@ -12,6 +12,7 @@ import type { StorageStatsResponse } from '@/lib/api/system';
 import { listApiKeys } from '@/lib/apiKeys';
 import { getRequestUser } from '@/lib/auth';
 import { db } from '@/lib/db';
+import { listConnectedApps } from '@/lib/oauth';
 import { getGrowthTrend, getStorageStats } from '@/lib/systemStats';
 
 export const dynamic = 'force-dynamic';
@@ -47,6 +48,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ worksp
   const roles = new Map(memberships.map((item) => [item.workspaceId, item.role]));
 
   const apiKeys = await listApiKeys(user.id);
+  const connectedApps = await listConnectedApps(user.id);
   // Derived from the actual request host, not NEXT_PUBLIC_SITE_URL — this
   // app is self-hosted per-deployment and a project can be reachable from
   // multiple domains (see additionalDomains), so the MCP endpoint shown
@@ -126,6 +128,11 @@ export default async function ProfilePage({ params }: { params: Promise<{ worksp
               tokenPrefix: key.tokenPrefix,
               lastUsedAt: key.lastUsedAt?.toISOString() ?? null,
               createdAt: key.createdAt.toISOString(),
+            }))}
+            connectedApps={connectedApps.map((app) => ({
+              clientId: app.clientId,
+              clientName: app.clientName,
+              createdAt: app.createdAt.toISOString(),
             }))}
             mcpEndpoint={mcpEndpoint}
             storageStats={storageStats}
