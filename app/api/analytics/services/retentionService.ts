@@ -1,7 +1,8 @@
-import { and, eq, gte, sql } from 'drizzle-orm';
+import { and, count, eq, gte, sql } from 'drizzle-orm';
 import { pageViews } from '@/db/schema';
 import { db } from '@/lib/db';
 import { isValidUuid } from '@/lib/uuid';
+import { assertRowsWithinLimit } from './queryLimits';
 
 export interface RetentionCohort {
   cohortWeek: string; // ISO date of the Monday that starts the cohort week
@@ -33,6 +34,12 @@ export class RetentionService {
 
     const now = new Date();
     const since = this.startOfWeek(new Date(now.getTime() - weeks * 7 * 24 * 60 * 60 * 1000));
+
+    const [{ count: rowCount }] = await db
+      .select({ count: count() })
+      .from(pageViews)
+      .where(and(eq(pageViews.projectId, projectId), gte(pageViews.timestamp, since)));
+    assertRowsWithinLimit(rowCount, 'Retention analysis');
 
     const rows = await db
       .select({

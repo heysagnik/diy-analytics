@@ -1,11 +1,13 @@
-import { and, count, countDistinct, desc, eq, gte, inArray, lte, max, min, type SQL, sql } from 'drizzle-orm';
-import type { PgColumn } from 'drizzle-orm/pg-core';
+import { and, count, countDistinct, desc, eq, gte, inArray, lte, type SQL, sql } from 'drizzle-orm';
+
 import { events, goals as goalsTable, pageViews, projects } from '@/db/schema';
 import { db } from '@/lib/db';
 import { requireAnd } from '@/lib/sql';
 import { isValidUuid } from '@/lib/uuid';
 import type {
   AnalyticsResponse,
+  AnalyticsSegment,
+  AnalyticsSegmentResponse,
   BrowserData,
   CampaignData,
   CityData,
@@ -44,19 +46,20 @@ import {
 } from '../utils/dateUtils';
 import { queryEventPropertyBreakdown, queryEventPropertyKeys } from './eventPropertyQueries';
 
-interface SessionRollupRow {
-  sessionId: string;
-  userId: string | null;
-  firstTs: Date;
-  pageCount: number;
-  timestamps: string[];
+interface SessionMetrics {
+  sessions: number;
+  users: number;
+  views: number;
+  bounced: number;
+  durationTotalSec: number;
+  sessionSeries: Map<number, number>;
+  userSeries: Map<number, number>;
 }
 
-interface SessionPageSequenceRow {
-  sessionId: string;
-  paths: string[];
-  timestamps: string[];
-}
+// Gaps between consecutive pageviews are clipped to this ceiling before
+// being summed, so a tab left open in the background for hours doesn't get
+// counted as active session time and blow out the average.
+const MAX_GAP_SEC = 30 * 60;
 
 // Process-local cache for getAnalytics results. Serverless instances stay
 // warm across nearby requests (tab switches, filter toggles on the same
@@ -64,19 +67,21 @@ interface SessionPageSequenceRow {
 // database for identical queries within the TTL. Not shared across
 // instances/regions — that's fine, it's a latency optimization, not a
 // correctness guarantee, and results are never more than TTL_MS stale.
-const analyticsCache = new Map<string, { expiresAt: number; data: AnalyticsResponse }>();
+const analyticsCache = new Map<string, { expiresAt: number; data: AnalyticsSegmentResponse }>();
 const ANALYTICS_CACHE_TTL_MS = 60_000;
+
+type BreakdownDimension = 'country' | 'browser' | 'os' | 'device' | 'source' | 'campaign';
+interface BreakdownRow {
+  value: string | null;
+  users: number;
+  sessions: number;
+}
+const BREAKDOWN_LIMIT = 10;
+const WEB_VITAL_METRICS: readonly WebVitalData['metric'][] = ['LCP', 'CLS', 'INP'];
 
 function analyticsCacheKey(options: QueryOptions): string {
   const { projectId, dateRange, timezone, filters, startDate, endDate } = options;
   return JSON.stringify({ projectId, dateRange, timezone, filters, startDate, endDate });
-}
-
-/** Nearest-rank percentile over an already-sorted numeric array. */
-function percentile(sorted: number[], p: number): number {
-  if (sorted.length === 0) return 0;
-  const idx = Math.min(sorted.length - 1, Math.floor(sorted.length * p));
-  return sorted[idx] ?? 0;
 }
 
 /**
@@ -292,18 +297,27 @@ export class AnalyticsService {
    * switches, filter toggles) skip the ~15-query round-trip.
    */
   async getAnalytics(options: QueryOptions): Promise<AnalyticsResponse> {
-    const key = analyticsCacheKey(options);
+    return (await this.getAnalyticsSegment(options, 'all')) as AnalyticsResponse;
+  }
+
+  async getAnalyticsSegment(options: QueryOptions, segment: AnalyticsSegment): Promise<AnalyticsSegmentResponse> {
+    const key = `${segment}|${analyticsCacheKey(options)}`;
     const cached = analyticsCache.get(key);
     if (cached && cached.expiresAt > Date.now()) {
       return cached.data;
     }
 
-    const data = await this.fetchAnalytics(options);
+    const data = await this.fetchAnalytics(options, segment);
     analyticsCache.set(key, { expiresAt: Date.now() + ANALYTICS_CACHE_TTL_MS, data });
     return data;
   }
 
-  private async fetchAnalytics(options: QueryOptions): Promise<AnalyticsResponse> {
+  /**
+   * Resolves everything a segment fetch needs before touching the metric
+   * queries: the project's reporting timezone, the effective window, and
+   * the shared dimension-filter conditions.
+   */
+  private async resolveQueryContext(options: QueryOptions) {
     const { projectId, dateRange, timezone = 'UTC', filters, startDate, endDate } = options;
 
     if (!isValidUuid(projectId)) {
@@ -325,8 +339,90 @@ export class AnalyticsService {
     // to core metrics and every breakdown, which is what makes
     // click-to-filter (drill into a country/browser/page and see the whole
     // page re-scope) possible.
-    const dimConditions = pageViewDimensionConditions(filters);
-    const eventDimConditions = eventDimensionConditions(filters);
+    return {
+      projectId,
+      tzResolved,
+      timeRange,
+      previousRange,
+      config,
+      dimConditions: pageViewDimensionConditions(filters),
+      eventDimConditions: eventDimensionConditions(filters),
+    };
+  }
+
+  /**
+   * Fetches one slice of the dashboard. The panels have very different
+   * costs, so requesting them together meant the fastest numbers waited on
+   * the slowest panel before anything could render. Segments let the client
+   * issue them in parallel and paint each as it lands; `all` preserves the
+   * single-payload contract for the public dashboard and MCP tools.
+   */
+  private async fetchAnalytics(options: QueryOptions, segment: AnalyticsSegment): Promise<AnalyticsSegmentResponse> {
+    const ctx = await this.resolveQueryContext(options);
+    const wants = (s: AnalyticsSegment) => segment === 'all' || segment === s;
+
+    const [core, breakdowns, insights] = await Promise.all([
+      wants('core') ? this.fetchCoreSegment(ctx) : undefined,
+      wants('breakdowns') ? this.fetchBreakdownSegment(ctx) : undefined,
+      wants('insights') ? this.fetchInsightSegment(ctx, options.projectId) : undefined,
+    ]);
+
+    return {
+      timeRange: ctx.timeRange,
+      granularity: ctx.config.granularity,
+      ...core,
+      ...breakdowns,
+      ...insights,
+    };
+  }
+
+  private async fetchCoreSegment(ctx: Awaited<ReturnType<AnalyticsService['resolveQueryContext']>>) {
+    const core = await this.getCoreMetricsBundle(
+      ctx.projectId,
+      ctx.dimConditions,
+      ctx.timeRange,
+      ctx.previousRange,
+      ctx.config.granularity,
+      ctx.config.dataPoints,
+      ctx.tzResolved,
+    );
+    return core;
+  }
+
+  private async fetchBreakdownSegment(ctx: Awaited<ReturnType<AnalyticsService['resolveQueryContext']>>) {
+    const { projectId, dimConditions, timeRange, previousRange } = ctx;
+    const [pages, breakdowns, browserVersions, osVersions, deviceModels, cities, utmBreakdown, entryExit] =
+      await Promise.all([
+        this.getTopPages(projectId, dimConditions, timeRange, previousRange),
+        this.getDimensionBreakdowns(projectId, dimConditions, timeRange),
+        this.getVersionSummaryMap(projectId, dimConditions, timeRange, pageViews.browser, pageViews.browserVersion),
+        this.getVersionSummaryMap(projectId, dimConditions, timeRange, pageViews.os, pageViews.osVersion),
+        this.getDeviceModelSummaryMap(projectId, dimConditions, timeRange),
+        this.getUsersByCity(projectId, dimConditions, timeRange),
+        this.getUtmBreakdown(projectId, dimConditions, timeRange),
+        this.getEntryExitPages(projectId, dimConditions, timeRange),
+      ]);
+
+    return {
+      pages,
+      sources: this.mapSources(breakdowns),
+      countries: this.mapCountries(breakdowns),
+      browsers: this.mapBrowsers(breakdowns, browserVersions),
+      devices: this.mapDevices(breakdowns, deviceModels),
+      os: this.mapOS(breakdowns, osVersions),
+      campaigns: this.mapCampaigns(breakdowns),
+      cities,
+      utmBreakdown,
+      entryPages: entryExit.entryPages,
+      exitPages: entryExit.exitPages,
+    };
+  }
+
+  private async fetchInsightSegment(
+    ctx: Awaited<ReturnType<AnalyticsService['resolveQueryContext']>>,
+    projectId: string,
+  ) {
+    const { dimConditions, eventDimConditions, timeRange } = ctx;
 
     // Goals are only defined per-project when the user opts in via
     // settings, so this is a cheap indexed lookup — the (usually empty)
@@ -334,70 +430,18 @@ export class AnalyticsService {
     // computation itself is skipped entirely when there are none.
     const projectGoals = await db.select().from(goalsTable).where(eq(goalsTable.projectId, projectId));
 
-    const [
-      core,
-      pages,
-      sources,
-      countries,
-      browsers,
-      devices,
-      os,
-      cities,
-      campaigns,
-      utmBreakdown,
-      { entryPages, exitPages },
-      goalConversions,
-      webVitals,
-      webVitalsBreakdown,
-      resourceTimings,
-      topEvents,
-      recentEvents,
-    ] = await Promise.all([
-      this.getCoreMetricsBundle(
-        projectId,
-        dimConditions,
-        timeRange,
-        previousRange,
-        config.granularity,
-        config.dataPoints,
-        tzResolved,
-      ),
-      this.getTopPages(projectId, dimConditions, timeRange, previousRange),
-      this.getTopSources(projectId, dimConditions, timeRange),
-      this.getUsersByCountry(projectId, dimConditions, timeRange),
-      this.getUsersByBrowser(projectId, dimConditions, timeRange),
-      this.getUsersByDevice(projectId, dimConditions, timeRange),
-      this.getUsersByOS(projectId, dimConditions, timeRange),
-      this.getUsersByCity(projectId, dimConditions, timeRange),
-      this.getTopCampaigns(projectId, dimConditions, timeRange),
-      this.getUtmBreakdown(projectId, dimConditions, timeRange),
-      this.getEntryExitPages(projectId, dimConditions, timeRange),
+    const [goalConversions, vitals, resourceTimings, topEvents, recentEvents] = await Promise.all([
       this.getGoalConversions(projectGoals, projectId, dimConditions, eventDimConditions, timeRange),
-      this.getWebVitals(projectId, eventDimConditions, timeRange),
-      this.getWebVitalsBreakdown(projectId, eventDimConditions, timeRange),
+      this.getWebVitalsBundle(projectId, eventDimConditions, timeRange),
       this.getResourceTimings(projectId, eventDimConditions, timeRange),
       this.getTopEvents(projectId, eventDimConditions, timeRange),
       this.getRecentEvents(projectId, eventDimConditions, timeRange),
     ]);
 
     return {
-      timeRange,
-      granularity: config.granularity,
-      ...core,
-      pages,
-      sources,
-      countries,
-      browsers,
-      devices,
-      os,
-      cities,
-      campaigns,
-      utmBreakdown,
-      entryPages,
-      exitPages,
       goals: goalConversions,
-      webVitals,
-      webVitalsBreakdown,
+      webVitals: vitals.webVitals,
+      webVitalsBreakdown: vitals.breakdown,
       resourceTimings,
       topEvents,
       recentEvents,
@@ -446,39 +490,148 @@ export class AnalyticsService {
    * filter dimension applies the same way to event-based panels as it does
    * to pageview-based ones.
    */
-  private async getSessionRollup(
+  /**
+   * All session-derived core metrics for one window, computed entirely in
+   * SQL. Nothing per-session crosses the wire: the response is a handful of
+   * scalar rows plus at most one row per chart bucket, so the payload is
+   * flat in the size of the window rather than linear in pageviews.
+   *
+   * `edges` drives the session/user series; pass null for the comparison
+   * window, which only needs the scalars.
+   */
+  private async getSessionMetrics(
     projectId: string,
     dimConditions: SQL[],
     window: { start: Date; end: Date },
-  ): Promise<SessionRollupRow[]> {
-    const rows = await db
-      .select({
-        sessionId: pageViews.sessionId,
-        // Old Mongo pipeline used `$first: '$userId'` — only ever consumed
-        // downstream as "some non-null identity for that session", so any
-        // single-value aggregate is equivalent.
-        userId: max(pageViews.userId),
-        // MIN over a GROUP BY session_id is never null — every group has
-        // at least one row by construction.
-        firstTs: min(pageViews.timestamp),
-        pageCount: count(),
-        // jsonb_agg, not array_agg — a raw array_agg(...) inside a typed
-        // .select() field comes back from postgres.js as an unparsed
-        // Postgres array-literal string, not a JS array; jsonb_agg is
-        // reliably parsed.
-        timestamps: sql<string[]>`jsonb_agg(${pageViews.timestamp})`,
-      })
-      .from(pageViews)
-      .where(
-        and(
+    edges: { starts: number[]; ends: number[] } | null,
+  ): Promise<SessionMetrics> {
+    const gap = sql`
+      CASE
+        WHEN lag(${pageViews.timestamp}) OVER (PARTITION BY ${pageViews.sessionId} ORDER BY ${pageViews.timestamp}) IS NULL
+          THEN 0
+        ELSE least(
+          extract(epoch FROM ${pageViews.timestamp} - lag(${pageViews.timestamp}) OVER (PARTITION BY ${pageViews.sessionId} ORDER BY ${pageViews.timestamp})),
+          ${MAX_GAP_SEC}
+        )
+      END`;
+
+    // Identity mirrors the old JS `userId || sessionId`, where an empty
+    // string is falsy — hence nullif, not a bare coalesce.
+    const base = sql`
+      WITH gaps AS (
+        SELECT
+          ${pageViews.sessionId} AS session_id,
+          ${pageViews.userId} AS user_id,
+          ${pageViews.timestamp} AS ts,
+          ${gap} AS gap
+        FROM ${pageViews}
+        WHERE ${and(
           eq(pageViews.projectId, projectId),
           ...dimConditions,
           gte(pageViews.timestamp, window.start),
           lte(pageViews.timestamp, window.end),
-        ),
-      )
-      .groupBy(pageViews.sessionId);
-    return rows as SessionRollupRow[];
+        )}
+      ),
+      sess AS (
+        SELECT
+          session_id,
+          coalesce(nullif(max(user_id), ''), session_id) AS identity,
+          min(ts) AS first_ts,
+          count(*)::int AS page_count,
+          coalesce(sum(gap), 0) AS duration_sec
+        FROM gaps
+        GROUP BY session_id
+      ),
+      ident AS (
+        SELECT identity, min(first_ts) AS first_ts FROM sess GROUP BY identity
+      )`;
+
+    const scalars = sql`
+      SELECT 'sessions' AS kind, -1 AS idx, count(*)::double precision AS n FROM sess
+      UNION ALL SELECT 'users', -1, count(*)::double precision FROM ident
+      UNION ALL SELECT 'views', -1, coalesce(sum(page_count), 0)::double precision FROM sess
+      UNION ALL SELECT 'bounced', -1, count(*) FILTER (WHERE page_count = 1)::double precision FROM sess
+      UNION ALL SELECT 'duration', -1, coalesce(sum(duration_sec), 0)::double precision FROM sess`;
+
+    const query = edges
+      ? sql`${base}, bucket(idx, lo, hi) AS (VALUES ${this.bucketValues(edges)})
+          ${scalars}
+          UNION ALL SELECT 'sessionSeries', bucket.idx, count(*)::double precision
+            FROM sess JOIN bucket ON sess.first_ts >= bucket.lo AND sess.first_ts < bucket.hi
+            GROUP BY bucket.idx
+          UNION ALL SELECT 'userSeries', bucket.idx, count(*)::double precision
+            FROM ident JOIN bucket ON ident.first_ts >= bucket.lo AND ident.first_ts < bucket.hi
+            GROUP BY bucket.idx`
+      : sql`${base} ${scalars}`;
+
+    const rows = await db.execute<{ kind: string; idx: number; n: number }>(query);
+
+    const metrics: SessionMetrics = {
+      sessions: 0,
+      users: 0,
+      views: 0,
+      bounced: 0,
+      durationTotalSec: 0,
+      sessionSeries: new Map(),
+      userSeries: new Map(),
+    };
+
+    for (const row of rows) {
+      const n = Number(row.n) || 0;
+      if (row.kind === 'sessions') metrics.sessions = n;
+      else if (row.kind === 'users') metrics.users = n;
+      else if (row.kind === 'views') metrics.views = n;
+      else if (row.kind === 'bounced') metrics.bounced = n;
+      else if (row.kind === 'duration') metrics.durationTotalSec = n;
+      else if (row.kind === 'sessionSeries') metrics.sessionSeries.set(Number(row.idx), n);
+      else if (row.kind === 'userSeries') metrics.userSeries.set(Number(row.idx), n);
+    }
+    return metrics;
+  }
+
+  private bucketValues(edges: { starts: number[]; ends: number[] }): SQL {
+    return sql.join(
+      edges.starts.map(
+        (start, i) =>
+          sql`(${i}::int, ${new Date(start).toISOString()}::timestamptz, ${new Date(edges.ends[i]).toISOString()}::timestamptz)`,
+      ),
+      sql`, `,
+    );
+  }
+
+  /**
+   * Pageview counts per chart bucket, aggregated in SQL so the series costs
+   * one row per bucket (≤60) instead of one row per pageview.
+   *
+   * The bucket edges are computed in JS and joined in as a VALUES list
+   * rather than re-derived with date_trunc. Deriving them independently
+   * looked equivalent but silently disagreed with the JS boundaries in
+   * non-UTC timezones, shifting counts into neighbouring buckets; passing
+   * the same edges the locator uses keeps one definition of a bucket.
+   */
+  private async getPageViewSeries(
+    projectId: string,
+    dimConditions: SQL[],
+    window: { start: Date; end: Date },
+    edges: { starts: number[]; ends: number[] },
+  ): Promise<Map<number, number>> {
+    if (edges.starts.length === 0) return new Map();
+
+    const rows = await db.execute<{ idx: number; views: number }>(sql`
+      SELECT bucket.idx AS idx, count(*)::int AS views
+      FROM ${pageViews}
+      JOIN (VALUES ${this.bucketValues(edges)}) AS bucket(idx, lo, hi)
+        ON ${pageViews.timestamp} >= bucket.lo AND ${pageViews.timestamp} < bucket.hi
+      WHERE ${and(
+        eq(pageViews.projectId, projectId),
+        ...dimConditions,
+        gte(pageViews.timestamp, window.start),
+        lte(pageViews.timestamp, window.end),
+      )}
+      GROUP BY bucket.idx
+    `);
+
+    return new Map(rows.map((row) => [Number(row.idx), row.views]));
   }
 
   /**
@@ -503,106 +656,49 @@ export class AnalyticsService {
     bounceRate: MetricData;
     avgSessionDuration: MetricData;
   }> {
-    const [currentSessions, previousSessions] = await Promise.all([
-      this.getSessionRollup(projectId, dimConditions, {
-        start: new Date(timeRange.start),
-        end: new Date(timeRange.end),
-      }),
-      this.getSessionRollup(projectId, dimConditions, {
-        start: new Date(previousRange.start),
-        end: new Date(previousRange.end),
-      }),
-    ]);
-
     const buckets = generateTimeBuckets(new Date(timeRange.start), dataPoints, granularity, timezone);
     const labels = generateTimeLabels(new Date(timeRange.start), dataPoints, granularity, timezone);
+    const edges = this.computeBucketEdges(buckets, granularity, timezone);
 
-    // Already fetched per-session in currentSessionRollup — reusing it here
-    // avoids a redundant query re-scanning the same rows.
-    const pageViewTimestamps = currentSessions.flatMap((s) => s.timestamps);
-    const currentViews = pageViewTimestamps.length;
-    const previousViews = previousSessions.reduce((acc, s) => acc + s.pageCount, 0);
+    const [current, previous, viewBuckets] = await Promise.all([
+      this.getSessionMetrics(
+        projectId,
+        dimConditions,
+        { start: new Date(timeRange.start), end: new Date(timeRange.end) },
+        edges,
+      ),
+      this.getSessionMetrics(
+        projectId,
+        dimConditions,
+        { start: new Date(previousRange.start), end: new Date(previousRange.end) },
+        null,
+      ),
+      this.getPageViewSeries(
+        projectId,
+        dimConditions,
+        { start: new Date(timeRange.start), end: new Date(timeRange.end) },
+        edges,
+      ),
+    ]);
 
-    // Identity for "unique users" is the persistent userId when present,
-    // falling back to sessionId for anonymous rows so every session still
-    // counts as at least one user. This is deliberately distinct from
-    // "sessions" below, which always counts sessionId.
-    const identityOf = (s: SessionRollupRow) => s.userId || s.sessionId;
+    const currentViews = current.views;
+    const previousViews = previous.views;
+    const currentUsers = current.users;
+    const previousUsers = previous.users;
+    const currentSessionCount = current.sessions;
+    const previousSessionCount = previous.sessions;
 
-    // Sessions series — bucketed by each session's first pageview.
-    const sessionBucketMap = new Map<number, number>();
-    for (const s of currentSessions) {
-      const idx = this.findBucketIndex(new Date(s.firstTs), buckets, granularity, timezone);
-      if (idx !== -1) sessionBucketMap.set(idx, (sessionBucketMap.get(idx) || 0) + 1);
-    }
-    const sessionSeries = labels.map((_, i) => sessionBucketMap.get(i) || 0);
+    const sessionSeries = labels.map((_, i) => current.sessionSeries.get(i) || 0);
+    const userSeries = labels.map((_, i) => current.userSeries.get(i) || 0);
+    const viewSeries = labels.map((_, i) => viewBuckets.get(i) || 0);
 
-    // Unique-users series — bucketed by each distinct user's earliest
-    // session start in the window, so a returning user with several
-    // sessions is only counted once, in their first bucket.
-    const userFirstSeen = (sessions: SessionRollupRow[]) => {
-      const map = new Map<string, Date>();
-      for (const s of sessions) {
-        const id = identityOf(s);
-        const ts = new Date(s.firstTs);
-        const existing = map.get(id);
-        if (!existing || ts < existing) map.set(id, ts);
-      }
-      return map;
-    };
-    const currentUserFirstSeen = userFirstSeen(currentSessions);
-    const previousUserFirstSeen = userFirstSeen(previousSessions);
+    const rateOf = (part: number, whole: number) => (whole === 0 ? 0 : (part / whole) * 100);
+    const meanOf = (total: number, whole: number) => (whole === 0 ? 0 : total / whole);
 
-    const userBucketMap = new Map<number, number>();
-    for (const ts of currentUserFirstSeen.values()) {
-      const idx = this.findBucketIndex(ts, buckets, granularity, timezone);
-      if (idx !== -1) userBucketMap.set(idx, (userBucketMap.get(idx) || 0) + 1);
-    }
-    const userSeries = labels.map((_, i) => userBucketMap.get(i) || 0);
-
-    // Page views series — bucketed by each raw pageview's own timestamp.
-    const viewBucketMap = new Map<number, number>();
-    for (const timestamp of pageViewTimestamps) {
-      const idx = this.findBucketIndex(new Date(timestamp), buckets, granularity, timezone);
-      if (idx !== -1) viewBucketMap.set(idx, (viewBucketMap.get(idx) || 0) + 1);
-    }
-    const viewSeries = labels.map((_, i) => viewBucketMap.get(i) || 0);
-
-    const currentUsers = currentUserFirstSeen.size;
-    const previousUsers = previousUserFirstSeen.size;
-    const currentSessionCount = currentSessions.length;
-    const previousSessionCount = previousSessions.length;
-
-    const bounceOf = (rollup: SessionRollupRow[]) => {
-      if (rollup.length === 0) return 0;
-      const bounced = rollup.filter((s) => s.pageCount === 1).length;
-      return (bounced / rollup.length) * 100;
-    };
-
-    // Gaps between consecutive pageviews are clipped to this ceiling before
-    // being summed, so a tab left open in the background for hours doesn't
-    // get counted as active session time and blow out the average.
-    const MAX_GAP_SEC = 30 * 60;
-
-    const durationOf = (rollup: SessionRollupRow[]) => {
-      if (rollup.length === 0) return 0;
-      const totalSec = rollup.reduce((acc, s) => {
-        if (s.pageCount <= 1) return acc;
-        const sorted = [...s.timestamps].sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
-        let sessionSec = 0;
-        for (let i = 1; i < sorted.length; i++) {
-          const gapSec = (new Date(sorted[i]).getTime() - new Date(sorted[i - 1]).getTime()) / 1000;
-          sessionSec += Math.min(gapSec, MAX_GAP_SEC);
-        }
-        return acc + sessionSec;
-      }, 0);
-      return totalSec / rollup.length;
-    };
-
-    const currentBounce = bounceOf(currentSessions);
-    const previousBounce = bounceOf(previousSessions);
-    const currentDuration = durationOf(currentSessions);
-    const previousDuration = durationOf(previousSessions);
+    const currentBounce = rateOf(current.bounced, current.sessions);
+    const previousBounce = rateOf(previous.bounced, previous.sessions);
+    const currentDuration = meanOf(current.durationTotalSec, current.sessions);
+    const previousDuration = meanOf(previous.durationTotalSec, previous.sessions);
 
     return {
       uniqueUsers: {
@@ -671,7 +767,10 @@ export class AnalyticsService {
       lte(pageViews.timestamp, new Date(timeRange.end)),
     );
 
-    const [result, sessionRows] = await Promise.all([
+    const windowStartIso = new Date(timeRange.start).toISOString();
+    const windowEndIso = new Date(timeRange.end).toISOString();
+
+    const [result, perPath] = await Promise.all([
       db
         .select({ path: pageViews.path, views: count(), users: countDistinct(pageViews.sessionId) })
         .from(pageViews)
@@ -679,54 +778,55 @@ export class AnalyticsService {
         .groupBy(pageViews.path)
         .orderBy(desc(count()))
         .limit(20),
-      // Widened past the window's start (to `previousRange.start`) so a
-      // session that began before the window isn't misread as a bounce —
-      // same fix getCoreMetricsBundle applies to its own session rollups.
-      db
-        .select({
-          sessionId: pageViews.sessionId,
-          // jsonb_agg, not array_agg — see getSessionRollup's comment above.
-          paths: sql<string[]>`jsonb_agg(${pageViews.path} ORDER BY ${pageViews.timestamp})`,
-          timestamps: sql<string[]>`jsonb_agg(${pageViews.timestamp} ORDER BY ${pageViews.timestamp})`,
-        })
-        .from(pageViews)
-        .where(
-          and(
+      // Per-path entry/bounce and time-on-page, aggregated in SQL. This
+      // previously pulled every path and timestamp in the window as jsonb
+      // arrays and rebuilt the sequences in JS — at 200K pageviews that one
+      // query dominated the whole dashboard. The window function does the
+      // same sequencing next to the data and returns one row per path.
+      //
+      // The scan is deliberately widened to `previousRange.start` so a
+      // session that began before the window isn't misread as a bounce;
+      // only rows whose own timestamp falls inside the window contribute.
+      db.execute<{ kind: string; path: string; a: number; b: number }>(sql`
+        WITH seq AS (
+          SELECT
+            ${pageViews.path} AS path,
+            ${pageViews.timestamp} AS ts,
+            lead(${pageViews.timestamp}) OVER (PARTITION BY ${pageViews.sessionId} ORDER BY ${pageViews.timestamp}) AS next_ts,
+            row_number() OVER (PARTITION BY ${pageViews.sessionId} ORDER BY ${pageViews.timestamp}) AS rn,
+            count(*) OVER (PARTITION BY ${pageViews.sessionId}) AS page_count
+          FROM ${pageViews}
+          WHERE ${and(
             eq(pageViews.projectId, projectId),
             ...dimConditions,
             gte(pageViews.timestamp, new Date(previousRange.start)),
             lte(pageViews.timestamp, new Date(timeRange.end)),
-          ),
+          )}
         )
-        .groupBy(pageViews.sessionId) as unknown as Promise<SessionPageSequenceRow[]>,
+        SELECT 'entry' AS kind, path,
+               count(*)::double precision AS a,
+               count(*) FILTER (WHERE page_count = 1)::double precision AS b
+        FROM seq
+        WHERE rn = 1 AND ts >= ${windowStartIso}::timestamptz AND ts <= ${windowEndIso}::timestamptz
+        GROUP BY path
+        UNION ALL
+        SELECT 'duration', path,
+               coalesce(sum(extract(epoch FROM next_ts - ts)), 0)::double precision,
+               count(*)::double precision
+        FROM seq
+        WHERE next_ts IS NOT NULL AND ts >= ${windowStartIso}::timestamptz AND ts <= ${windowEndIso}::timestamptz
+        GROUP BY path
+      `),
     ]);
-
-    const windowStart = new Date(timeRange.start).getTime();
-    const windowEnd = new Date(timeRange.end).getTime();
 
     const entryBounce = new Map<string, { entries: number; bounces: number }>();
     const duration = new Map<string, { totalSec: number; count: number }>();
 
-    for (const session of sessionRows) {
-      const pages = session.paths.map((path, i) => ({ path, timestamp: session.timestamps[i] }));
-      if (pages.length === 0) continue;
-
-      const entryTs = new Date(pages[0].timestamp).getTime();
-      if (entryTs >= windowStart && entryTs <= windowEnd) {
-        const stat = entryBounce.get(pages[0].path) ?? { entries: 0, bounces: 0 };
-        stat.entries += 1;
-        if (pages.length === 1) stat.bounces += 1;
-        entryBounce.set(pages[0].path, stat);
-      }
-
-      for (let i = 0; i < pages.length - 1; i++) {
-        const curTs = new Date(pages[i].timestamp).getTime();
-        if (curTs < windowStart || curTs > windowEnd) continue;
-        const seconds = (new Date(pages[i + 1].timestamp).getTime() - curTs) / 1000;
-        const stat = duration.get(pages[i].path) ?? { totalSec: 0, count: 0 };
-        stat.totalSec += seconds;
-        stat.count += 1;
-        duration.set(pages[i].path, stat);
+    for (const row of perPath) {
+      if (row.kind === 'entry') {
+        entryBounce.set(row.path, { entries: Number(row.a), bounces: Number(row.b) });
+      } else {
+        duration.set(row.path, { totalSec: Number(row.a), count: Number(row.b) });
       }
     }
 
@@ -748,62 +848,91 @@ export class AnalyticsService {
   }
 
   /**
-   * Get top traffic sources — `source` is computed and stored at ingest
-   * time (see trackingService.deriveSource), so this is a plain indexed
-   * GROUP BY instead of regex-parsing `referrer` on every query.
+   * Single-column pageview breakdowns (country, browser, os, device,
+   * source, campaign) in one pass. Each was previously its own query with
+   * an identical WHERE clause, so Postgres scanned the same window six
+   * times — measurably the dominant cost on small/shared compute, where
+   * the round trips parallelize but the scans still contend for CPU.
+   * GROUPING SETS collapses them to a single scan; row_number keeps the
+   * per-dimension top-N bound server-side so high-cardinality dimensions
+   * (source, campaign) can't stream unbounded rows into Node.
    */
-  private async getTopSources(projectId: string, dimConditions: SQL[], timeRange: TimeRange): Promise<SourceData[]> {
-    const result = await db
-      .select({
-        name: sql<string>`coalesce(${pageViews.source}, 'Direct')`,
-        users: countDistinct(pageViews.sessionId),
-        sessions: countDistinct(pageViews.sessionId),
-      })
-      .from(pageViews)
-      .where(
-        and(
+  private async getDimensionBreakdowns(
+    projectId: string,
+    dimConditions: SQL[],
+    timeRange: TimeRange,
+  ): Promise<Map<BreakdownDimension, BreakdownRow[]>> {
+    const rows = await db.execute<{ dimension: BreakdownDimension; value: string | null; users: number }>(sql`
+      WITH base AS (
+        SELECT
+          ${pageViews.country} AS country,
+          ${pageViews.browser} AS browser,
+          ${pageViews.os} AS os,
+          ${pageViews.device} AS device,
+          coalesce(${pageViews.source}, 'Direct') AS source,
+          coalesce(${pageViews.utmCampaign}, '(none)') AS campaign,
+          ${pageViews.sessionId} AS session_id
+        FROM ${pageViews}
+        WHERE ${and(
           eq(pageViews.projectId, projectId),
           ...dimConditions,
           gte(pageViews.timestamp, new Date(timeRange.start)),
           lte(pageViews.timestamp, new Date(timeRange.end)),
-        ),
+        )}
+      ),
+      agg AS (
+        SELECT
+          CASE
+            WHEN grouping(country) = 0 THEN 'country'
+            WHEN grouping(browser) = 0 THEN 'browser'
+            WHEN grouping(os) = 0 THEN 'os'
+            WHEN grouping(device) = 0 THEN 'device'
+            WHEN grouping(source) = 0 THEN 'source'
+            ELSE 'campaign'
+          END AS dimension,
+          coalesce(country, browser, os, device, source, campaign) AS value,
+          count(DISTINCT session_id)::int AS users
+        FROM base
+        GROUP BY GROUPING SETS ((country), (browser), (os), (device), (source), (campaign))
       )
-      .groupBy(sql`coalesce(${pageViews.source}, 'Direct')`)
-      .orderBy(desc(countDistinct(pageViews.sessionId)))
-      .limit(10);
+      SELECT dimension, value, users
+      FROM (SELECT agg.*, row_number() OVER (PARTITION BY dimension ORDER BY users DESC, value ASC) AS rn FROM agg) ranked
+      WHERE rn <= ${BREAKDOWN_LIMIT}
+      ORDER BY dimension, users DESC, value ASC
+    `);
 
-    return result;
+    const grouped = new Map<BreakdownDimension, BreakdownRow[]>();
+    for (const row of rows) {
+      const bucket = grouped.get(row.dimension) ?? [];
+      bucket.push({ value: row.value, users: row.users, sessions: row.users });
+      grouped.set(row.dimension, bucket);
+    }
+    return grouped;
+  }
+
+  /**
+   * Get top traffic sources — `source` is computed and stored at ingest
+   * time (see trackingService.deriveSource), so this is a plain indexed
+   * GROUP BY instead of regex-parsing `referrer` on every query.
+   */
+  private mapSources(breakdowns: Map<BreakdownDimension, BreakdownRow[]>): SourceData[] {
+    return (breakdowns.get('source') ?? []).map((row) => ({
+      name: row.value ?? 'Direct',
+      users: row.users,
+      sessions: row.sessions,
+    }));
   }
 
   /**
    * Get top UTM campaigns — buckets by utmCampaign, falling back to
    * "(none)" for traffic with no campaign tag (direct/organic visits).
    */
-  private async getTopCampaigns(
-    projectId: string,
-    dimConditions: SQL[],
-    timeRange: TimeRange,
-  ): Promise<CampaignData[]> {
-    const result = await db
-      .select({
-        name: sql<string>`coalesce(${pageViews.utmCampaign}, '(none)')`,
-        users: countDistinct(pageViews.sessionId),
-        sessions: countDistinct(pageViews.sessionId),
-      })
-      .from(pageViews)
-      .where(
-        and(
-          eq(pageViews.projectId, projectId),
-          ...dimConditions,
-          gte(pageViews.timestamp, new Date(timeRange.start)),
-          lte(pageViews.timestamp, new Date(timeRange.end)),
-        ),
-      )
-      .groupBy(sql`coalesce(${pageViews.utmCampaign}, '(none)')`)
-      .orderBy(desc(countDistinct(pageViews.sessionId)))
-      .limit(10);
-
-    return result;
+  private mapCampaigns(breakdowns: Map<BreakdownDimension, BreakdownRow[]>): CampaignData[] {
+    return (breakdowns.get('campaign') ?? []).map((row) => ({
+      name: row.value ?? '(none)',
+      users: row.users,
+      sessions: row.sessions,
+    }));
   }
 
   /**
@@ -867,32 +996,33 @@ export class AnalyticsService {
       ...eventSessionRows.map((r) => r.sessionId),
     ]).size;
 
-    const results: GoalConversionData[] = [];
-    for (const goal of projectGoals) {
-      let conversions = 0;
-      if (goal.type === 'page') {
-        const [row] = await db
-          .select({ count: countDistinct(pageViews.sessionId) })
-          .from(pageViews)
-          .where(and(pageViewMatch, eq(pageViews.path, goal.matchValue)));
-        conversions = row?.count ?? 0;
-      } else {
-        const [row] = await db
-          .select({ count: countDistinct(events.sessionId) })
-          .from(events)
-          .where(and(eventMatch, eq(events.name, goal.matchValue)));
-        conversions = row?.count ?? 0;
-      }
+    const results = await Promise.all(
+      projectGoals.map(async (goal): Promise<GoalConversionData> => {
+        let conversions = 0;
+        if (goal.type === 'page') {
+          const [row] = await db
+            .select({ count: countDistinct(pageViews.sessionId) })
+            .from(pageViews)
+            .where(and(pageViewMatch, eq(pageViews.path, goal.matchValue)));
+          conversions = row?.count ?? 0;
+        } else {
+          const [row] = await db
+            .select({ count: countDistinct(events.sessionId) })
+            .from(events)
+            .where(and(eventMatch, eq(events.name, goal.matchValue)));
+          conversions = row?.count ?? 0;
+        }
 
-      results.push({
-        goalId: goal.id,
-        name: goal.name,
-        type: goal.type,
-        conversions,
-        totalSessions,
-        rate: totalSessions > 0 ? Math.round((conversions / totalSessions) * 10000) / 100 : 0,
-      });
-    }
+        return {
+          goalId: goal.id,
+          name: goal.name,
+          type: goal.type,
+          conversions,
+          totalSessions,
+          rate: totalSessions > 0 ? Math.round((conversions / totalSessions) * 10000) / 100 : 0,
+        };
+      }),
+    );
 
     return results;
   }
@@ -907,29 +1037,98 @@ export class AnalyticsService {
    * parity with the Mongo-era implementation (which avoided requiring
    * MongoDB 7+'s $percentile) — a straight port keeps behavior identical.
    */
-  private async getWebVitals(
+  /**
+   * Site-wide vitals and the four per-dimension breakdowns in one scan.
+   * Previously the overall figures and each of page/country/device/browser
+   * were separate queries with an identical WHERE clause, so the same
+   * `name = '__web_vital'` slice was scanned five times per request.
+   * GROUPING SETS keeps metric in every set and varies only the dimension
+   * column, so one pass yields all five result shapes.
+   */
+  private async getWebVitalsBundle(
     projectId: string,
     eventDimConditions: SQL[],
     timeRange: TimeRange,
-  ): Promise<WebVitalData[]> {
-    const rows = await db.execute<{ metric: string; values: number[] }>(sql`
-      SELECT (${events.data} ->> 'metric') AS metric, array_agg((${events.data} ->> 'value')::double precision) AS values
-      FROM ${events}
-      WHERE ${and(eq(events.projectId, projectId), ...eventDimConditions, eq(events.name, '__web_vital'), gte(events.timestamp, new Date(timeRange.start)), lte(events.timestamp, new Date(timeRange.end)))}
-      GROUP BY metric
+  ): Promise<{ webVitals: WebVitalData[]; breakdown: WebVitalBreakdown }> {
+    const rows = await db.execute<{
+      dimension: WebVitalDimension | 'overall';
+      key: string | null;
+      metric: string;
+      p50: number;
+      p75: number;
+      samples: number;
+    }>(sql`
+      WITH base AS (
+        SELECT
+          (${events.data} ->> 'metric') AS metric,
+          (${events.data} ->> 'value')::double precision AS value,
+          ${events.path} AS page,
+          ${events.country} AS country,
+          ${events.device} AS device,
+          ${events.browser} AS browser
+        FROM ${events}
+        WHERE ${and(
+          eq(events.projectId, projectId),
+          ...eventDimConditions,
+          eq(events.name, '__web_vital'),
+          gte(events.timestamp, new Date(timeRange.start)),
+          lte(events.timestamp, new Date(timeRange.end)),
+        )}
+      )
+      SELECT
+        CASE
+          WHEN grouping(page) = 0 THEN 'page'
+          WHEN grouping(country) = 0 THEN 'country'
+          WHEN grouping(device) = 0 THEN 'device'
+          WHEN grouping(browser) = 0 THEN 'browser'
+          ELSE 'overall'
+        END AS dimension,
+        coalesce(page, country, device, browser) AS key,
+        metric,
+        percentile_cont(0.5) WITHIN GROUP (ORDER BY value) AS p50,
+        percentile_cont(0.75) WITHIN GROUP (ORDER BY value) AS p75,
+        count(*)::int AS samples
+      FROM base
+      GROUP BY GROUPING SETS ((metric), (metric, page), (metric, country), (metric, device), (metric, browser))
     `);
 
-    return rows
-      .filter((r): r is { metric: 'LCP' | 'CLS' | 'INP'; values: number[] } => ['LCP', 'CLS', 'INP'].includes(r.metric))
-      .map((r) => {
-        const sorted = [...r.values].sort((a, b) => a - b);
-        return {
-          metric: r.metric,
-          p50: percentile(sorted, 0.5),
-          p75: percentile(sorted, 0.75),
-          samples: sorted.length,
-        };
-      });
+    const webVitals: WebVitalData[] = [];
+    const byDimension = new Map<WebVitalDimension, Map<string, WebVitalBreakdownItem>>();
+
+    for (const row of rows) {
+      if (!WEB_VITAL_METRICS.includes(row.metric as WebVitalData['metric'])) continue;
+      const metric = row.metric as WebVitalData['metric'];
+
+      if (row.dimension === 'overall') {
+        webVitals.push({
+          metric,
+          p50: Number(row.p50) || 0,
+          p75: Number(row.p75) || 0,
+          samples: row.samples,
+        });
+        continue;
+      }
+
+      if (!row.key) continue;
+      const items = byDimension.get(row.dimension) ?? new Map<string, WebVitalBreakdownItem>();
+      const item = items.get(row.key) ?? { key: row.key, samples: 0 };
+      const p75 = Number(row.p75) || 0;
+      if (metric === 'LCP') item.lcp = p75;
+      else if (metric === 'CLS') item.cls = p75;
+      else if (metric === 'INP') item.inp = p75;
+      item.samples += row.samples;
+      items.set(row.key, item);
+      byDimension.set(row.dimension, items);
+    }
+
+    const breakdown = Object.fromEntries(
+      WEB_VITAL_BREAKDOWN_DIMENSIONS.map((dimension) => [
+        dimension,
+        [...(byDimension.get(dimension)?.values() ?? [])].sort((a, b) => b.samples - a.samples).slice(0, 20),
+      ]),
+    ) as WebVitalBreakdown;
+
+    return { webVitals, breakdown };
   }
 
   /**
@@ -939,63 +1138,6 @@ export class AnalyticsService {
    * indexed events column, not the jsonb `data` field — trackEvent already
    * writes both.
    */
-  private async getWebVitalsBreakdown(
-    projectId: string,
-    eventDimConditions: SQL[],
-    timeRange: TimeRange,
-  ): Promise<WebVitalBreakdown> {
-    const dimensionColumns: Record<WebVitalDimension, PgColumn> = {
-      page: events.path,
-      country: events.country,
-      device: events.device,
-      browser: events.browser,
-    };
-
-    const entries = await Promise.all(
-      WEB_VITAL_BREAKDOWN_DIMENSIONS.map(async (dimension) => {
-        const items = await this.getWebVitalsByDimension(
-          projectId,
-          eventDimConditions,
-          timeRange,
-          dimensionColumns[dimension],
-        );
-        return [dimension, items] as const;
-      }),
-    );
-
-    return Object.fromEntries(entries) as WebVitalBreakdown;
-  }
-
-  private async getWebVitalsByDimension(
-    projectId: string,
-    eventDimConditions: SQL[],
-    timeRange: TimeRange,
-    dimensionColumn: PgColumn,
-  ): Promise<WebVitalBreakdownItem[]> {
-    const rows = await db.execute<{ key: string | null; metric: string; values: number[] }>(sql`
-      SELECT ${dimensionColumn} AS key, (${events.data} ->> 'metric') AS metric, array_agg((${events.data} ->> 'value')::double precision) AS values
-      FROM ${events}
-      WHERE ${and(eq(events.projectId, projectId), ...eventDimConditions, eq(events.name, '__web_vital'), gte(events.timestamp, new Date(timeRange.start)), lte(events.timestamp, new Date(timeRange.end)))}
-      GROUP BY key, metric
-    `);
-
-    const itemByKey = new Map<string, WebVitalBreakdownItem>();
-    for (const row of rows) {
-      if (!row.key || !['LCP', 'CLS', 'INP'].includes(row.metric)) continue;
-      const sorted = [...row.values].sort((a, b) => a - b);
-      const p75 = percentile(sorted, 0.75);
-
-      const item = itemByKey.get(row.key) ?? { key: row.key, samples: 0 };
-      if (row.metric === 'LCP') item.lcp = p75;
-      else if (row.metric === 'CLS') item.cls = p75;
-      else if (row.metric === 'INP') item.inp = p75;
-      item.samples += sorted.length;
-      itemByKey.set(row.key, item);
-    }
-
-    return [...itemByKey.values()].sort((a, b) => b.samples - a.samples).slice(0, 20);
-  }
-
   /**
    * Slowest resources across all page loads. The tracker only reports
    * resources over 200ms, sampled at 20% of pageviews (see tracker.js), so
@@ -1007,41 +1149,33 @@ export class AnalyticsService {
     eventDimConditions: SQL[],
     timeRange: TimeRange,
   ): Promise<ResourceTimingData[]> {
-    const rows = await db.execute<{ name: string; type: string; duration: number; size: number }>(sql`
+    const rows = await db.execute<{
+      name: string;
+      type: string;
+      p75_duration: number;
+      avg_size: number;
+      samples: number;
+    }>(sql`
       SELECT
         (resource ->> 'name') AS name,
         (resource ->> 'type') AS type,
-        (resource ->> 'duration')::double precision AS duration,
-        (resource ->> 'size')::double precision AS size
+        percentile_cont(0.75) WITHIN GROUP (ORDER BY (resource ->> 'duration')::double precision) AS p75_duration,
+        avg((resource ->> 'size')::double precision) AS avg_size,
+        count(*)::int AS samples
       FROM ${events}, jsonb_array_elements(${events.data} -> 'resources') AS resource
       WHERE ${and(eq(events.projectId, projectId), ...eventDimConditions, eq(events.name, '__resource_timing'), gte(events.timestamp, new Date(timeRange.start)), lte(events.timestamp, new Date(timeRange.end)))}
+      GROUP BY (resource ->> 'name'), (resource ->> 'type')
+      ORDER BY p75_duration DESC
+      LIMIT 15
     `);
 
-    const durationsByResource = new Map<
-      string,
-      { name: string; type: string; durations: number[]; totalSize: number }
-    >();
-    for (const row of rows) {
-      const key = `${row.name}::${row.type}`;
-      const entry = durationsByResource.get(key) ?? { name: row.name, type: row.type, durations: [], totalSize: 0 };
-      entry.durations.push(row.duration);
-      entry.totalSize += row.size;
-      durationsByResource.set(key, entry);
-    }
-
-    return [...durationsByResource.values()]
-      .map((entry) => ({
-        name: entry.name,
-        type: entry.type,
-        p75Duration: percentile(
-          [...entry.durations].sort((a, b) => a - b),
-          0.75,
-        ),
-        avgSize: Math.round(entry.totalSize / entry.durations.length),
-        samples: entry.durations.length,
-      }))
-      .sort((a, b) => b.p75Duration - a.p75Duration)
-      .slice(0, 15);
+    return rows.map((row) => ({
+      name: row.name,
+      type: row.type,
+      p75Duration: Number(row.p75_duration) || 0,
+      avgSize: Math.round(Number(row.avg_size) || 0),
+      samples: row.samples,
+    }));
   }
 
   /**
@@ -1092,35 +1226,12 @@ export class AnalyticsService {
   /**
    * Get users by country
    */
-  private async getUsersByCountry(
-    projectId: string,
-    dimConditions: SQL[],
-    timeRange: TimeRange,
-  ): Promise<CountryData[]> {
-    const result = await db
-      .select({
-        country: pageViews.country,
-        users: countDistinct(pageViews.sessionId),
-        sessions: countDistinct(pageViews.sessionId),
-      })
-      .from(pageViews)
-      .where(
-        and(
-          eq(pageViews.projectId, projectId),
-          ...dimConditions,
-          gte(pageViews.timestamp, new Date(timeRange.start)),
-          lte(pageViews.timestamp, new Date(timeRange.end)),
-        ),
-      )
-      .groupBy(pageViews.country)
-      .orderBy(desc(countDistinct(pageViews.sessionId)))
-      .limit(10);
-
-    return result.map((item) => ({
-      country: item.country || 'Unknown',
-      countryCode: item.country || 'UN',
-      users: item.users,
-      sessions: item.sessions,
+  private mapCountries(breakdowns: Map<BreakdownDimension, BreakdownRow[]>): CountryData[] {
+    return (breakdowns.get('country') ?? []).map((row) => ({
+      country: row.value || 'Unknown',
+      countryCode: row.value || 'UN',
+      users: row.users,
+      sessions: row.sessions,
     }));
   }
 
@@ -1180,78 +1291,35 @@ export class AnalyticsService {
   /**
    * Get users by browser
    */
-  private async getUsersByBrowser(
-    projectId: string,
-    dimConditions: SQL[],
-    timeRange: TimeRange,
-  ): Promise<BrowserData[]> {
-    const [result, versionSummary] = await Promise.all([
-      db
-        .select({
-          browser: pageViews.browser,
-          users: countDistinct(pageViews.sessionId),
-          sessions: countDistinct(pageViews.sessionId),
-        })
-        .from(pageViews)
-        .where(
-          and(
-            eq(pageViews.projectId, projectId),
-            ...dimConditions,
-            gte(pageViews.timestamp, new Date(timeRange.start)),
-            lte(pageViews.timestamp, new Date(timeRange.end)),
-          ),
-        )
-        .groupBy(pageViews.browser)
-        .orderBy(desc(countDistinct(pageViews.sessionId)))
-        .limit(10),
-      this.getVersionSummaryMap(projectId, dimConditions, timeRange, pageViews.browser, pageViews.browserVersion),
-    ]);
-
-    return result.map((item) => ({
-      browser: item.browser || 'Unknown',
-      version: versionSummary.get(item.browser || 'Unknown'),
-      users: item.users,
-      sessions: item.sessions,
+  private mapBrowsers(
+    breakdowns: Map<BreakdownDimension, BreakdownRow[]>,
+    versionSummary: Map<string, string>,
+  ): BrowserData[] {
+    return (breakdowns.get('browser') ?? []).map((row) => ({
+      browser: row.value || 'Unknown',
+      version: versionSummary.get(row.value || 'Unknown'),
+      users: row.users,
+      sessions: row.sessions,
     }));
   }
 
   /**
    * Get users by device
    */
-  private async getUsersByDevice(projectId: string, dimConditions: SQL[], timeRange: TimeRange): Promise<DeviceData[]> {
-    const category = sql<
-      'mobile' | 'tablet' | 'desktop'
-    >`CASE ${pageViews.device} WHEN 'mobile' THEN 'mobile' WHEN 'tablet' THEN 'tablet' ELSE 'desktop' END`;
-    const [result, modelSummary] = await Promise.all([
-      db
-        .select({
-          device: pageViews.device,
-          category,
-          users: countDistinct(pageViews.sessionId),
-          sessions: countDistinct(pageViews.sessionId),
-        })
-        .from(pageViews)
-        .where(
-          and(
-            eq(pageViews.projectId, projectId),
-            ...dimConditions,
-            gte(pageViews.timestamp, new Date(timeRange.start)),
-            lte(pageViews.timestamp, new Date(timeRange.end)),
-          ),
-        )
-        .groupBy(pageViews.device)
-        .orderBy(desc(countDistinct(pageViews.sessionId)))
-        .limit(10),
-      this.getDeviceModelSummaryMap(projectId, dimConditions, timeRange),
-    ]);
-
-    return result.map((item) => ({
-      device: item.device || 'desktop',
-      category: item.category,
-      detail: modelSummary.get(item.device || 'desktop'),
-      users: item.users,
-      sessions: item.sessions,
-    }));
+  private mapDevices(
+    breakdowns: Map<BreakdownDimension, BreakdownRow[]>,
+    modelSummary: Map<string, string>,
+  ): DeviceData[] {
+    return (breakdowns.get('device') ?? []).map((row) => {
+      const device = row.value || 'desktop';
+      return {
+        device,
+        category: device === 'mobile' || device === 'tablet' ? device : 'desktop',
+        detail: modelSummary.get(device),
+        users: row.users,
+        sessions: row.sessions,
+      };
+    });
   }
 
   /**
@@ -1310,34 +1378,12 @@ export class AnalyticsService {
    * Get users by OS — mirrors getUsersByBrowser; `os` is stored/indexed the
    * same way.
    */
-  private async getUsersByOS(projectId: string, dimConditions: SQL[], timeRange: TimeRange): Promise<OSData[]> {
-    const [result, versionSummary] = await Promise.all([
-      db
-        .select({
-          os: pageViews.os,
-          users: countDistinct(pageViews.sessionId),
-          sessions: countDistinct(pageViews.sessionId),
-        })
-        .from(pageViews)
-        .where(
-          and(
-            eq(pageViews.projectId, projectId),
-            ...dimConditions,
-            gte(pageViews.timestamp, new Date(timeRange.start)),
-            lte(pageViews.timestamp, new Date(timeRange.end)),
-          ),
-        )
-        .groupBy(pageViews.os)
-        .orderBy(desc(countDistinct(pageViews.sessionId)))
-        .limit(10),
-      this.getVersionSummaryMap(projectId, dimConditions, timeRange, pageViews.os, pageViews.osVersion),
-    ]);
-
-    return result.map((item) => ({
-      os: item.os || 'Unknown',
-      version: versionSummary.get(item.os || 'Unknown'),
-      users: item.users,
-      sessions: item.sessions,
+  private mapOS(breakdowns: Map<BreakdownDimension, BreakdownRow[]>, versionSummary: Map<string, string>): OSData[] {
+    return (breakdowns.get('os') ?? []).map((row) => ({
+      os: row.value || 'Unknown',
+      version: versionSummary.get(row.value || 'Unknown'),
+      users: row.users,
+      sessions: row.sessions,
     }));
   }
 
@@ -1581,16 +1627,38 @@ export class AnalyticsService {
   /**
    * Find the correct bucket index for a given timestamp
    */
-  private findBucketIndex(timestamp: Date, buckets: Date[], granularity: GranularityType, timezone: string): number {
+  /**
+   * Builds a reusable bucket locator. Bucket boundaries are resolved once
+   * per request rather than per timestamp: `getBucketEnd` performs Intl
+   * timezone math, so calling it inside a per-timestamp scan made this
+   * O(timestamps × buckets) Intl conversions — ~16 minutes of blocking JS
+   * at 200K pageviews. Buckets are contiguous and ascending, so the
+   * precomputed edges support a binary search instead.
+   */
+  private computeBucketEdges(
+    buckets: Date[],
+    granularity: GranularityType,
+    timezone: string,
+  ): { starts: number[]; ends: number[] } {
+    // Month buckets in DST-transitioning zones (e.g. America/Santiago) can
+    // end up to 24h past the next bucket's start — a latent bug in
+    // dateUtils' calendar arithmetic. The previous linear scan resolved
+    // such overlaps by returning the first matching bucket, so the
+    // overlapped span is absorbed by the earlier bucket here: each start is
+    // pushed forward past the preceding end. That preserves the old
+    // assignment exactly while leaving the intervals disjoint and ascending,
+    // which is what the binary search below requires.
+    const starts: number[] = [];
+    const ends: number[] = [];
     for (let i = 0; i < buckets.length; i++) {
-      const bucketStart = buckets[i];
-      const bucketEnd = this.getBucketEnd(bucketStart, granularity, timezone);
-
-      if (timestamp >= bucketStart && timestamp < bucketEnd) {
-        return i;
-      }
+      const end = this.getBucketEnd(buckets[i], granularity, timezone).getTime();
+      const prevEnd = ends[i - 1];
+      const start = buckets[i].getTime();
+      starts.push(prevEnd !== undefined && prevEnd > start ? prevEnd : start);
+      ends.push(end);
     }
-    return -1;
+
+    return { starts, ends };
   }
 
   /**

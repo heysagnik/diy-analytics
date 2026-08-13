@@ -1,4 +1,10 @@
-import type { AnalyticsResponse, DateRange, EventPropertyKeyData, EventPropertyValueData } from '@/types/analytics';
+import type {
+  AnalyticsResponse,
+  AnalyticsSegment,
+  DateRange,
+  EventPropertyKeyData,
+  EventPropertyValueData,
+} from '@/types/analytics';
 import type { FilterDimension } from '@/types/filters';
 
 export type AnalyticsFilters = Partial<Record<FilterDimension, string[]>>;
@@ -72,6 +78,38 @@ export function isAnalyticsResponse(value: unknown): value is AnalyticsResponse 
   );
 }
 
+/**
+ * A segment response carries only the fields it owns, so absent keys are
+ * expected; present ones must still be well-formed.
+ */
+export function isAnalyticsSegmentResponse(value: unknown): value is Partial<AnalyticsResponse> {
+  if (!isRecord(value) || !isRecord(value.timeRange) || typeof value.granularity !== 'string') return false;
+
+  const metricKeys = ['uniqueUsers', 'pageViews', 'sessions', 'bounceRate', 'avgSessionDuration'] as const;
+  const collectionKeys = [
+    'pages',
+    'sources',
+    'countries',
+    'browsers',
+    'devices',
+    'os',
+    'cities',
+    'campaigns',
+    'utmBreakdown',
+    'entryPages',
+    'exitPages',
+    'goals',
+    'webVitals',
+    'topEvents',
+    'recentEvents',
+  ] as const;
+
+  return (
+    metricKeys.every((key) => value[key] === undefined || isMetricData(value[key])) &&
+    collectionKeys.every((key) => value[key] === undefined || Array.isArray(value[key]))
+  );
+}
+
 export function serializeAnalyticsQuery({
   projectId,
   dateRange,
@@ -121,18 +159,25 @@ export async function fetchAnalytics(
   endpoint: '/api/analytics' | '/api/public/analytics',
   options: AnalyticsQueryOptions,
   signal?: AbortSignal,
+  segment?: AnalyticsSegment,
 ): Promise<AnalyticsResponse> {
-  const response = await fetch(`${endpoint}?${serializeAnalyticsQuery(options).toString()}`, {
+  const params = serializeAnalyticsQuery(options);
+  if (segment) params.set('segment', segment);
+  const response = await fetch(`${endpoint}?${params.toString()}`, {
     cache: 'no-store',
     signal,
   });
   const result: unknown = await response.json().catch(() => null);
 
-  if (!response.ok || !isRecord(result) || result.success !== true || !isAnalyticsResponse(result.data)) {
+  const valid = segment
+    ? isAnalyticsSegmentResponse((result as { data?: unknown })?.data)
+    : isAnalyticsResponse((result as { data?: unknown })?.data);
+
+  if (!response.ok || !isRecord(result) || result.success !== true || !valid) {
     throw new AnalyticsRequestError(response.status);
   }
 
-  return result.data;
+  return result.data as AnalyticsResponse;
 }
 
 export interface EventPropertyQueryOptions {

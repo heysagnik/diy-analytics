@@ -1,8 +1,9 @@
-import { and, eq, gte, lte, sql } from 'drizzle-orm';
+import { and, count, eq, gte, lte, sql } from 'drizzle-orm';
 import { events, pageViews } from '@/db/schema';
 import { db } from '@/lib/db';
 import { isValidUuid } from '@/lib/uuid';
 import { getDateRangeDetails } from '../utils/dateUtils';
+import { assertRowsWithinLimit } from './queryLimits';
 
 // Recency/Frequency only — there's no monetary/revenue field in this
 // schema, so this is RF segmentation, not full RFM. "userId" is a
@@ -40,6 +41,18 @@ export class SegmentService {
     const { timeRange } = getDateRangeDetails(dateRangeKey);
     const start = new Date(timeRange.start);
     const end = new Date(timeRange.end);
+
+    const [[pv], [ev]] = await Promise.all([
+      db
+        .select({ count: count() })
+        .from(pageViews)
+        .where(and(eq(pageViews.projectId, projectId), gte(pageViews.timestamp, start), lte(pageViews.timestamp, end))),
+      db
+        .select({ count: count() })
+        .from(events)
+        .where(and(eq(events.projectId, projectId), gte(events.timestamp, start), lte(events.timestamp, end))),
+    ]);
+    assertRowsWithinLimit(pv.count + ev.count, 'Segment analysis');
 
     const rows = await db.execute<{ user_id: string; last_seen: string; frequency: number }>(sql`
       WITH activity AS (

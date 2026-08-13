@@ -3,6 +3,7 @@ import { events, pageViews } from '@/db/schema';
 import { db } from '@/lib/db';
 import { isValidUuid } from '@/lib/uuid';
 import { getDateRangeDetails } from '../utils/dateUtils';
+import { assertRowsWithinLimit } from './queryLimits';
 
 export interface FunnelStepInput {
   type: 'page' | 'event';
@@ -32,11 +33,6 @@ interface SessionEvent {
  * of steps) and the per-session walk is far easier to reason about than
  * expressing ordered-subsequence matching in SQL.
  */
-// Above this many combined pageview+event rows in the window, loading the
-// whole session graph into memory risks OOM/timeouts (especially on
-// serverless). Fail fast with a clear message instead of degrading slowly.
-const MAX_FUNNEL_ROWS = 200_000;
-
 export class FunnelService {
   async getFunnelAnalysis(
     projectId: string,
@@ -64,11 +60,7 @@ export class FunnelService {
       db.select({ count: count() }).from(pageViews).where(pvWindow),
       db.select({ count: count() }).from(events).where(evWindow),
     ]);
-    if (pv.count + ev.count > MAX_FUNNEL_ROWS) {
-      throw new Error(
-        `Funnel analysis window is too large (${pv.count + ev.count} rows, limit ${MAX_FUNNEL_ROWS}). Narrow the date range and try again.`,
-      );
-    }
+    assertRowsWithinLimit(pv.count + ev.count, 'Funnel analysis');
 
     const [pageviewRows, eventRows] = await Promise.all([
       db

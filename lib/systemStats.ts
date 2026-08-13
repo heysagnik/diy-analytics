@@ -82,7 +82,7 @@ export async function getStorageStats(): Promise<StorageStats> {
   const start = Date.now();
 
   try {
-    const [[sizeRow], [pvCountRow], [evCountRow], trend] = await Promise.all([
+    const [[sizeRow], [pvCountRow], [evCountRow], [avgRowRow], trend] = await Promise.all([
       db.execute<{ data_bytes: string; index_bytes: string }>(sql`
         SELECT
           COALESCE(SUM(pg_relation_size(relid)), 0)::bigint AS data_bytes,
@@ -94,6 +94,20 @@ export async function getStorageStats(): Promise<StorageStats> {
       `),
       db.execute<{ estimate: number }>(sql`
         SELECT GREATEST(0, round(reltuples))::int AS estimate FROM pg_class WHERE relname = 'events'
+      `),
+      // Bytes-per-row estimated from pg_stats column widths (analyzer
+      // samples of actual stored data) rather than usedBytes / row count.
+      // The latter divides *table size on disk* — which includes bloat
+      // left behind by deletions/retention purges until autovacuum
+      // reclaims it — by the *current live row count*, so a single delete
+      // cycle inflates the estimate arbitrarily (seen directly: 200K
+      // seeded rows deleted, table still 179MB pre-vacuum against 540 live
+      // rows, projecting 14 days to fill instead of years). avg_width
+      // reflects genuine row content and is unaffected by bloat.
+      db.execute<{ avg_row_bytes: number }>(sql`
+        SELECT COALESCE(SUM(avg_width), 0)::int + 24 AS avg_row_bytes
+        FROM pg_stats
+        WHERE tablename IN ('pageviews', 'events')
       `),
       getGrowthTrend(7),
     ]);
@@ -107,8 +121,12 @@ export async function getStorageStats(): Promise<StorageStats> {
 
     const pageviewCount = pvCountRow?.estimate ?? 0;
     const eventCount = evCountRow?.estimate ?? 0;
-    const totalDocs = pageviewCount + eventCount;
-    const avgBytesPerDoc = totalDocs > 0 ? usedBytes / totalDocs : 0;
+
+    // Index overhead is folded in proportionally so bytesPerDay lands on
+    // the same basis as capBytes (data + index), without re-deriving it
+    // from table size the way avgBytesPerDoc used to.
+    const indexOverheadRatio = dataSizeBytes > 0 ? 1 + indexSizeBytes / dataSizeBytes : 1;
+    const avgBytesPerDoc = Number(avgRowRow?.avg_row_bytes ?? 0) * indexOverheadRatio;
     const avgDocsPerDay = trend.reduce((sum, p) => sum + p.count, 0) / trend.length;
     const bytesPerDay = avgBytesPerDoc * avgDocsPerDay;
     const remainingBytes = capBytes - usedBytes;

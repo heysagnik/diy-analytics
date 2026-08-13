@@ -12,6 +12,8 @@
 
 import type { AnalyticsResponse as ServerAnalyticsResponse } from '../app/api/analytics/types';
 
+export type { AnalyticsSegment } from '../app/api/analytics/types';
+
 export { WEB_VITAL_BREAKDOWN_DIMENSIONS } from '../app/api/analytics/types';
 
 export interface TimeRange {

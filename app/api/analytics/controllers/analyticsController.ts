@@ -1,7 +1,13 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { requireProjectAccess } from '../../../../lib/serverAuth';
 import { AnalyticsService } from '../services/analyticsService';
-import { DATE_RANGES, type ErrorResponse, type QueryOptions } from '../types';
+import {
+  ANALYTICS_SEGMENTS,
+  type AnalyticsSegment,
+  DATE_RANGES,
+  type ErrorResponse,
+  type QueryOptions,
+} from '../types';
 import { normalizeTimezone } from '../utils/dateUtils';
 
 export class AnalyticsController {
@@ -21,6 +27,7 @@ export class AnalyticsController {
       const endDate = searchParams.get('endDate') || undefined;
 
       const filters = this.parseFilters(searchParams);
+      const segment = this.parseSegment(searchParams.get('segment'));
 
       if (dateRange === 'CUSTOM' && (!startDate || !endDate)) {
         return this.createErrorResponse('Custom date range requires startDate and endDate', 400);
@@ -56,7 +63,7 @@ export class AnalyticsController {
         filters,
       };
 
-      const analyticsData = await this.analyticsService.getAnalytics(options);
+      const analyticsData = await this.analyticsService.getAnalyticsSegment(options, segment);
 
       return NextResponse.json({
         success: true,
@@ -253,6 +260,16 @@ export class AnalyticsController {
     }
 
     return null;
+  }
+
+  /**
+   * Unknown or absent values fall back to the full payload, so older
+   * clients and the public dashboard keep their single-request behaviour.
+   */
+  private parseSegment(value: string | null): AnalyticsSegment {
+    return ANALYTICS_SEGMENTS.includes(value as (typeof ANALYTICS_SEGMENTS)[number])
+      ? (value as AnalyticsSegment)
+      : 'all';
   }
 
   private parseFilters(searchParams: URLSearchParams): QueryOptions['filters'] | undefined {

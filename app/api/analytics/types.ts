@@ -248,6 +248,15 @@ export interface AnalyticsResponse {
   recentEvents: RecentEvent[];
 }
 
+export const ANALYTICS_SEGMENTS = ['core', 'breakdowns', 'insights'] as const;
+/**
+ * A segment carries only the fields it owns, so merging segments in any
+ * order cannot clobber a sibling's data with an empty placeholder.
+ */
+export type AnalyticsSegmentResponse = Partial<AnalyticsResponse> &
+  Pick<AnalyticsResponse, 'timeRange' | 'granularity'>;
+export type AnalyticsSegment = (typeof ANALYTICS_SEGMENTS)[number] | 'all';
+
 export interface QueryOptions {
   projectId: string;
   dateRange: string;

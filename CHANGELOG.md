@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 While the major version is `0`, breaking changes may ship in a minor release.
 
+## [0.1.5] - 2026-08-13
+
+### Changed
+
+- **Analytics dashboard read performance** — the Overview dashboard is
+  substantially faster, especially on projects with large event/pageview
+  volumes. Verified against a seeded 200K-pageview dataset: full-payload
+  response time dropped from ~16.5s to ~1.95s, and the slowest single
+  panel query from ~21.7s to ~1.6s. On typical project sizes, time to first
+  meaningful paint dropped from ~4.6s to under 400ms.
+  - Fixed a chart-bucketing routine that was doing redundant timezone
+    conversions per pageview per bucket instead of once per request.
+  - Batched several breakdown queries (country/browser/os/device/source/
+    campaign, and web vitals per-dimension) into single grouped queries
+    instead of scanning the same window separately for each.
+  - Moved session/bounce-rate/duration and top-pages engagement metrics
+    from in-app JavaScript aggregation to SQL, so the response no longer
+    grows with pageview volume.
+  - The dashboard now fetches in three parallel segments (core metrics,
+    breakdowns, insights) instead of one blocking request, so metric tiles
+    and the main chart can render before slower panels finish loading.
+
+### Fixed
+
+- The Profile "System" storage card could report a wildly inflated
+  "days until storage is full" estimate after a large delete (e.g. data
+  retention cleanup), because it derived average row size from total
+  table size including reclaimable space rather than from actual row
+  content. It now uses Postgres's column-width statistics, which aren't
+  affected by table bloat.
+
 ## [0.1.4] - 2026-08-13
 
 ### Added

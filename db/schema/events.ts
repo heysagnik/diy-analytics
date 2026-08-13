@@ -47,6 +47,13 @@ export const events = pgTable(
     index('events_project_id_name_idx').on(table.projectId, table.name),
     index('events_project_id_session_id_idx').on(table.projectId, table.sessionId),
     index('events_project_id_source_idx').on(table.projectId, table.source),
+    index('events_project_id_country_idx').on(table.projectId, table.country),
+    index('events_project_id_browser_idx').on(table.projectId, table.browser),
+    index('events_project_id_os_idx').on(table.projectId, table.os),
+    index('events_project_id_device_idx').on(table.projectId, table.device),
+    index('events_project_id_path_idx').on(table.projectId, table.path),
+    index('events_project_id_utm_source_idx').on(table.projectId, table.utmSource),
+    index('events_project_id_utm_medium_idx').on(table.projectId, table.utmMedium),
     index('events_project_id_utm_campaign_idx').on(table.projectId, table.utmCampaign),
   ],
 );

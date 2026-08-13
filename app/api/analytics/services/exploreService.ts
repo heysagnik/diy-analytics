@@ -1,9 +1,10 @@
-import { type SQL, sql } from 'drizzle-orm';
+import { and, count, eq, gte, lte, type SQL, sql } from 'drizzle-orm';
 import type { PgColumn } from 'drizzle-orm/pg-core';
 import { events, pageViews } from '@/db/schema';
 import { db } from '@/lib/db';
 import { isValidUuid } from '@/lib/uuid';
 import { getDateRangeDetails } from '../utils/dateUtils';
+import { assertRowsWithinLimit } from './queryLimits';
 
 export const EXPLORE_DIMENSIONS = [
   'country',
@@ -143,8 +144,28 @@ export class ExploreService {
     // bare Date here reaches postgres-js's param binder untranslated and
     // throws. ISO strings bind cleanly and Postgres casts them to
     // timestamptz for the BETWEEN comparison.
-    const start = new Date(timeRange.start).toISOString();
-    const end = new Date(timeRange.end).toISOString();
+    const startDate = new Date(timeRange.start);
+    const endDate = new Date(timeRange.end);
+    const start = startDate.toISOString();
+    const end = endDate.toISOString();
+
+    const [[pv], [ev]] = await Promise.all([
+      db
+        .select({ count: count() })
+        .from(pageViews)
+        .where(
+          and(
+            eq(pageViews.projectId, projectId),
+            gte(pageViews.timestamp, startDate),
+            lte(pageViews.timestamp, endDate),
+          ),
+        ),
+      db
+        .select({ count: count() })
+        .from(events)
+        .where(and(eq(events.projectId, projectId), gte(events.timestamp, startDate), lte(events.timestamp, endDate))),
+    ]);
+    assertRowsWithinLimit(pv.count + ev.count, 'Explore query');
 
     const whereClause = combineConditions(
       query.conditions.map((c) => compileCondition(projectId, c, start, end)),
