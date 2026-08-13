@@ -17,8 +17,11 @@ const PUBLIC_PATH_PATTERNS: Array<RegExp> = [
   /^\/api\/cron(\/.*)?$/,
   // MCP clients authenticate via `Authorization: Bearer <api key>`, not a
   // session cookie — app/api/mcp/route.ts enforces that itself via
-  // requireApiKeyUser, so this only bypasses the cookie check.
+  // requireApiKeyUser, so this only bypasses the cookie check. Also covers
+  // /api/mcp/oauth/* (register, authorize, token, consent, revoke, client-info).
   /^\/api\/mcp(\/.*)?$/,
+  /^\/\.well-known\/oauth-(authorization-server|protected-resource)$/,
+  /^\/oauth\/consent(\/.*)?$/,
   /^\/public(\/.*)?$/,
   /^\/login(\/.*)?$/,
   /^\/register(\/.*)?$/,
