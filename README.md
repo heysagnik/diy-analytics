@@ -39,6 +39,9 @@ processor ever sees your visitors' data.
 - Workspaces with role-based member access.
 - A built-in [MCP](https://modelcontextprotocol.io) server so AI assistants
   can query your analytics directly.
+- An in-app AI chat assistant (bring your own API key — Anthropic, OpenAI,
+  Gemini, Groq, OpenRouter, or NVIDIA NIM) that answers questions about your
+  data using the same read-only tools as the MCP server.
 
 ## Getting started
 
@@ -77,6 +80,12 @@ npm run dev
 ```
 
 The app runs at `http://localhost:3000`.
+
+To enable the in-app AI chat assistant, set exactly one provider API key
+(e.g. `ANTHROPIC_API_KEY`) in `.env.local` — see the "AI chat agent" section
+of `.env.local.example` for the full list of supported providers, model
+overrides, and priority order. It's entirely optional; the rest of the
+dashboard works without it.
 
 On Vercel, migrations run automatically on every **Production** deploy
 (gated on `VERCEL_ENV=production`, via a `postinstall` hook) — Preview

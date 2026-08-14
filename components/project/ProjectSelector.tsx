@@ -30,7 +30,7 @@ function ProjectAvatar({ name, url }: { name: string; url: string }) {
 
   if (hostname && !failed) {
     return (
-      <div className="size-5 rounded-full flex-shrink-0 relative overflow-hidden bg-surface-secondary outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10">
+      <div className="size-5 rounded-full flex-shrink-0 relative overflow-hidden bg-neutral-800 outline outline-1 -outline-offset-1 outline-white/10">
         {/* biome-ignore lint/performance/noImgElement: needs onError fallback for a favicon that may 404; next/image can't do that */}
         <img
           src={`/api/site-icon?domain=${encodeURIComponent(hostname)}`}

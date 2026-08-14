@@ -1,6 +1,6 @@
 {
   "name": "diy-analytics",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Self-hosted, privacy-friendly website analytics.",
   "license": "MIT",
   "private": true,
@@ -29,11 +29,19 @@
     "db:seed-analytics-load": "tsx --env-file=.env.local scripts/seed-analytics-load.ts"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^2.0.95",
+    "@ai-sdk/google": "^2.0.87",
+    "@ai-sdk/groq": "^2.0.48",
+    "@ai-sdk/openai": "^2.0.118",
+    "@ai-sdk/openai-compatible": "^1.0.48",
+    "@ai-sdk/react": "^2.0.238",
     "@base-ui/react": "^1.6.0",
     "@modelcontextprotocol/sdk": "^1.30.0",
+    "@openrouter/ai-sdk-provider": "^1.5.4",
     "@phosphor-icons/react": "^2.1.10",
     "@tanstack/react-query": "^5.101.4",
     "@vercel/queue": "^0.4.0",
+    "ai": "^5.0.235",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.45.2",

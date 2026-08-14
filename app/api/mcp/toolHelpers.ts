@@ -28,19 +28,15 @@ export function errorResult(message: string): CallToolResult {
   return { content: [{ type: 'text', text: message }], isError: true };
 }
 
-/**
- * Every project-scoped tool re-checks membership on every call — a key's
- * user may lose/gain project access between calls within a long-lived MCP
- * client session, so access is never cached across tool invocations.
- */
-export async function withProjectAccess(
+export class ToolAccessError extends Error {}
+
+export async function requireProjectAccess(
   userId: string,
   projectId: string,
   minimumRole: 'viewer' | 'member' | 'admin' = 'viewer',
-): Promise<{ ok: true } | { ok: false; result: CallToolResult }> {
+): Promise<void> {
   const access = await checkProjectRole(userId, projectId, minimumRole);
   if ('error' in access) {
-    return { ok: false, result: errorResult(`${access.error} (project ${projectId})`) };
+    throw new ToolAccessError(`${access.error} (project ${projectId})`);
   }
-  return { ok: true };
 }

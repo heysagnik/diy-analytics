@@ -43,6 +43,7 @@ that section.
 - [Workspaces and roles](#workspaces-and-roles)
 - [Project settings](#project-settings)
 - [MCP server & API keys](#mcp-server--api-keys)
+- [In-app AI chat assistant](#in-app-ai-chat-assistant)
 - [Data export](#data-export)
 
 ## Overview dashboard
@@ -415,6 +416,27 @@ dashboard view described elsewhere in this document.
 
 Revoke a key any time from the same **Profile → API Keys** page.
 Revocation takes effect immediately.
+
+## In-app AI chat assistant
+
+Projects can show a chat pill at the bottom of the dashboard for asking
+questions about your data in plain English — "what were my top sources
+last week", "did the funnel conversion rate drop" — without leaving the
+page. It uses the same read-only tools as the MCP server above, scoped to
+the project you're currently viewing.
+
+The assistant is disabled by default. To enable it, set exactly one
+provider API key in your deployment's environment: `ANTHROPIC_API_KEY`,
+`OPENAI_API_KEY`, `GEMINI_API_KEY`, `GROQ_API_KEY`, `OPENROUTER_API_KEY`,
+or `NVIDIA_API_KEY`. If more than one is set, the first available wins,
+in that order. `AI_PROVIDER` forces a specific provider instead of relying
+on that priority order, and `AI_MODEL` (or a provider-specific override
+like `ANTHROPIC_MODEL`) selects a non-default model. See
+`.env.local.example` for the full list of variables, including
+`AI_BASE_URL` for pointing at a self-hosted gateway or proxy.
+
+There's no per-workspace or per-project toggle — if a key is configured,
+the assistant is available on every project the deployment serves.
 
 ## Data export
 

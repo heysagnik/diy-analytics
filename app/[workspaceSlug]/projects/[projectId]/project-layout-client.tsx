@@ -4,6 +4,7 @@ import { WarningIcon } from '@phosphor-icons/react';
 import { usePathname } from 'next/navigation';
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import ChatWidget from '@/components/chat/ChatWidget';
 import ErrorBoundary from '@/components/layout/ErrorBoundary';
 import Header from '@/components/project/Header';
 import Sidebar from '@/components/project/Sidebar';
@@ -220,13 +221,14 @@ export default function ProjectLayoutClient({
               footerLinks={footerLinks}
             />
 
-            <SidebarInset className="flex-1 flex flex-col min-w-0 overflow-hidden">
+            <SidebarInset className="relative flex-1 flex flex-col min-w-0 overflow-hidden">
               <div className="lg:hidden">
                 <Header projectName={projectName} isLoading={isLoadingProject} />
               </div>
               <div className="flex-1 overflow-y-auto scrollbar-thin">
                 <div className="w-full">{children}</div>
               </div>
+              <ChatWidget projectId={projectId} workspaceId={workspaceId} />
             </SidebarInset>
           </div>
         </SidebarProvider>

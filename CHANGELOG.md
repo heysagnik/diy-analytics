@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 While the major version is `0`, breaking changes may ship in a minor release.
 
+## [0.1.6] - 2026-08-14
+
+### Added
+
+- **In-app AI chat assistant** — an optional chat widget that answers
+  questions about your analytics using the same read-only tools as the MCP
+  server. Bring your own API key for one of six providers (Anthropic,
+  OpenAI, Gemini, Groq, OpenRouter, or NVIDIA NIM); if multiple keys are
+  set, the first available wins in that priority order. Provider, model,
+  and base URL are all configurable via environment variables — see
+  `.env.local.example`. Disabled by default (no keys set).
+
+### Fixed
+
+- The chat pill's response bubble and "thinking" indicator now hide
+  whenever the pill loses focus, instead of staying visible after you click
+  away.
+
 ## [0.1.5] - 2026-08-13
 
 ### Changed
@@ -145,6 +163,9 @@ While the major version is `0`, breaking changes may ship in a minor release.
 - Self-hosted tracking script (`/api/tracker.js`) with automatic SPA pageview
   tracking, custom events, Core Web Vitals, and a visitor opt-out API.
 
+[0.1.6]: https://github.com/heysagnik/diy-analytics/compare/v0.1.5...v0.1.6
+[0.1.5]: https://github.com/heysagnik/diy-analytics/compare/v0.1.4...v0.1.5
+[0.1.4]: https://github.com/heysagnik/diy-analytics/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/heysagnik/diy-analytics/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/heysagnik/diy-analytics/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/heysagnik/diy-analytics/compare/v0.1.0...v0.1.1

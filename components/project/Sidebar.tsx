@@ -1,6 +1,6 @@
 'use client';
 
-import { StarFourIcon } from '@phosphor-icons/react';
+import { SidebarSimpleIcon, StarFourIcon } from '@phosphor-icons/react';
 import Link from 'next/link';
 import {
   Sidebar as ShadcnSidebar,
@@ -10,7 +10,8 @@ import {
   SidebarRail,
   useSidebar,
 } from '@/components/ui/sidebar';
-import { ThemeToggle } from '@/components/ui/theme-toggle';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import Navigation, { type NavigationItem } from '../layout/Navigation';
 import Footer, { type FooterLink } from './Footer';
 import ProjectSelector from './ProjectSelector';
@@ -38,7 +39,7 @@ export default function Sidebar({
   setActivePageId,
   footerLinks,
 }: SidebarProps) {
-  const { state, setOpenMobile } = useSidebar();
+  const { state, setOpenMobile, toggleSidebar } = useSidebar();
   const isCollapsed = state === 'collapsed';
 
   const handleNavItemClick = (itemId: string) => {
@@ -49,7 +50,7 @@ export default function Sidebar({
   return (
     <ShadcnSidebar collapsible="icon" className="border-r border-border bg-sidebar text-sidebar-foreground">
       <SidebarHeader className="border-b border-border p-2">
-        <div className="flex h-10 items-center justify-between px-2">
+        <div className={cn('flex h-10 items-center px-2', isCollapsed ? 'justify-center' : 'justify-between')}>
           {!isCollapsed && (
             <Link href="/" className="flex items-center gap-2 min-w-0 rounded-md">
               <StarFourIcon size={20} weight="fill" className="shrink-0 text-foreground" />
@@ -58,8 +59,16 @@ export default function Sidebar({
               </span>
             </Link>
           )}
-          <div className="flex items-center gap-1.5 ml-auto">
-            <ThemeToggle className="relative text-muted-foreground hover:bg-surface-tertiary" iconSize={20} />
+          <div className={cn('flex items-center gap-1.5', !isCollapsed && 'ml-auto')}>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="text-muted-foreground hover:bg-surface-tertiary"
+              onClick={toggleSidebar}
+              aria-label="Toggle sidebar"
+            >
+              <SidebarSimpleIcon size={20} />
+            </Button>
           </div>
         </div>
       </SidebarHeader>
