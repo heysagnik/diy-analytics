@@ -86,12 +86,12 @@ export default function ChatWidget({ projectId, workspaceId }: ChatWidgetProps) 
         aria-hidden="true"
       />
 
-      <div className="pointer-events-none absolute inset-x-0 bottom-6 z-40 flex flex-col-reverse items-center gap-3 px-4">
+      <div className="pointer-events-none absolute inset-x-0 bottom-6 z-40 flex flex-col-reverse items-center gap-3 px-4 pb-[env(safe-area-inset-bottom)]">
         <form
           onSubmit={handleSubmit}
           className={cn(
             'pointer-events-auto flex items-center gap-1.5 rounded-full border border-border bg-popover p-1.5 pl-4 shadow-lg transition-all duration-300 ease-out',
-            isFocused || input ? 'w-full max-w-xl' : 'w-64 max-w-xl',
+            isFocused || input ? 'w-full max-w-xl' : 'w-56 sm:w-64 max-w-xl',
           )}
         >
           <AsteriskIcon className="size-5 shrink-0 text-primary" />
@@ -103,7 +103,7 @@ export default function ChatWidget({ projectId, workspaceId }: ChatWidgetProps) 
             onBlur={() => setIsFocused(false)}
             placeholder={configured ? 'Ask about your site…' : 'Assistant not configured'}
             disabled={!configured || configured === null}
-            className="h-8 w-0 min-w-0 flex-1 truncate bg-transparent text-sm outline-none placeholder:text-muted-foreground disabled:opacity-50"
+            className="h-8 w-0 min-w-0 flex-1 truncate bg-transparent text-base outline-none placeholder:text-muted-foreground disabled:opacity-50 sm:text-sm"
           />
           <Button
             type="submit"
