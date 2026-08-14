@@ -1,5 +1,5 @@
 import { inArray, lt } from 'drizzle-orm';
-import { events, pageViews } from '@/db/schema';
+import { errorOccurrences, events, pageViews } from '@/db/schema';
 import { db } from '@/lib/db';
 
 // Postgres has no TTL index equivalent to Mongo's expireAfterSeconds — this
@@ -37,6 +37,24 @@ async function pruneEvents(cutoff: Date): Promise<number> {
   return totalDeleted;
 }
 
+async function pruneErrorOccurrences(cutoff: Date): Promise<number> {
+  let totalDeleted = 0;
+  for (;;) {
+    const idsToDelete = db
+      .select({ id: errorOccurrences.id })
+      .from(errorOccurrences)
+      .where(lt(errorOccurrences.occurredAt, cutoff))
+      .limit(BATCH_SIZE);
+    const deleted = await db
+      .delete(errorOccurrences)
+      .where(inArray(errorOccurrences.id, idsToDelete))
+      .returning({ id: errorOccurrences.id });
+    totalDeleted += deleted.length;
+    if (deleted.length < BATCH_SIZE) break;
+  }
+  return totalDeleted;
+}
+
 function retentionCutoff(envVar: string): Date | null {
   const days = Number(process.env[envVar]);
   if (!Number.isFinite(days) || days <= 0) return null;
@@ -44,17 +62,26 @@ function retentionCutoff(envVar: string): Date | null {
 }
 
 /**
- * Opt-in retention: no-op unless PAGEVIEW_RETENTION_DAYS/EVENT_RETENTION_DAYS
- * is explicitly set — same opt-in behavior as the old Mongo TTL indexes.
+ * Opt-in retention: no-op unless PAGEVIEW_RETENTION_DAYS/EVENT_RETENTION_DAYS/
+ * ERROR_OCCURRENCE_RETENTION_DAYS is explicitly set — same opt-in behavior
+ * as the old Mongo TTL indexes. Pruning occurrences never touches the
+ * `errors` grouping rows themselves (message/stack/count), only the
+ * detailed per-occurrence rows.
  */
-export async function pruneExpiredData(): Promise<{ pageviewsDeleted: number; eventsDeleted: number }> {
+export async function pruneExpiredData(): Promise<{
+  pageviewsDeleted: number;
+  eventsDeleted: number;
+  errorOccurrencesDeleted: number;
+}> {
   const pageviewCutoff = retentionCutoff('PAGEVIEW_RETENTION_DAYS');
   const eventCutoff = retentionCutoff('EVENT_RETENTION_DAYS');
+  const errorOccurrenceCutoff = retentionCutoff('ERROR_OCCURRENCE_RETENTION_DAYS');
 
-  const [pageviewsDeleted, eventsDeleted] = await Promise.all([
+  const [pageviewsDeleted, eventsDeleted, errorOccurrencesDeleted] = await Promise.all([
     pageviewCutoff ? prunePageViews(pageviewCutoff) : Promise.resolve(0),
     eventCutoff ? pruneEvents(eventCutoff) : Promise.resolve(0),
+    errorOccurrenceCutoff ? pruneErrorOccurrences(errorOccurrenceCutoff) : Promise.resolve(0),
   ]);
 
-  return { pageviewsDeleted, eventsDeleted };
+  return { pageviewsDeleted, eventsDeleted, errorOccurrencesDeleted };
 }

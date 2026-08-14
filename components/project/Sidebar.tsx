@@ -82,11 +82,11 @@ export default function Sidebar({
         collapsed={isCollapsed}
       />
 
-      <SidebarContent className="px-2 py-3">
+      <SidebarContent className="px-2 py-3 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:py-2">
         <Navigation navigationItems={navigationItems} activePageId={activePageId} onNavItemClick={handleNavItemClick} />
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-border">
+      <SidebarFooter className="border-t border-border px-2 py-2 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:py-2">
         <Footer footerLinks={footerLinks} onLinkClick={() => setOpenMobile(false)} />
       </SidebarFooter>
 

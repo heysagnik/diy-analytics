@@ -71,6 +71,13 @@
       "when": 1786628965706,
       "tag": "0009_luxuriant_lilandra",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1786667318716,
+      "tag": "0010_foamy_firebrand",
+      "breakpoints": true
     }
   ]
 }

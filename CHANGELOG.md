@@ -18,12 +18,38 @@ While the major version is `0`, breaking changes may ship in a minor release.
   set, the first available wins in that priority order. Provider, model,
   and base URL are all configurable via environment variables — see
   `.env.local.example`. Disabled by default (no keys set).
+- **Detailed error tracking** — error detail pages now show affected-user
+  and affected-session counts, a daily occurrence timeline, and breakdowns
+  by browser/OS/device/country, backed by a new per-occurrence
+  `error_occurrences` table (capped at 500 stored occurrences per error per
+  day; prune with the new `ERROR_OCCURRENCE_RETENTION_DAYS`). Full,
+  multi-frame stack traces are now resolved through source maps (previously
+  only the top frame). Breadcrumbs — console logs, clicks, network
+  requests, and navigations in the moments before an error — are captured
+  automatically and shown on the detail page. Errors now carry a
+  filterable, structured type (e.g. `TypeError`), and a new
+  `window.__DIY_CAPTURE_EXCEPTION__(error, { level, tags, extra })` lets you
+  report caught exceptions (e.g. from your own React error boundary) with
+  custom severity and context. New MCP tool: `get_error_occurrences`.
+
+### Changed
+
+- **Errors**: error groups whose message is exactly `Script error.` with no
+  stack or source location — the browser's redaction of uncaught errors
+  thrown by a cross-origin `<script>` without `crossorigin="anonymous"` and
+  a matching CORS header — are now tagged **cross-origin** in the list, with
+  an explanation and fix in the detail view instead of a dead-end "No stack
+  trace captured."
 
 ### Fixed
 
 - The chat pill's response bubble and "thinking" indicator now hide
   whenever the pill loses focus, instead of staying visible after you click
   away.
+- The chat pill is now usable on mobile: the input no longer triggers
+  iOS Safari's auto-zoom on focus, the collapsed pill fits narrower
+  screens, and it no longer sits flush against the home-indicator bar on
+  notched devices.
 
 ## [0.1.5] - 2026-08-13
 

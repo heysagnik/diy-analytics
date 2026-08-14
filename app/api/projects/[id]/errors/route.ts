@@ -32,11 +32,16 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const releaseCondition =
     release === null ? undefined : release === 'none' ? isNull(errors.release) : eq(errors.release, release);
 
+  // 'none' selects errors with no parsed error name; absent means "all".
+  const errorName = request.nextUrl.searchParams.get('errorName');
+  const errorNameCondition =
+    errorName === null ? undefined : errorName === 'none' ? isNull(errors.errorName) : eq(errors.errorName, errorName);
+
   try {
     const rows = await db
       .select()
       .from(errors)
-      .where(and(eq(errors.projectId, id), eq(errors.status, status), releaseCondition))
+      .where(and(eq(errors.projectId, id), eq(errors.status, status), releaseCondition, errorNameCondition))
       .orderBy(desc(errors.lastSeenAt))
       .limit(limit);
     return NextResponse.json(rows.map(withMongoId));

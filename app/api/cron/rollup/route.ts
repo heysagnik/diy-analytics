@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  let retention: { pageviewsDeleted: number; eventsDeleted: number } | null = null;
+  let retention: { pageviewsDeleted: number; eventsDeleted: number; errorOccurrencesDeleted: number } | null = null;
   try {
     retention = await pruneExpiredData();
   } catch (error) {

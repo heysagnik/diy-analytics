@@ -21,6 +21,9 @@ export const errors = pgTable(
     // occurrences of the same error, distinct across different ones.
     fingerprint: varchar('fingerprint', { length: 40 }).notNull(),
     message: text('message').notNull(),
+    // e.g. "TypeError" — from event.error.name, or parsed server-side from
+    // a leading "SomeError:" message prefix if the client didn't send one.
+    errorName: varchar('error_name', { length: 100 }),
     stack: text('stack'),
     sourceUrl: text('source_url'),
     line: integer('line'),
@@ -39,6 +42,7 @@ export const errors = pgTable(
   (table) => [
     uniqueIndex('errors_project_id_fingerprint_idx').on(table.projectId, table.fingerprint),
     index('errors_project_id_last_seen_at_idx').on(table.projectId, table.lastSeenAt.desc()),
+    index('errors_project_id_error_name_idx').on(table.projectId, table.errorName),
     check('errors_severity_check', sql`${table.severity} IN (${checkInList(ERROR_SEVERITIES)})`),
     check('errors_status_check', sql`${table.status} IN (${checkInList(ERROR_STATUSES)})`),
   ],

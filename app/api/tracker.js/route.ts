@@ -131,6 +131,31 @@ function generateTrackingScript(project: ProjectForScript) {
   let url = location.href;
   let sid = getSID();
   let lastActivity = Date.now();
+
+  // Breadcrumbs: a capped ring buffer of console/click/http/navigation
+  // events leading up to an error, attached only to error payloads.
+  const MAX_BREADCRUMBS = 20;
+  const MAX_BREADCRUMB_MSG = 200;
+  let breadcrumbs = [];
+  let lastBreadcrumbPath = location.pathname;
+
+  function pushBreadcrumb(type, message, data) {
+    breadcrumbs.push({
+      type: type,
+      message: String(message).slice(0, MAX_BREADCRUMB_MSG),
+      data: data,
+      ts: Date.now()
+    });
+    if (breadcrumbs.length > MAX_BREADCRUMBS) breadcrumbs.shift();
+  }
+
+  function breadcrumbUrlPath(u) {
+    try {
+      return new URL(u, location.href).pathname;
+    } catch (e) {
+      return String(u).split('?')[0];
+    }
+  }
   
   function genID() { return Math.random().toString(36).substring(2, 10); }
 
@@ -193,15 +218,86 @@ function generateTrackingScript(project: ProjectForScript) {
     
     return { browser, os, device };
   }
-  
-   ["mousedown", "keydown", "touchstart", "scroll"].forEach(e => 
+
+  (function initBreadcrumbs() {
+    ['log', 'warn', 'error'].forEach(function(level) {
+      const original = console[level];
+      if (typeof original !== 'function') return;
+      console[level] = function() {
+        try {
+          const args = Array.prototype.slice.call(arguments).map(function(a) {
+            if (typeof a === 'string') return a;
+            try { return JSON.stringify(a); } catch (e) { return String(a); }
+          }).join(' ');
+          pushBreadcrumb('console', args);
+        } catch (e) { /* never let breadcrumb capture break console */ }
+        return original.apply(console, arguments);
+      };
+    });
+
+    document.addEventListener('click', function(event) {
+      try {
+        const t = event.target;
+        if (!t || !t.tagName) return;
+        let desc = t.tagName.toLowerCase();
+        if (t.id) desc += '#' + t.id;
+        else if (typeof t.className === 'string' && t.className.trim()) {
+          desc += '.' + t.className.trim().split(/\\s+/).slice(0, 2).join('.');
+        }
+        pushBreadcrumb('ui.click', desc);
+      } catch (e) { /* ignore */ }
+    }, true);
+
+    if (typeof window.fetch === 'function') {
+      const originalFetch = window.fetch;
+      window.fetch = function(input, init) {
+        const reqUrl = typeof input === 'string' ? input : (input && input.url) || '';
+        const method = (init && init.method) || (input && input.method) || 'GET';
+        const promise = originalFetch.apply(window, arguments);
+        if (typeof reqUrl === 'string' && reqUrl.indexOf(EP) !== 0) {
+          promise.then(function(res) {
+            pushBreadcrumb('http', method + ' ' + breadcrumbUrlPath(reqUrl) + ' -> ' + res.status);
+          }).catch(function() {
+            pushBreadcrumb('http', method + ' ' + breadcrumbUrlPath(reqUrl) + ' -> failed');
+          });
+        }
+        return promise;
+      };
+    }
+
+    if (typeof XMLHttpRequest !== 'undefined') {
+      const originalOpen = XMLHttpRequest.prototype.open;
+      XMLHttpRequest.prototype.open = function(method, reqUrl) {
+        this.__diyMethod = method;
+        this.__diyUrl = reqUrl;
+        return originalOpen.apply(this, arguments);
+      };
+      const originalSend = XMLHttpRequest.prototype.send;
+      XMLHttpRequest.prototype.send = function() {
+        const xhr = this;
+        if (typeof xhr.__diyUrl === 'string' && xhr.__diyUrl.indexOf(EP) !== 0) {
+          xhr.addEventListener('loadend', function() {
+            pushBreadcrumb('http', xhr.__diyMethod + ' ' + breadcrumbUrlPath(xhr.__diyUrl) + ' -> ' + xhr.status);
+          });
+        }
+        return originalSend.apply(this, arguments);
+      };
+    }
+  })();
+
+   ["mousedown", "keydown", "touchstart", "scroll"].forEach(e =>
      window.addEventListener(e, refresh, { passive: true }));
    
    function pageview() {
      if (!sid) return;
      refresh();
      if (!sid) return;
-     
+
+     if (location.pathname !== lastBreadcrumbPath) {
+       pushBreadcrumb('navigation', lastBreadcrumbPath + ' -> ' + location.pathname);
+       lastBreadcrumbPath = location.pathname;
+     }
+
      const params = new URLSearchParams(window.location.search);
      const { browser, os, device } = getBrowserInfo();
     
@@ -449,6 +545,7 @@ function generateTrackingScript(project: ProjectForScript) {
         v: SV,
         ts: Date.now(),
         release: window.__DIY_RELEASE__ || undefined,
+        breadcrumbs: breadcrumbs.slice(),
       }, payload));
     }
 
@@ -456,6 +553,7 @@ function generateTrackingScript(project: ProjectForScript) {
       if (!event.error && !event.message) return;
       sendError({
         errorMessage: String(event.message || (event.error && event.error.message) || 'Unknown error').slice(0, 500),
+        errorName: event.error && event.error.name ? String(event.error.name).slice(0, 100) : undefined,
         errorStack: event.error && event.error.stack ? String(event.error.stack).slice(0, 4000) : undefined,
         errorSourceUrl: event.filename || undefined,
         errorLine: typeof event.lineno === 'number' ? event.lineno : undefined,
@@ -469,6 +567,7 @@ function generateTrackingScript(project: ProjectForScript) {
       const message = reason && reason.message ? reason.message : String(reason);
       sendError({
         errorMessage: String(message || 'Unhandled rejection').slice(0, 500),
+        errorName: reason && reason.name ? String(reason.name).slice(0, 100) : undefined,
         errorStack: reason && reason.stack ? String(reason.stack).slice(0, 4000) : undefined,
         errorSeverity: 'warning',
       });
@@ -488,6 +587,22 @@ function generateTrackingScript(project: ProjectForScript) {
         errorSeverity: 'warning',
       });
     }, true);
+
+    // Manual capture — for consumers reporting a caught exception (e.g.
+    // their own React error boundary) rather than an uncaught one, with
+    // optional custom tags/extra context and severity.
+    window.__DIY_CAPTURE_EXCEPTION__ = function(error, context) {
+      context = context || {};
+      const message = error && error.message ? error.message : String(error);
+      sendError({
+        errorMessage: String(message || 'Captured exception').slice(0, 500),
+        errorName: error && error.name ? String(error.name).slice(0, 100) : undefined,
+        errorStack: error && error.stack ? String(error.stack).slice(0, 4000) : undefined,
+        errorSeverity: context.level || 'error',
+        tags: context.tags,
+        extra: context.extra,
+      });
+    };
   })();
 
    // Public opt-out / opt-in hooks — used by the dashboard's "don't track

@@ -41,9 +41,11 @@ export type GoalType = (typeof GOAL_TYPES)[number];
 export const FUNNEL_STEP_TYPES = ['page', 'event'] as const;
 export type FunnelStepType = (typeof FUNNEL_STEP_TYPES)[number];
 
-// 'error': window.onerror (uncaught exceptions).
-// 'warning': unhandledrejection (rejected promises — usually recoverable).
-export const ERROR_SEVERITIES = ['error', 'warning'] as const;
+// 'fatal'/'info'/'debug' are only reachable via the manual capture API
+// (window.__DIY_CAPTURE_EXCEPTION__'s context.level) — automatic capture
+// only ever produces 'error' (window.onerror) or 'warning' (unhandledrejection,
+// resource load failures).
+export const ERROR_SEVERITIES = ['fatal', 'error', 'warning', 'info', 'debug'] as const;
 export type ErrorSeverity = (typeof ERROR_SEVERITIES)[number];
 
 // 'resolved' -> 'active' transition (a new occurrence after being marked

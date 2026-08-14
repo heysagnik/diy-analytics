@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { and, count, countDistinct, desc, eq, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { AnalyticsService } from '@/app/api/analytics/services/analyticsService';
 import { EXPLORE_DIMENSIONS, ExploreService, MAX_CONDITIONS } from '@/app/api/analytics/services/exploreService';
@@ -9,6 +9,7 @@ import { SegmentService } from '@/app/api/analytics/services/segmentService';
 import {
   ERROR_STATUSES,
   type ErrorStatus,
+  errorOccurrences,
   errors,
   funnels,
   goals,
@@ -208,6 +209,68 @@ export const TOOL_DEFINITIONS = [
         .where(and(eq(errors.projectId, projectId), eq(errors.status, resolvedStatus), releaseCondition))
         .orderBy(desc(errors.lastSeenAt))
         .limit(limit ?? 50);
+    },
+  }),
+
+  defineTool({
+    name: 'get_error_occurrences',
+    title: 'Get error occurrences',
+    description:
+      'Detail for a single tracked error: affected-user/session counts, a daily occurrence timeline, and breakdowns by browser/OS/device/country. Use list_errors first to find the errorId.',
+    inputSchema: {
+      projectId: z.string(),
+      errorId: z.string(),
+      breakdownBy: z.enum(['browser', 'os', 'device', 'country']).optional(),
+      timelineDays: z.number().int().min(1).max(90).optional(),
+    },
+    async handler({ projectId, errorId, breakdownBy, timelineDays }, { userId }) {
+      await requireProjectAccess(userId, projectId);
+      if (!isValidUuid(errorId)) {
+        throw new ToolError('errorId must be a valid UUID');
+      }
+
+      const [errorRow] = await db
+        .select({ id: errors.id })
+        .from(errors)
+        .where(and(eq(errors.id, errorId), eq(errors.projectId, projectId)))
+        .limit(1);
+      if (!errorRow) {
+        throw new ToolError('Error not found for this project');
+      }
+
+      const [summary] = await db
+        .select({
+          totalOccurrences: count(),
+          affectedSessions: countDistinct(errorOccurrences.sessionId),
+          affectedUsers: countDistinct(sql`coalesce(${errorOccurrences.userId}, ${errorOccurrences.sessionId})`),
+        })
+        .from(errorOccurrences)
+        .where(eq(errorOccurrences.errorId, errorId));
+
+      const days = timelineDays ?? 14;
+      const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+      const timeline = await db
+        .select({
+          date: sql<string>`to_char(date_trunc('day', ${errorOccurrences.occurredAt}), 'YYYY-MM-DD')`,
+          count: count(),
+        })
+        .from(errorOccurrences)
+        .where(and(eq(errorOccurrences.errorId, errorId), sql`${errorOccurrences.occurredAt} >= ${since}`))
+        .groupBy(sql`date_trunc('day', ${errorOccurrences.occurredAt})`)
+        .orderBy(sql`date_trunc('day', ${errorOccurrences.occurredAt})`);
+
+      let breakdown: { value: string | null; count: number }[] | undefined;
+      if (breakdownBy) {
+        const column = errorOccurrences[breakdownBy];
+        breakdown = await db
+          .select({ value: column, count: count() })
+          .from(errorOccurrences)
+          .where(eq(errorOccurrences.errorId, errorId))
+          .groupBy(column)
+          .orderBy(sql`count(*) desc`);
+      }
+
+      return { summary, timeline, breakdown: breakdown ?? null };
     },
   }),
 

@@ -2,6 +2,7 @@ export * from './alerts';
 export * from './apiKeys';
 export * from './dailyRollups';
 export * from './enums';
+export * from './errorOccurrences';
 export * from './errors';
 export * from './events';
 export * from './funnels';

@@ -17,7 +17,7 @@ interface NavigationProps {
 
 export default function Navigation({ navigationItems, activePageId, onNavItemClick }: NavigationProps) {
   return (
-    <SidebarMenu className="gap-1">
+    <SidebarMenu className="gap-1 group-data-[collapsible=icon]:items-center">
       {navigationItems.map((item) => {
         const IconComponent = item.icon;
         const isActive = item.id === activePageId;
@@ -27,7 +27,7 @@ export default function Navigation({ navigationItems, activePageId, onNavItemCli
             <SidebarMenuButton
               isActive={isActive}
               tooltip={item.label}
-              className={`relative flex items-center transition-all duration-150 active:scale-[0.96] rounded-md gap-2.5 px-3 py-1.5 ${
+              className={`relative flex items-center transition-all duration-150 active:scale-[0.96] rounded-md gap-2.5 px-3 py-1.5 group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-0! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:mx-auto ${
                 isActive
                   ? 'bg-accent! text-accent-foreground! font-semibold shadow-xs'
                   : 'font-medium text-muted-foreground hover:text-foreground hover:bg-surface-tertiary/60'
@@ -45,7 +45,7 @@ export default function Navigation({ navigationItems, activePageId, onNavItemCli
                 weight={isActive ? 'fill' : 'regular'}
                 className={isActive ? 'text-accent-foreground!' : ''}
               />
-              <span>{item.label}</span>
+              <span className="truncate group-data-[collapsible=icon]:hidden">{item.label}</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         );

@@ -1,7 +1,16 @@
 import { createHash } from 'node:crypto';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, gte, sql } from 'drizzle-orm';
 import { UAParser } from 'ua-parser-js';
-import { type ErrorSeverity, errors, events, pageViews, projects } from '../../../../db/schema';
+import {
+  type Breadcrumb,
+  ERROR_SEVERITIES,
+  type ErrorSeverity,
+  errorOccurrences,
+  errors,
+  events,
+  pageViews,
+  projects,
+} from '../../../../db/schema';
 import { db } from '../../../../lib/db';
 import { normalizeProjectUrl } from '../../../../utils/url';
 
@@ -17,11 +26,15 @@ export interface TrackingPayload {
   uid?: string;
   timestamp?: string | number | Date;
   errorMessage?: string;
+  errorName?: string;
   errorStack?: string;
   errorSourceUrl?: string;
   errorLine?: number;
   errorCol?: number;
   errorSeverity?: ErrorSeverity;
+  breadcrumbs?: Breadcrumb[];
+  tags?: Record<string, string>;
+  extra?: Record<string, unknown>;
   release?: string;
 }
 
@@ -164,7 +177,7 @@ export class TrackingService {
       } else if (payload.type === 'event') {
         await this.trackEvent(project.id, payload, deviceInfo, sessionId, geoData);
       } else if (payload.type === 'error') {
-        await this.trackError(project.id, payload, urlData);
+        await this.trackError(project.id, payload, urlData, deviceInfo, geoData, sessionId);
       }
 
       return {
@@ -198,6 +211,7 @@ export class TrackingService {
     sessionId: 100,
     uid: 100,
     errorMessage: 500,
+    errorName: 100,
     errorStack: 4000,
     errorSourceUrl: 2048,
     release: 100,
@@ -279,11 +293,32 @@ export class TrackingService {
       if (payload.errorSourceUrl !== undefined && !this.isBoundedString(payload.errorSourceUrl, LEN.errorSourceUrl)) {
         return 'errorSourceUrl must be a string within length limits';
       }
-      if (payload.errorSeverity !== undefined && !['error', 'warning'].includes(payload.errorSeverity)) {
-        return 'errorSeverity must be "error" or "warning"';
+      if (payload.errorName !== undefined && !this.isBoundedString(payload.errorName, LEN.errorName)) {
+        return 'errorName must be a string within length limits';
+      }
+      if (
+        payload.errorSeverity !== undefined &&
+        !(ERROR_SEVERITIES as readonly string[]).includes(payload.errorSeverity)
+      ) {
+        return `errorSeverity must be one of: ${ERROR_SEVERITIES.join(', ')}`;
       }
       if (payload.release !== undefined && !this.isBoundedString(payload.release, LEN.release)) {
         return 'release must be a string within length limits';
+      }
+      if (payload.breadcrumbs !== undefined && !Array.isArray(payload.breadcrumbs)) {
+        return 'breadcrumbs must be an array';
+      }
+      if (
+        payload.tags !== undefined &&
+        (typeof payload.tags !== 'object' || payload.tags === null || Array.isArray(payload.tags))
+      ) {
+        return 'tags must be an object';
+      }
+      if (
+        payload.extra !== undefined &&
+        (typeof payload.extra !== 'object' || payload.extra === null || Array.isArray(payload.extra))
+      ) {
+        return 'extra must be an object';
       }
     }
 
@@ -627,7 +662,14 @@ export class TrackingService {
    * row instead of inserting a new one. A resolved error that reoccurs is
    * reopened and its `regressedAt` is stamped.
    */
-  private async trackError(projectId: string, payload: TrackingPayload, urlData: UrlData): Promise<void> {
+  private async trackError(
+    projectId: string,
+    payload: TrackingPayload,
+    urlData: UrlData,
+    deviceInfo: DeviceInfo,
+    geoData: GeoData,
+    sessionId: string,
+  ): Promise<void> {
     if (!payload.errorMessage) {
       throw new Error('trackError called without an errorMessage');
     }
@@ -641,7 +683,10 @@ export class TrackingService {
       .where(and(eq(errors.projectId, projectId), eq(errors.fingerprint, fingerprint)))
       .limit(1);
 
+    let errorId: string;
+
     if (existing) {
+      errorId = existing.id;
       const isRegression = existing.status === 'resolved';
       await db
         .update(errors)
@@ -655,23 +700,103 @@ export class TrackingService {
           updatedAt: now,
         })
         .where(eq(errors.id, existing.id));
-      return;
+    } else {
+      const [inserted] = await db
+        .insert(errors)
+        .values({
+          projectId,
+          fingerprint,
+          message: payload.errorMessage,
+          errorName: this.deriveErrorName(payload.errorName, payload.errorMessage),
+          stack: payload.errorStack,
+          sourceUrl: payload.errorSourceUrl,
+          line: payload.errorLine,
+          col: payload.errorCol,
+          path: urlData.pathname,
+          severity: payload.errorSeverity || 'error',
+          release: payload.release,
+          firstSeenAt: now,
+          lastSeenAt: now,
+        })
+        .returning({ id: errors.id });
+      errorId = inserted.id;
     }
 
-    await db.insert(errors).values({
-      projectId,
-      fingerprint,
-      message: payload.errorMessage,
-      stack: payload.errorStack,
-      sourceUrl: payload.errorSourceUrl,
-      line: payload.errorLine,
-      col: payload.errorCol,
-      path: urlData.pathname,
-      severity: payload.errorSeverity || 'error',
-      release: payload.release,
-      firstSeenAt: now,
-      lastSeenAt: now,
-    });
+    // Cap detailed per-occurrence rows per error per day so a single
+    // runaway error can't blow up table size — the aggregate `count` above
+    // is still incremented unconditionally.
+    const dayStart = new Date();
+    dayStart.setUTCHours(0, 0, 0, 0);
+    const [{ count: occurrencesToday }] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(errorOccurrences)
+      .where(and(eq(errorOccurrences.errorId, errorId), gte(errorOccurrences.occurredAt, dayStart)));
+
+    if (Number(occurrencesToday) < TrackingService.MAX_OCCURRENCES_PER_ERROR_PER_DAY) {
+      await db.insert(errorOccurrences).values({
+        errorId,
+        projectId,
+        sessionId: payload.uid || sessionId,
+        userId: payload.uid,
+        browser: deviceInfo.browser,
+        browserVersion: deviceInfo.browserVersion || undefined,
+        os: deviceInfo.os,
+        osVersion: deviceInfo.osVersion || undefined,
+        device: deviceInfo.device,
+        deviceVendor: deviceInfo.deviceVendor || undefined,
+        deviceModel: deviceInfo.deviceModel || undefined,
+        country: geoData.country,
+        region: geoData.region,
+        city: geoData.city,
+        url: payload.url,
+        sourceUrl: payload.errorSourceUrl,
+        line: payload.errorLine,
+        col: payload.errorCol,
+        breadcrumbs: this.normalizeBreadcrumbs(payload.breadcrumbs),
+        tags: this.normalizeJsonBlob(payload.tags, TrackingService.MAX_TAGS_BYTES),
+        extra: this.normalizeJsonBlob(payload.extra, TrackingService.MAX_EXTRA_BYTES),
+        occurredAt: now,
+      });
+    }
+  }
+
+  // "SomeError: message" -> "SomeError". Only used as a fallback when the
+  // client didn't send errorName directly (older cached tracker script, or
+  // a non-Error unhandledrejection reason).
+  private deriveErrorName(explicit: string | undefined, message: string): string | null {
+    if (explicit) return explicit;
+    const match = /^([A-Za-z_$][\w$]*(?:Error)?):\s/.exec(message);
+    return match ? match[1] : null;
+  }
+
+  private static readonly MAX_OCCURRENCES_PER_ERROR_PER_DAY = 500;
+  private static readonly MAX_BREADCRUMBS = 20;
+  private static readonly MAX_BREADCRUMBS_BYTES = 4 * 1024;
+  private static readonly MAX_TAGS_BYTES = 1 * 1024;
+  private static readonly MAX_EXTRA_BYTES = 4 * 1024;
+
+  /**
+   * Defense in depth against non-standard clients: the tracker already caps
+   * breadcrumbs client-side, but this is a public unauthenticated endpoint,
+   * so re-cap count and serialized size here too. Oldest entries are
+   * dropped first (same "keep the most recent" bias as the client's ring
+   * buffer).
+   */
+  private normalizeBreadcrumbs(breadcrumbs?: Breadcrumb[]): Breadcrumb[] | undefined {
+    if (!Array.isArray(breadcrumbs) || breadcrumbs.length === 0) return undefined;
+    let capped = breadcrumbs.slice(-TrackingService.MAX_BREADCRUMBS);
+    while (capped.length > 0 && Buffer.byteLength(JSON.stringify(capped)) > TrackingService.MAX_BREADCRUMBS_BYTES) {
+      capped = capped.slice(1);
+    }
+    return capped.length > 0 ? capped : undefined;
+  }
+
+  private normalizeJsonBlob<T extends Record<string, unknown>>(blob: T | undefined, maxBytes: number): T | undefined {
+    if (!blob || typeof blob !== 'object') return undefined;
+    if (Buffer.byteLength(JSON.stringify(blob)) > maxBytes) {
+      return { _truncated: true } as unknown as T;
+    }
+    return blob;
   }
 
   /**

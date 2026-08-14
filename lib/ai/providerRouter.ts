@@ -37,14 +37,7 @@ const PROVIDER_MODEL_ENV_VARS: Record<ChatProvider, string> = {
   nvidia: 'NVIDIA_MODEL',
 };
 
-const PROVIDER_PRIORITY: ChatProvider[] = [
-  'anthropic',
-  'openai',
-  'gemini',
-  'groq',
-  'openrouter',
-  'nvidia',
-];
+const PROVIDER_PRIORITY: ChatProvider[] = ['anthropic', 'openai', 'gemini', 'groq', 'openrouter', 'nvidia'];
 
 const DEFAULT_NVIDIA_BASE_URL = 'https://integrate.api.nvidia.com/v1';
 
@@ -86,9 +79,7 @@ function resolveActiveProvider(): ChatProvider | null {
 }
 
 function resolveModelId(provider: ChatProvider): string {
-  return (
-    env(PROVIDER_MODEL_ENV_VARS[provider]) ?? env('AI_MODEL') ?? DEFAULT_MODEL_IDS[provider]
-  );
+  return env(PROVIDER_MODEL_ENV_VARS[provider]) ?? env('AI_MODEL') ?? DEFAULT_MODEL_IDS[provider];
 }
 
 function buildModel(provider: ChatProvider, modelId: string): LanguageModel {

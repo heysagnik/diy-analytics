@@ -253,7 +253,7 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
         />
       </PopoverTrigger>
 
-      <PopoverContent align="end" className="w-64 max-w-[calc(100vw-2rem)] p-2 text-xs font-body">
+      <PopoverContent align="end" className="w-64 max-w-[calc(100vw-2rem)] p-1 text-xs font-body">
         {!showCustomPicker ? (
           <>
             {DATE_RANGE_OPTIONS.map((option) => (
@@ -262,7 +262,7 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
                 type="button"
                 variant="ghost"
                 onClick={() => handleSelectOption(option)}
-                className={`w-full justify-between px-3.5 py-2 text-left font-medium ${
+                className={`w-full justify-between px-2.5 py-1.5 text-left font-medium ${
                   dateRange === option && !customRange
                     ? 'bg-accent text-accent-foreground hover:bg-accent hover:text-accent-foreground'
                     : 'text-foreground'
@@ -273,12 +273,12 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
               </Button>
             ))}
             {onCustomRangeChange && (
-              <div className="border-t border-border pt-1.5 mt-1.5">
+              <div className="border-t border-border pt-1 mt-1">
                 <Button
                   type="button"
                   variant="ghost"
                   onClick={() => setShowCustomPicker(true)}
-                  className="w-full justify-start px-3.5 py-2 text-foreground font-medium"
+                  className="w-full justify-start px-2.5 py-1.5 text-foreground font-medium"
                 >
                   Custom Range...
                 </Button>
@@ -286,8 +286,8 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
             )}
           </>
         ) : (
-          <form onSubmit={handleApplyCustomRange} className="p-2 flex flex-col gap-3">
-            <div className="font-medium text-foreground border-b border-border pb-2 text-sm">Select Custom Dates</div>
+          <form onSubmit={handleApplyCustomRange} className="p-1.5 flex flex-col gap-2.5">
+            <div className="font-medium text-foreground border-b border-border pb-1.5 text-sm">Select Custom Dates</div>
 
             <DateField
               label="Start Date"

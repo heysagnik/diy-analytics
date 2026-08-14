@@ -229,22 +229,60 @@ seen in the last 24 hours).
 
 - **Status** — `active` or `resolved`. Mark an error resolved from its
   detail view; a regression flips it back to active automatically.
-- **Severity** — `error` for genuine exceptions and rejections, `warning`
-  for resource-load failures and rejections without a proper `Error`
-  object.
+- **Severity** — `fatal`, `error`, `warning`, `info`, or `debug`. Automatic
+  capture only ever produces `error` (uncaught exceptions) or `warning`
+  (unhandled rejections, resource-load failures); the other levels are only
+  reachable through the manual capture API below.
+- **Type** — the parsed exception name (e.g. `TypeError`), shown as a badge
+  and filterable via a dropdown on the Errors list, alongside the existing
+  release filter.
 - **Release** — an optional free-text tag, such as a version string or git
   SHA, attached to each error. Nothing in this app assigns releases for
   you — set `window.__DIY_RELEASE__` on your page before the tracking
   script loads, and every error captured on that page carries the tag. The
   Errors list can then be filtered by release, including a "No release"
   filter for errors without one.
-- **Source resolution** — if an error's `sourceUrl`/`line`/`column` were
-  captured, its detail view offers a "Resolve source" action. This fetches
-  the deployed JS file, follows its `//# sourceMappingURL=` comment to the
-  source map, and shows the original, non-minified source line plus a few
-  lines of surrounding context. It runs on demand, not automatically, and
-  is best-effort: it fails gracefully — showing no source — if the file is
-  larger than 2 MB, the fetch times out, or no source map is found.
+- **Source resolution** — click into an error's detail page (or use
+  "Resolve source" from the list) to resolve its full stack trace, not just
+  the top frame: every frame with an `http(s)` source URL is resolved via
+  its deployed JS file's `//# sourceMappingURL=` comment and the map it
+  points to, showing the original, non-minified source line, function name,
+  and a few lines of surrounding context for each. It runs on demand, not
+  automatically, and is best-effort per frame: a frame with no source map
+  (or a file over 2 MB, or a timed-out fetch) is shown as unresolved rather
+  than failing the whole trace.
+- **Breadcrumbs** — an error's detail page shows what happened on the page
+  in the moments before the *most recent* occurrence: console
+  logs/warnings/errors, clicks (by element and id/class), `fetch`/XHR
+  requests (method, path, status), and SPA navigations. Captured
+  automatically, capped at the last 20 events and 4 KB per occurrence —
+  nothing to configure.
+- **Per-occurrence detail** — an error's detail page also shows affected-user
+  and affected-session counts (not just a raw occurrence count, which can
+  overcount one person reloading repeatedly), a daily occurrence timeline,
+  and breakdowns by browser, OS, device, and country — all computed from
+  detailed per-occurrence records, capped at 500 stored occurrences per
+  error per day so one runaway error can't flood storage (the aggregate
+  count above is unaffected by the cap). These records age out on their own
+  schedule — set `ERROR_OCCURRENCE_RETENTION_DAYS` to enable pruning,
+  independent of `EVENT_RETENTION_DAYS`.
+- **Manual capture** — call `window.__DIY_CAPTURE_EXCEPTION__(error,
+  { level, tags, extra })` to report a caught exception (e.g. from your own
+  React error boundary) instead of only uncaught ones. `level` sets the
+  severity (defaults to `error`); `tags` and `extra` attach custom
+  key/value context to that occurrence, visible on its detail page.
+- **"Script error." with no details** — if an error group's message is
+  exactly `Script error.` with no stack trace and no source location, it's
+  tagged **cross-origin** in the list and its detail view explains why: this
+  is a browser security feature, not a gap in capture. Browsers withhold the
+  real message and stack for uncaught errors thrown by a `<script>` loaded
+  from a different origin, unless that script tag has
+  `crossorigin="anonymous"` set and the origin serving it responds with a
+  matching `Access-Control-Allow-Origin` header. Once thrown, the real
+  details are gone — there's no way to recover them after the fact. Fix it
+  by adding `crossorigin="anonymous"` to the offending `<script>` tag (and
+  enabling CORS on that resource); future occurrences will then report the
+  real message and stack.
 
 ## Visitors: Directory & Segments
 
@@ -404,15 +442,18 @@ project before returning anything, on every single call, so revoking a
 workspace membership takes effect immediately, even for a client that has
 had a long-running session open.
 
-All 14 tools available today are **read-only** — there's currently no way
+All 15 tools available today are **read-only** — there's currently no way
 to create, edit, or delete anything (goals, alerts, errors, and so on)
 through MCP, only to query:
 
 `list_workspaces`, `list_projects`, `get_project`, `get_analytics`,
 `get_realtime`, `list_goals`, `list_funnels`, `get_funnel_analysis`,
-`list_errors`, `get_retention`, `get_flow` (Journeys), `get_segments`,
-`explore`, and `get_event_properties` — each mirroring the equivalent
-dashboard view described elsewhere in this document.
+`list_errors`, `get_error_occurrences`, `get_retention`, `get_flow`
+(Journeys), `get_segments`, `explore`, and `get_event_properties` — each
+mirroring the equivalent dashboard view described elsewhere in this
+document. `get_error_occurrences` answers questions `list_errors` can't on
+its own, like "which browsers are hitting this error" or "is this error
+trending up" — pass the `errorId` from a `list_errors` result.
 
 Revoke a key any time from the same **Profile → API Keys** page.
 Revocation takes effect immediately.

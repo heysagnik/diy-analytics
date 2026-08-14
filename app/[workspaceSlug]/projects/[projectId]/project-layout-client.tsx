@@ -228,7 +228,11 @@ export default function ProjectLayoutClient({
               <div className="flex-1 overflow-y-auto scrollbar-thin">
                 <div className="w-full">{children}</div>
               </div>
-              <ChatWidget projectId={projectId} workspaceId={workspaceId} />
+              <ChatWidget
+                projectId={projectId}
+                workspaceId={workspaceId}
+                projectName={isLoadingProject ? undefined : projectName}
+              />
             </SidebarInset>
           </div>
         </SidebarProvider>

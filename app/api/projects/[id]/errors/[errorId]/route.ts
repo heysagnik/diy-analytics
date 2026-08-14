@@ -10,6 +10,25 @@ function isErrorStatus(value: unknown): value is ErrorStatus {
   return typeof value === 'string' && (ERROR_STATUSES as readonly string[]).includes(value);
 }
 
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string; errorId: string }> }) {
+  const { id, errorId } = await params;
+  if (!isValidUuid(id) || !isValidUuid(errorId)) {
+    return NextResponse.json({ error: 'Invalid ID' }, { status: 400 });
+  }
+  const access = await requireProjectAccess(request, id);
+  if (access instanceof NextResponse) return access;
+
+  const [row] = await db
+    .select()
+    .from(errors)
+    .where(and(eq(errors.id, errorId), eq(errors.projectId, id)))
+    .limit(1);
+  if (!row) {
+    return NextResponse.json({ error: 'Error not found' }, { status: 404 });
+  }
+  return NextResponse.json(withMongoId(row));
+}
+
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string; errorId: string }> }) {
   const { id, errorId } = await params;
   if (!isValidUuid(id) || !isValidUuid(errorId)) {

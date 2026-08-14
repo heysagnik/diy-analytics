@@ -110,3 +110,55 @@ export async function resolveSourceLocation(
     };
   });
 }
+
+export interface StackFrame {
+  sourceUrl: string;
+  line: number;
+  column: number;
+  functionName: string | null;
+}
+
+export interface ResolvedStackFrame extends StackFrame {
+  resolved: ResolvedSourceLocation | null;
+}
+
+// V8-style frame: "    at fnName (https://host/app.js:12:34)" or, for
+// top-level/anonymous frames, "    at https://host/app.js:12:34".
+const STACK_FRAME_RE = /at\s+(?:(.+?)\s+\()?(https?:\/\/[^\s)]+):(\d+):(\d+)\)?/;
+
+const MAX_STACK_FRAMES = 15;
+
+/** Parses a raw `error.stack` string into frames, skipping the leading
+ * "Error: message" line and any frame that isn't a resolvable http(s) URL
+ * (native/anonymous frames). */
+export function parseStackFrames(stack: string): StackFrame[] {
+  const frames: StackFrame[] = [];
+  for (const raw of stack.split('\n').slice(1)) {
+    const match = STACK_FRAME_RE.exec(raw.trim());
+    if (!match) continue;
+    const [, functionName, sourceUrl, lineStr, colStr] = match;
+    frames.push({
+      sourceUrl,
+      line: Number(lineStr),
+      column: Number(colStr),
+      functionName: functionName?.trim() || null,
+    });
+    if (frames.length >= MAX_STACK_FRAMES) break;
+  }
+  return frames;
+}
+
+/**
+ * Resolves every frame in a stack trace, not just the top one — frames
+ * sharing a source file reuse the same cached map (see mapCache above), so
+ * a typical multi-frame stack from one bundle costs one fetch, not N.
+ */
+export async function resolveStackFrames(stack: string): Promise<ResolvedStackFrame[]> {
+  const frames = parseStackFrames(stack);
+  const results: ResolvedStackFrame[] = [];
+  for (const frame of frames) {
+    const resolved = await resolveSourceLocation(frame.sourceUrl, frame.line, frame.column).catch(() => null);
+    results.push({ ...frame, resolved });
+  }
+  return results;
+}
