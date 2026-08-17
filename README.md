@@ -8,6 +8,7 @@
 <p align="center">Self-hosted, privacy-friendly website analytics.</p>
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![launch with diploi badge](https://diploi.com/launch.svg)](https://diploi.com/launch/heysagnik/diy-analytics)
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/heysagnik/diy-analytics)
 
 > **Status:** alpha. The core dashboard is functional, but expect breaking
@@ -45,7 +46,44 @@ processor ever sees your visitors' data.
 
 ## Getting started
 
-### Deploy
+### Option 1: Launch with Diploi
+
+[![launch with diploi button](https://diploi.com/launch-big.svg)](https://diploi.com/launch/heysagnik/diy-analytics)
+
+
+1. Launch the project
+
+   Click the launch button above to create a new Diploi deployment for the app. The successful project import in Diploi should include 1 component (Next.js) and 1 add-on (PostgreSQL)
+
+2. Add environment variables
+
+   Open the **Environment** tab in the sidebar and add the required variables from this README.
+
+3. Run database migrations
+  
+   After confirming that `DATABASE_URL` set correctly with the postgres add-on connection URI, run the migration command from the terminal of the devpod found from the sidebar:
+
+   ```bash
+   npm run db:migrate
+   ```
+
+    After running the migrations, verify they were applied by connecting to the Postgres add-on from the browser terminal (left sidebar), select postgres from dropdown and running the following commands:
+
+    ```bash
+    psql -U postgres
+    \c app
+    \dt
+    ```
+
+    Do this before sending traffic to the app, and again after deploying any updates that include database schema changes.
+
+4. View the deployment
+
+   Open the preview URL from your Diploi deployment page.
+
+For more information, visit [diploi.com](https://diploi.com/).
+
+### Option 2: Deploy with Vercel
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/heysagnik/diy-analytics)
 
