@@ -1,5 +1,5 @@
 import { createAnthropic } from '@ai-sdk/anthropic';
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import { createGoogle } from '@ai-sdk/google';
 import { createGroq } from '@ai-sdk/groq';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
@@ -92,7 +92,7 @@ function buildModel(provider: ChatProvider, modelId: string): LanguageModel {
     case 'openai':
       return createOpenAI({ apiKey, ...(baseURL ? { baseURL } : {}) })(modelId);
     case 'gemini':
-      return createGoogleGenerativeAI({ apiKey, ...(baseURL ? { baseURL } : {}) })(modelId);
+      return createGoogle({ apiKey, ...(baseURL ? { baseURL } : {}) })(modelId);
     case 'groq':
       return createGroq({ apiKey, ...(baseURL ? { baseURL } : {}) })(modelId);
     case 'openrouter':
