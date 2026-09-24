@@ -1,10 +1,13 @@
 import {
   convertToModelMessages,
-  generateObject,
+  createUIMessageStreamResponse,
+  generateText,
   InvalidToolInputError,
+  isStepCount,
   NoSuchToolError,
-  stepCountIs,
+  Output,
   streamText,
+  toUIMessageStream,
   type UIMessage,
 } from 'ai';
 import { type NextRequest, NextResponse } from 'next/server';
@@ -121,10 +124,10 @@ export async function POST(request: NextRequest) {
 
   const result = streamText({
     model: selection.model,
-    system,
-    messages: convertToModelMessages(recentMessages),
+    instructions: system,
+    messages: await convertToModelMessages(recentMessages),
     tools,
-    stopWhen: stepCountIs(MAX_STEPS),
+    stopWhen: isStepCount(MAX_STEPS),
     temperature: TEMPERATURE,
     experimental_repairToolCall: async ({ toolCall, tools: availableTools, error, inputSchema }) => {
       if (NoSuchToolError.isInstance(error)) return null;
@@ -134,9 +137,9 @@ export async function POST(request: NextRequest) {
       if (!tool) return null;
 
       try {
-        const { object: repairedInput } = await generateObject({
+        const { output: repairedInput } = await generateText({
           model: selection.model,
-          schema: tool.inputSchema,
+          output: Output.object({ schema: tool.inputSchema }),
           prompt: [
             `You called the tool "${toolCall.toolName}" with these inputs:`,
             toolCall.input,
@@ -145,6 +148,8 @@ export async function POST(request: NextRequest) {
             `Error: ${error.message}`,
             'Return corrected inputs that satisfy the schema, preserving the original intent.',
           ].join('\n'),
+          // Keep AI SDK 5's non-strict JSON schema mode: tool schemas have optional fields, which strict mode rejects.
+          providerOptions: { openai: { strictJsonSchema: false }, groq: { strictJsonSchema: false } },
         });
         return { ...toolCall, input: JSON.stringify(repairedInput) };
       } catch {
@@ -156,7 +161,11 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  return result.toUIMessageStreamResponse({
-    onError: (error) => (error instanceof Error ? error.message : 'The assistant hit an unexpected error.'),
+  return createUIMessageStreamResponse({
+    stream: toUIMessageStream({
+      stream: result.stream,
+      tools,
+      onError: (error) => (error instanceof Error ? error.message : 'The assistant hit an unexpected error.'),
+    }),
   });
 }
